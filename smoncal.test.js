@@ -17,7 +17,9 @@ test('Check create of new calculation line', () => {
 	const line_amount = lines.length;
 	addLineButton.click(); 
 	
-	let lines_now = lines.length;
+	const new_sheet = document.getElementById('sheet');
+	const new_lines = sheet.getElementsByTagName('calc-line'); 
+	let lines_now = new_lines.length;
 	let target_amount = line_amount + 1; 
 	expect(lines_now).toBe(target_amount); 
 }); 
