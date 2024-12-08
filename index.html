@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<!-- 
+	custom html: https://matthewjamestaylor.com/custom-tags
+-->
+<html>
+	<head>
+		<meta charset="UTF-8" />
+		<meta name="viewport" content="width=device-width" />
+		<title>smoncal</title>
+		<style type="text/css" media="screen">
+			calc-line{
+				font-size: 12pt; 
+				height: 20px; 
+				border: solid silver; 
+				padding: 4px; 
+				width: 700px; 
+				display: block; 
+			}
+		</style>
+		<script type="text/javascript" src="./smoncal.js" charset="utf-8"> </script>
+	</head>
+	<body>
+		<calc-sheet id="sheet">
+			<calc-line contenteditable>Here wego </calc-line>
+		</calc-sheet>
+		<button onclick="add_calc_line()">Add line</button>
+	</body>
+</html>
