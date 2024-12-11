@@ -1,10 +1,4 @@
 {
-  "scripts": {
-    "test": "jest"
-  },
-  "jest": {
-    "testEnvironment": "jsdom"
-  },
   "devDependencies": {
     "@playwright/test": "^1.49.1",
     "@types/node": "^22.10.2"
