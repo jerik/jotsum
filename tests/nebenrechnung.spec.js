@@ -15,3 +15,13 @@ test('initial start of page', async ({ page }) => {
   // Expect a title "to contain" a substring.
   await expect(page).toHaveTitle(/nebenrechnung/);
 });
+
+test('test button', async ({ page }) => {
+  await page.goto('https://localhost:8008');
+
+  // Expect a title "to contain" a substring.
+  await page.locator('button:text("Add line")').click();
+  // https://www.marketingscoop.com/tech/web-scraping/playwright-how-to-find-elements-by-xpath-in-playwright/
+  const clines = await page.locator('//calc-line').count()
+  console.log(clines)
+});
