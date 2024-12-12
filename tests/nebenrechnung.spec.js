@@ -33,19 +33,21 @@ test('button creates new calc line', async ({ page }) => {
   await expect(after).toBe(before + 1); 
 });
 
-// @todo wie unit test machen
 // https://pkerschbaum.com/blog/using-playwright-to-run-unit-tests .  trifft es nicht ganz
 
 
 // simple unit test of function 
+// https://playwright.dev/docs/evaluating
 test('unit test', async ({ page }) => {
 
-	console.log(`Current directory: ${process.cwd()}`);
 	// Get current working directory
-	//
+	// console.log(`Current directory: ${process.cwd()}`);
+
 	await page.addScriptTag({path: 'sum.js'});
 	const data = await page.evaluate(() => window.sum(1,7));
-	console.log(data); 
+	// await seems not to be needed, but I use it anyway
+	await expect(data).toBe(15); // 1+2*7=15
+	// console.log(data); 
 	
 });
 
