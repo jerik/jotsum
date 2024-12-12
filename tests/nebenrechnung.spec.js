@@ -8,6 +8,7 @@ test.use({
   ignoreHTTPSErrors: true,
 });
 
+// https://playwright.dev/docs/writing-tests
 // test nebenrechnung
 test('initial start of page', async ({ page }) => {
   await page.goto('https://localhost:8008');
@@ -16,12 +17,20 @@ test('initial start of page', async ({ page }) => {
   await expect(page).toHaveTitle(/nebenrechnung/);
 });
 
-test('test button', async ({ page }) => {
+test('button creates new calc line', async ({ page }) => {
   await page.goto('https://localhost:8008');
+
+  const before = await page.locator('//calc-line').count(); 
+  // console.log(before); 
 
   // Expect a title "to contain" a substring.
   await page.locator('button:text("Add line")').click();
   // https://www.marketingscoop.com/tech/web-scraping/playwright-how-to-find-elements-by-xpath-in-playwright/
-  const clines = await page.locator('//calc-line').count()
-  console.log(clines)
+  const after = await page.locator('//calc-line').count(); 
+
+  // https://playwright.dev/docs/test-assertions
+  await expect(after).toBe(before + 1); 
 });
+
+// @todo wie unit test machen
+// https://pkerschbaum.com/blog/using-playwright-to-run-unit-tests .  trifft es nicht ganz
