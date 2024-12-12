@@ -38,6 +38,8 @@ test('button creates new calc line', async ({ page }) => {
 
 // simple unit test of function 
 // https://playwright.dev/docs/evaluating
+// FUNKTIONIERT auch OHNE WEBSERVER und MUSS NUR MIT EINEM BROWSER AUFGERUFEN WERDEN
+// npx playwright test foo.spec.js --project chromium
 test('unit test', async ({ page }) => {
 
 	// Get current working directory
