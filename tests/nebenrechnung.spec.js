@@ -17,6 +17,7 @@ test('initial start of page', async ({ page }) => {
   await expect(page).toHaveTitle(/nebenrechnung/);
 });
 
+// https://playwright.dev/docs/running-tests
 test('button creates new calc line', async ({ page }) => {
   await page.goto('https://localhost:8008');
 
@@ -34,3 +35,17 @@ test('button creates new calc line', async ({ page }) => {
 
 // @todo wie unit test machen
 // https://pkerschbaum.com/blog/using-playwright-to-run-unit-tests .  trifft es nicht ganz
+
+
+// simple unit test of function 
+test('unit test', async ({ page }) => {
+
+	console.log(`Current directory: ${process.cwd()}`);
+	// Get current working directory
+	//
+	await page.addScriptTag({path: 'sum.js'});
+	const data = await page.evaluate(() => window.sum(1,7));
+	console.log(data); 
+	
+});
+
