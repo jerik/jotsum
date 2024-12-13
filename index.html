@@ -8,7 +8,23 @@
 		<meta name="viewport" content="width=device-width" />
 		<title>nebenrechnung</title>
 		<style type="text/css" media="screen">
-			nr-line{
+			nr-line {
+				background-color: #f7f7f7;
+				/* background-color: rgba(255, 255, 255, 0.8); */ /* durchsichtig abgeschwächt mit 0.8 */
+				border-bottom: 1px solid #ffffff;
+				padding: 7px;
+				font-size: 20px;
+				text-align: left;
+			}
+			nr-sum {
+				background-color: rgba(255, 255, 255);
+				/* border: 1px solid rgba(0, 0, 0, 0.8); */
+				border-bottom: 1px solid #ffffff;
+				padding: 7px;
+				font-size: 20px;
+				text-align: left;
+			}
+			calc-line{
 				font-size: 12pt; 
 				height: 20px; 
 				border: solid silver; 
@@ -16,12 +32,19 @@
 				width: 700px; 
 				display: block; 
 			}
+			nr-sheet {
+				display: grid;
+				grid-template-columns: 70% auto;
+				/* background-color: #2196F3; */
+				padding: 7px
+			}
 		</style>
 		<script type="text/javascript" src="./nebenrechnung.js" charset="utf-8"> </script>
 	</head>
 	<body>
 		<nr-sheet id="sheet">
-			<nr-line contenteditable>Here wego </calc-line>
+			<nr-line contenteditable>Here wego </nr-line>
+			<nr-sum >12</nr-sum>
 		</nr-sheet>
 		<button onclick="add_calc_line()">Add line</button>
 	</body>
