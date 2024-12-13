@@ -21,7 +21,22 @@ class Nebenrechnung {
 
 		Array.from(sheet.children).forEach((child, index) => {
 			console.log(`Element ${index + 1}:`, child.tagName, child.textContent.trim());
+			if (child.tagName == 'NR-LINE') {
+				this.#read_line(); 
+			} else if (child.tagName == 'NR-SUM') {
+				console.log(child);
+				this.#to_sum(child, index);
+			}
+
 	    });
+	}
+
+	#read_line() {
+		console.log('readline');
+	}
+	#to_sum(tag, value) {
+		tag.textContent = `New ${value + 1}`; 
+		console.log(`to_sum: ${value + 1}`);
 	}
 }
 
