@@ -11,7 +11,7 @@ test('unit test', async ({ page }) => {
 	await page.addScriptTag({path: 'sum.js'});
 	const data = await page.evaluate(() => window.sum(1,7));
 	// await seems not to be needed, but I use it anyway
-	await expect(data).toBe(16); // 1+2*7=15
+	await expect(data).toBe(15); // 1+2*7=15
 	// console.log(data); 
 	
 });

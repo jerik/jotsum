@@ -21,13 +21,13 @@ test('initial start of page', async ({ page }) => {
 test('button creates new calc line', async ({ page }) => {
   await page.goto('https://localhost:8008');
 
-  const before = await page.locator('//calc-line').count(); 
+  const before = await page.locator('//nr-line').count(); 
   // console.log(before); 
 
   // Expect a title "to contain" a substring.
   await page.locator('button:text("Add line")').click();
   // https://www.marketingscoop.com/tech/web-scraping/playwright-how-to-find-elements-by-xpath-in-playwright/
-  const after = await page.locator('//calc-line').count(); 
+  const after = await page.locator('//nr-line').count(); 
 
   // https://playwright.dev/docs/test-assertions
   await expect(after).toBe(before + 1); 
