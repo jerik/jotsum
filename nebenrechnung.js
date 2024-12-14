@@ -33,25 +33,34 @@ class Nebenrechnung {
 	}
 
 	#read_line(tag) {
-		// const line = tag.textContent; 
-		// this.#calcon(line);
-		// console.log(line);
+		this.subtotal = 0;
+		const calc = new Array();
+
 		const words = tag.textContent.split(' ');
 		words.forEach(function(item) {
-			console.log(item);
+			let is_float = parseFloat(item);
+			
+			if (!isNaN(is_float)) {
+				calc.push(is_float);
+			} else if( item.length == 1 && item.match( /([-()+*/%])/ )) { 
+				calc.push(item);
+			} else {
+				console.log(`ELSE: ${item}`);
+			}
 		})
+		console.log(calc);
+		this.subtotal = eval(calc.join(''));
+		console.log(this.subtotal);
 	}
 
 	#to_sum(tag, value) {
-		tag.textContent = `New ${value + 1}`; 
+		tag.textContent = this.subtotal; 
 		console.log(`to_sum: ${value + 1}`);
 	}
 
-	#calcon(line) {
-		const words = line.split(' ');
-		words.forEach(function(item) {
-			console.log(item);
-		})
+	#rm_text(item) {
+		console.log('foo');
+		// console.log(item);
 	}
 
 }
