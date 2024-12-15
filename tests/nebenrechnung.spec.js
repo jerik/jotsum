@@ -10,7 +10,7 @@ test.use({
 
 // https://playwright.dev/docs/writing-tests
 // test nebenrechnung
-test('initial start of page', async ({ page }) => {
+test('initial start of page with line and sum', async ({ page }) => {
   await page.goto('https://localhost:8008');
 
   // Expect a title "to contain" a substring.
@@ -23,7 +23,7 @@ test('initial start of page', async ({ page }) => {
 });
 
 // https://playwright.dev/docs/running-tests
-test('button creates new calc line', async ({ page }) => {
+test('button creates new calc entry', async ({ page }) => {
   await page.goto('https://localhost:8008');
 
   const nrl_before = await page.locator('//nr-line').count(); 

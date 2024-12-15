@@ -63,6 +63,10 @@ class Nebenrechnung {
 		// console.log(item);
 	}
 
+	foo(txt) {
+		return txt;
+	}
+
 }
 
 window.onload = function () {
