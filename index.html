@@ -39,6 +39,26 @@
 				/* background-color: #2196F3; */
 				padding: 7px
 			}
+			nr-lastline {
+				display: grid;
+				grid-template-columns: 70% auto;
+				/* background-color: #2196F3; */
+				padding: 7px
+			}
+			nr-spacer {
+				/* background-color: rgba(255, 255, 255, 0.8); */ /* durchsichtig abgeschwächt mit 0.8 */
+				padding: 7px;
+			}
+			nr-total {
+				background-color: rgba(255, 255, 255);
+				/* border: 1px solid rgba(0, 0, 0, 0.8); */
+				border-top: 1px solid #000;
+				padding: 7px;
+				font-size: 20px;
+				font-weight: bold;
+				text-align: left;
+				width: 30%;
+			}
 		</style>
 		<script type="text/javascript" src="./nebenrechnung.js" charset="utf-8"> </script>
 	</head>
@@ -47,6 +67,10 @@
 			<nr-line contenteditable>I have 3 apples + 4 cherries </nr-line>
 			<nr-sum ></nr-sum>
 		</nr-sheet>
+		<nr-lastline>
+			<nr-spacer></nr-spacer>
+			<nr-total>20</nr-total>
+		</nr-lastline>
 		<button onclick="add_calc_line()">Add line</button>
 	</body>
 </html>
