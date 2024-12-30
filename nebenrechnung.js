@@ -7,6 +7,8 @@ function add_calc_line() {
 	// console.log(nr_sheet);
 	nr_sheet.appendChild(nr_line); 
 	nr_sheet.appendChild(nr_sum); 
+
+	nr_line.focus();
 }
 
 class Nebenrechnung {
@@ -21,11 +23,22 @@ class Nebenrechnung {
 	#key_listener() {
 		// console.log('key_listener');
 		document.body.addEventListener('keyup', this.#keyups.bind(this));
+		document.body.addEventListener('keydown', this.#keydowns.bind(this));
 	}
 
 	#keyups(e) {
 		// console.log(e.code);
 		this.#get_sheet();
+	}
+	#keydowns(e) {
+		console.log(e.code);
+		if(e.which == 13) { // Enter
+			if (e.target.tagName == 'NR-LINE') {
+				e.preventDefault(); // Avoid standard action, here make a carriage return in the text field
+				console.log('no enter');
+				add_calc_line();
+			}
+		}
 	}
 
 	#get_sheet() {
@@ -60,14 +73,14 @@ class Nebenrechnung {
 			} else if( item.length == 1 && item.match( /([-()+*/%])/ )) { 
 				calc.push(item);
 			} else {
-				console.log(`ELSE: ${item}`);
+				// console.log(`ELSE: ${item}`);
 			}
 		})
-		console.log(calc);
+		// console.log(calc);
 		this.subtotal = eval(calc.join(''));
-		console.log(this.subtotal);
+		// console.log(this.subtotal);
 		this.total += this.subtotal; 
-		console.log(this.total);
+		// console.log(this.total);
 	}
 
 	#to_sum(tag, value) {
