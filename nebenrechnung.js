@@ -31,12 +31,19 @@ class Nebenrechnung {
 		this.#get_sheet();
 	}
 	#keydowns(e) {
-		console.log(e.code);
-		if(e.which == 13) { // Enter
+		console.log(e.code, e.which);
+		if(e.which == 13) { // Enter, keycode 13;  @todo in IE e.keyCode ??
 			if (e.target.tagName == 'NR-LINE') {
 				e.preventDefault(); // Avoid standard action, here make a carriage return in the text field
-				console.log('no enter');
 				add_calc_line();
+			}
+		}
+
+		if(e.which == 38) { // ArrowUp
+			if (e.target.tagName == 'NR-LINE') {
+				let cur_element = document.activeElement;
+				console.log(cur_element);
+
 			}
 		}
 	}
@@ -78,6 +85,9 @@ class Nebenrechnung {
 		})
 		// console.log(calc);
 		this.subtotal = eval(calc.join(''));
+		if (this.subtotal == undefined) {
+			this.subtotal = 0; // initialise subtotal if nr-line is empty
+		}
 		// console.log(this.subtotal);
 		this.total += this.subtotal; 
 		// console.log(this.total);
