@@ -1,7 +1,11 @@
 /** Add a new calculation line **/
-function add_calc_line() {
+function add_calc_line(starter=0) {
 	const nr_line = document.createElement('nr-line');
 	nr_line.setAttribute('contenteditable', 'true'); 
+	console.log(starter)
+	if (starter) {
+		nr_line.textContent = starter; 
+	}
 	const nr_sum = document.createElement('nr-sum');
 	const nr_sheet = document.getElementById('sheet');
 	// console.log(nr_sheet);
@@ -16,6 +20,7 @@ class Nebenrechnung {
 	subtotal;
 
 	constructor() {
+		add_calc_line('7 apples + 4 pears'); 
 		this.#get_sheet();
 		this.#key_listener(); 
 	}
@@ -111,7 +116,8 @@ class Nebenrechnung {
 				// console.log(`ELSE: ${item}`);
 			}
 		})
-		// console.log(calc);
+		console.log(calc);
+
 		this.subtotal = eval(calc.join(''));
 		if (this.subtotal == undefined) {
 			this.subtotal = 0; // initialise subtotal if nr-line is empty
