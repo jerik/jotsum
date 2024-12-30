@@ -31,6 +31,7 @@ class Nebenrechnung {
 	#get_sheet() {
 		const sheet = document.querySelector('nr-sheet');
 
+		this.total = 0;
 		Array.from(sheet.children).forEach((child, index) => {
 			// console.log(`Element ${index + 1}:`, child.tagName, child.textContent.trim());
 			if (child.tagName == 'NR-LINE') {
@@ -41,6 +42,9 @@ class Nebenrechnung {
 			}
 
 	    });
+
+		const tag_total = document.getElementById('total');
+		tag_total.textContent = this.total;
 	}
 
 	#read_line(tag) {
@@ -56,12 +60,14 @@ class Nebenrechnung {
 			} else if( item.length == 1 && item.match( /([-()+*/%])/ )) { 
 				calc.push(item);
 			} else {
-				// console.log(`ELSE: ${item}`);
+				console.log(`ELSE: ${item}`);
 			}
 		})
-		// console.log(calc);
+		console.log(calc);
 		this.subtotal = eval(calc.join(''));
-		// console.log(this.subtotal);
+		console.log(this.subtotal);
+		this.total += this.subtotal; 
+		console.log(this.total);
 	}
 
 	#to_sum(tag, value) {
