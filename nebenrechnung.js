@@ -39,13 +39,34 @@ class Nebenrechnung {
 			}
 		}
 
+		// @todo error handling if I am on the first element. Perhaps circulate?
 		if(e.which == 38) { // ArrowUp
 			if (e.target.tagName == 'NR-LINE') {
-				let cur_element = document.activeElement;
-				console.log(cur_element);
+				this.line_movement('up');
 
 			}
 		}
+
+		// @todo error handling if I am on the last element. Perhaps circulate?
+		if(e.which == 40) { // ArrowDown
+			if (e.target.tagName == 'NR-LINE') {
+				this.line_movement('down');
+
+			}
+		}
+	}
+
+	line_movement(direction) {
+		const cur_element = document.activeElement;
+		console.log(cur_element);
+		let new_element = '';
+		if (direction == 'up') {
+			new_element = cur_element.previousElementSibling.previousElementSibling;
+		} else {
+			new_element = cur_element.nextElementSibling.nextElementSibling;
+		}
+		new_element.focus(); 
+		console.log(new_element);
 	}
 
 	#get_sheet() {
