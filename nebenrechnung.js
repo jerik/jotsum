@@ -35,7 +35,14 @@ class Nebenrechnung {
 		if(e.which == 13) { // Enter, keycode 13;  @todo in IE e.keyCode ??
 			if (e.target.tagName == 'NR-LINE') {
 				e.preventDefault(); // Avoid standard action, here make a carriage return in the text field
-				add_calc_line();
+
+				const cur_line = document.activeElement; 
+				const next_line =  cur_line.nextElementSibling.nextElementSibling; 
+				if (next_line == null)	{
+					add_calc_line();
+				} else {
+					this.line_movement('down');
+				}
 			}
 		}
 
@@ -58,7 +65,7 @@ class Nebenrechnung {
 
 	line_movement(direction) {
 		const cur_element = document.activeElement;
-		console.log(cur_element);
+		// console.log(cur_element);
 		let new_element = '';
 		if (direction == 'up') {
 			new_element = cur_element.previousElementSibling.previousElementSibling;
@@ -66,7 +73,7 @@ class Nebenrechnung {
 			new_element = cur_element.nextElementSibling.nextElementSibling;
 		}
 		new_element.focus(); 
-		console.log(new_element);
+		// console.log(new_element);
 	}
 
 	#get_sheet() {
