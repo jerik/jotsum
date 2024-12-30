@@ -31,7 +31,7 @@ class Nebenrechnung {
 		this.#get_sheet();
 	}
 	#keydowns(e) {
-		console.log(e.code, e.which);
+		// console.log(e.code, e.which);
 		if(e.which == 13) { // Enter, keycode 13;  @todo in IE e.keyCode ??
 			if (e.target.tagName == 'NR-LINE') {
 				e.preventDefault(); // Avoid standard action, here make a carriage return in the text field
@@ -92,7 +92,7 @@ class Nebenrechnung {
 	    });
 
 		const tag_total = document.getElementById('total');
-		tag_total.textContent = this.total;
+		tag_total.textContent = this.#round(this.total);
 	}
 
 	#read_line(tag) {
@@ -122,8 +122,16 @@ class Nebenrechnung {
 	}
 
 	#to_sum(tag, value) {
-		tag.textContent = this.subtotal; 
-		// console.log(`to_sum: ${value + 1}`);
+		tag.textContent = this.#round(this.subtotal); 
+	}
+
+	#round(num) {
+		console.log(num);
+		if (num % 1 !== 0) { // check if it is an decimal number
+			num = num.toFixed(4); // round to 4 decimals
+			console.log(num);
+		} 
+		return num; 
 	}
 
 }
