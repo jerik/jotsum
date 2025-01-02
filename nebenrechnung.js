@@ -23,8 +23,14 @@ class Nebenrechnung {
 		add_calc_line('7 apples + 4 pears'); 
 		this.#get_sheet();
 		this.#key_listener(); 
+		// this.#button_listener();
 	}
 
+	/* 
+	#button_listener() {
+		document.getElementById("addline").addEventListener('click', this.#line_new.bind(this)); // will not work, changed signature and naming of function
+	}
+	*/
 	#key_listener() {
 		// console.log('key_listener');
 		document.body.addEventListener('keyup', this.#keyups.bind(this));
@@ -44,6 +50,12 @@ class Nebenrechnung {
 			if(e.which == 13) { // Enter, keycode 13;  @todo in IE e.keyCode ??
 				e.preventDefault(); // Avoid standard action, here make a carriage return in the text field
 
+				// CTRL + Enter action: create new line after current line
+				if (e.ctrlKey) {
+					this.#line_new_in_between(); 
+				} 
+
+				// does not need to be in a else close, as next_line is populated and then the focus is shifted through line_movement(down)
 				// check if there is a next nr-line element, if not then I am on the last line and a new line is added
 				const cur_line = document.activeElement; 
 				const next_line =  cur_line.nextElementSibling.nextElementSibling; 
@@ -75,7 +87,18 @@ class Nebenrechnung {
 		}
 	}
 
-	line_new() { }
+	#line_new_in_between() { 
+		const nr_line = document.createElement('nr-line');
+		nr_line.setAttribute('contenteditable', 'true'); 
+		const nr_sum = document.createElement('nr-sum');
+		
+		const cur_element = document.activeElement;
+
+		// insert line after the current element
+		cur_element.parentNode.insertBefore(nr_line, cur_element.nextSibling)
+		cur_element.parentNode.insertBefore(nr_sum, cur_element.nextSibling)
+	}
+
 	line_delete() {
 		// Check how much elements are in the sheet
 		const sheet = document.querySelector('nr-sheet');
