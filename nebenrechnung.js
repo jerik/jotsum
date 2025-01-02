@@ -36,11 +36,13 @@ class Nebenrechnung {
 		this.#get_sheet();
 	}
 	#keydowns(e) {
-		// console.log(e.code, e.which);
+		console.log(e.code, e.which);
+		// Enter action: create a new line if on the last line
 		if(e.which == 13) { // Enter, keycode 13;  @todo in IE e.keyCode ??
 			if (e.target.tagName == 'NR-LINE') {
 				e.preventDefault(); // Avoid standard action, here make a carriage return in the text field
 
+				// check if there is a next nr-line element, if not then I am on the last line and a new line is added
 				const cur_line = document.activeElement; 
 				const next_line =  cur_line.nextElementSibling.nextElementSibling; 
 				if (next_line == null)	{
@@ -51,21 +53,39 @@ class Nebenrechnung {
 			}
 		}
 
+		// ArrowUp action: go one line up
 		// @todo error handling if I am on the first element. Perhaps circulate?
-		if(e.which == 38) { // ArrowUp
+		if (e.which == 38) { // ArrowUp
 			if (e.target.tagName == 'NR-LINE') {
 				this.line_movement('up');
 
 			}
 		}
 
+		// ArrowDown action: go one line down
 		// @todo error handling if I am on the last element. Perhaps circulate?
-		if(e.which == 40) { // ArrowDown
+		if (e.which == 40) { // ArrowDown
 			if (e.target.tagName == 'NR-LINE') {
 				this.line_movement('down');
 
 			}
 		}
+
+		// Ctrl + Delete Action: remove current line
+		if (e.which == 46) { // Delete
+			if (e.ctrlKey)  { 
+				console.log('Key Delete!');
+				console.log(e.ctrlKey);
+				this.delete_line();
+			}
+		}
+
+	}
+
+	delete_line() {
+		const cur_line = document.activeElement; 
+		cur_line.nextElementSibling.remove();
+		cur_line.remove();
 	}
 
 	line_movement(direction) {
@@ -118,7 +138,7 @@ class Nebenrechnung {
 		})
 		console.log(calc);
 
-		this.subtotal = eval(calc.join(''));
+		this.subtotal = eval(calc.join(' '));
 		if (this.subtotal == undefined) {
 			this.subtotal = 0; // initialise subtotal if nr-line is empty
 		}
