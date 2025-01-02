@@ -83,9 +83,18 @@ class Nebenrechnung {
 	}
 
 	delete_line() {
+		// Check how much elements are in the sheet
+		// If only 2, create a new line after removing the existing
+
 		const cur_line = document.activeElement; 
 		cur_line.nextElementSibling.remove();
 		cur_line.remove();
+
+		// create a new line, to avoid an empty sheet
+		const sheet = document.querySelector('nr-sheet');
+		if (sheet.children.length == 0) {
+			add_calc_line('New line 1 + 1');
+		}
 	}
 
 	line_movement(direction) {
