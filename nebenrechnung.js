@@ -74,24 +74,36 @@ class Nebenrechnung {
 		// Ctrl + Delete Action: remove current line
 		if (e.which == 46) { // Delete
 			if (e.ctrlKey)  { 
-				console.log('Key Delete!');
-				console.log(e.ctrlKey);
-				this.delete_line();
+				this.line_delete();
 			}
 		}
 
 	}
 
-	delete_line() {
+	line_new() { }
+	line_delete() {
 		// Check how much elements are in the sheet
-		// If only 2, create a new line after removing the existing
+		const sheet = document.querySelector('nr-sheet');
+		console.log(`sheet length: ${sheet.children.length}`);
 
+		// get the current element 
 		const cur_line = document.activeElement; 
+		let new_focus = cur_line.nextElementSibling.nextElementSibling;
+
+		if (sheet.children.length > 2) {
+			// check if there is a next Element, if not take the previous
+			if (! new_focus) {
+				new_focus = cur_line.previousElementSibling.previousElementSibling; 
+			}
+		}
+
 		cur_line.nextElementSibling.remove();
 		cur_line.remove();
 
-		// create a new line, to avoid an empty sheet
-		const sheet = document.querySelector('nr-sheet');
+		// focus on the new element
+		new_focus.focus();
+
+		// create a new line, to avoid an empty sheet if last line was deleted
 		if (sheet.children.length == 0) {
 			add_calc_line('New line 1 + 1');
 		}
