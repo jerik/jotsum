@@ -1,0 +1,216 @@
+// test 
+function sum(a, b) {
+  return a + b*2;
+}
+
+class Calc {
+	add(a,b) {
+  		return a + b*3;
+	}
+}
+/** Add a new calculation line **/
+function add_calc_line(starter=0) {
+	const nr_line = document.createElement('nr-line');
+	nr_line.setAttribute('contenteditable', 'true'); 
+	console.log(starter)
+	if (starter) {
+		nr_line.textContent = starter; 
+	}
+	const nr_sum = document.createElement('nr-sum');
+	const nr_sheet = document.getElementById('sheet');
+	// console.log(nr_sheet);
+	nr_sheet.appendChild(nr_line); 
+	nr_sheet.appendChild(nr_sum); 
+
+	nr_line.focus();
+}
+
+class Nebenrechnung {
+	total; 
+	subtotal;
+
+	constructor() {
+		add_calc_line('7 apples + 4 pears'); 
+		this.#get_sheet();
+		this.#key_listener(); 
+		// this.#button_listener();
+	}
+
+	/* 
+	#button_listener() {
+		document.getElementById("addline").addEventListener('click', this.#line_new.bind(this)); // will not work, changed signature and naming of function
+	}
+	*/
+	#key_listener() {
+		// console.log('key_listener');
+		document.body.addEventListener('keyup', this.#keyups.bind(this));
+		document.body.addEventListener('keydown', this.#keydowns.bind(this));
+	}
+
+	#keyups(e) {
+		// console.log(e.code);
+		this.#get_sheet();
+	}
+	#keydowns(e) {
+		console.log(e.code, e.which);
+		// only act in tag element NR-LINE
+		if (e.target.tagName == 'NR-LINE') {
+
+			// Enter action: create a new line if on the last line
+			if(e.which == 13) { // Enter, keycode 13;  @todo in IE e.keyCode ??
+				e.preventDefault(); // Avoid standard action, here make a carriage return in the text field
+
+				// CTRL + Enter action: create new line after current line
+				if (e.ctrlKey) {
+					this.#line_new_in_between(); 
+				} 
+
+				// does not need to be in a else close, as next_line is populated and then the focus is shifted through line_movement(down)
+				// check if there is a next nr-line element, if not then I am on the last line and a new line is added
+				const cur_line = document.activeElement; 
+				const next_line =  cur_line.nextElementSibling.nextElementSibling; 
+				if (next_line == null)	{
+					add_calc_line();
+				} else {
+					this.line_movement('down');
+				}
+			}
+
+			// ArrowUp action: go one line up
+			// @todo error handling if I am on the first element. Perhaps circulate?
+			if (e.which == 38) { // ArrowUp
+				this.line_movement('up');
+			}
+
+			// ArrowDown action: go one line down
+			// @todo error handling if I am on the last element. Perhaps circulate?
+			if (e.which == 40) { // ArrowDown
+				this.line_movement('down');
+			}
+
+			// Ctrl + Delete Action: remove current line
+			if (e.which == 46) { // Delete
+				if (e.ctrlKey)  { 
+					this.line_delete();
+				}
+			}
+		}
+	}
+
+	#line_new_in_between() { 
+		const nr_line = document.createElement('nr-line');
+		nr_line.setAttribute('contenteditable', 'true'); 
+		const nr_sum = document.createElement('nr-sum');
+		
+		const cur_element = document.activeElement;
+
+		// insert line after the current element
+		cur_element.parentNode.insertBefore(nr_line, cur_element.nextSibling)
+		cur_element.parentNode.insertBefore(nr_sum, cur_element.nextSibling)
+	}
+
+	line_delete() {
+		// Check how much elements are in the sheet
+		const sheet = document.querySelector('nr-sheet');
+		console.log(`sheet length: ${sheet.children.length}`);
+
+		// get the current element 
+		const cur_line = document.activeElement; 
+		let new_focus = cur_line.nextElementSibling.nextElementSibling;
+
+		if (sheet.children.length > 2) {
+			// check if there is a next Element, if not take the previous
+			if (! new_focus) {
+				new_focus = cur_line.previousElementSibling.previousElementSibling; 
+			}
+		}
+
+		cur_line.nextElementSibling.remove();
+		cur_line.remove();
+
+		// focus on the new element
+		new_focus.focus();
+
+		// create a new line, to avoid an empty sheet if last line was deleted
+		if (sheet.children.length == 0) {
+			add_calc_line('New line 1 + 1');
+		}
+	}
+
+	line_movement(direction) {
+		const cur_element = document.activeElement;
+		// console.log(cur_element);
+		let new_element = '';
+		if (direction == 'up') {
+			new_element = cur_element.previousElementSibling.previousElementSibling;
+		} else {
+			new_element = cur_element.nextElementSibling.nextElementSibling;
+		}
+		new_element.focus(); 
+		// console.log(new_element);
+	}
+
+	#get_sheet() {
+		const sheet = document.querySelector('nr-sheet');
+
+		this.total = 0;
+		Array.from(sheet.children).forEach((child, index) => {
+			// console.log(`Element ${index + 1}:`, child.tagName, child.textContent.trim());
+			if (child.tagName == 'NR-LINE') {
+				this.#read_line(child); 
+			} else if (child.tagName == 'NR-SUM') {
+				// console.log(child);
+				this.#to_sum(child, index);
+			}
+
+	    });
+
+		const tag_total = document.getElementById('total');
+		tag_total.textContent = this.#round(this.total);
+	}
+
+	#read_line(tag) {
+		this.subtotal = 0;
+		const calc = new Array();
+
+		const words = tag.textContent.split(' ');
+		words.forEach(function(item) {
+			let is_float = parseFloat(item);
+			
+			if (!isNaN(is_float)) {
+				calc.push(is_float);
+			} else if( item.length == 1 && item.match( /([-()+*/%])/ )) { 
+				calc.push(item);
+			} else {
+				// console.log(`ELSE: ${item}`);
+			}
+		})
+		console.log(calc);
+
+		this.subtotal = eval(calc.join(' '));
+		if (this.subtotal == undefined) {
+			this.subtotal = 0; // initialise subtotal if nr-line is empty
+		}
+		// console.log(this.subtotal);
+		this.total += this.subtotal; 
+		// console.log(this.total);
+	}
+
+	#to_sum(tag, value) {
+		tag.textContent = this.#round(this.subtotal); 
+	}
+
+	#round(num) {
+		console.log(num);
+		if (num % 1 !== 0) { // check if it is an decimal number
+			num = num.toFixed(4); // round to 4 decimals
+			console.log(num);
+		} 
+		return num; 
+	}
+
+}
+
+window.onload = function () {
+	const nr = new Nebenrechnung(); 
+}
