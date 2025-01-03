@@ -1,0 +1,29 @@
+name: Concat Files
+
+# Workflow startet bei Push in den Hauptbranch
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  concat:
+    runs-on: ubuntu-latest
+    steps:
+      # Checkout Repository
+      - name: Checkout Repository
+        uses: actions/checkout@v3
+
+      # Dateien zusammenführen
+      - name: Concat files
+        run: cat sum.js nebenrechnung.js > merged.txt
+
+      # Änderungen committen und pushen
+      - name: Commit and push changes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add merged.txt
+          git commit -m "Automated file merge"
+          git push
+
