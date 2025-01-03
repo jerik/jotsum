@@ -9,6 +9,10 @@
 		<title>nebenrechnung</title>
 		<style type="text/css" media="screen">
 		/* https://www.w3schools.com/css/tryit.asp?filename=trycss_grid */
+			* {
+				font-family: Arial, sans-serif;
+			}
+
 			nr-line {
 				background-color: #f7f7f7;
 				/* background-color: rgba(255, 255, 255, 0.8); */ /* durchsichtig abgeschwächt mit 0.8 */
@@ -59,6 +63,11 @@
 				text-align: left;
 				width: 30%;
 			}
+
+			#add_line {
+				padding: 10px; 
+				font-size: 20px; 
+			}
 		</style>
 		<script type="text/javascript" src="./nebenrechnung.js" charset="utf-8"> </script>
 	</head>
@@ -70,7 +79,10 @@
 			<nr-spacer></nr-spacer>
 			<nr-total id='total'></nr-total>
 		</nr-lastline>
-		<button onclick="add_calc_line()">Add line</button>
+		<button onclick="add_calc_line()" id="add_line">Add line</button>
 		<!-- button id="addline">Add line</button-->
+		<div style="padding-top: 30px; text-align:center">
+			Just downlaod this page for offline usage.</br>All source code and some documentation is available on <a href="https://github.com/jerik/nebenrechnung">GitHub</a>.
+		</div>
 	</body>
 </html>
