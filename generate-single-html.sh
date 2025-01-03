@@ -8,7 +8,7 @@ SOURCE=index.html
 FIRST=first.txt
 HEAD=head.txt
 BODY=body.txt
-FINAL=merge.html
+FINAL=merged.html
 
 # get header from source html
 cat $SOURCE | grep -B 10000 '</style>' > $FIRST
