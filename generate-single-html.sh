@@ -25,6 +25,6 @@ cat $SOURCE | grep -A 1000 '</head>' > $BODY
 cat $HEAD $BODY > $FINAL
 
 # cleanup
-# rm *.txt
+rm *.txt
 
 echo "created single file $FINAL"
