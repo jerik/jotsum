@@ -4,11 +4,11 @@ set -e
 
 echo "start merging javascript and html to one single file"
 
-SOURCE=index.html
+SOURCE=nebenrechnung.html
 FIRST=first.txt
 HEAD=head.txt
 BODY=body.txt
-FINAL=merged.html
+FINAL=index.html
 
 # get header from source html
 cat $SOURCE | grep -B 10000 '</style>' > $FIRST
