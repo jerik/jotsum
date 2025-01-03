@@ -1,4 +1,4 @@
-name: Concat Files
+name: Create single html file
 
 # Workflow startet bei Push in den Hauptbranch
 on:
@@ -7,16 +7,16 @@ on:
       - master
 
 jobs:
-  concat:
+  run-script:
     runs-on: ubuntu-latest
     steps:
       # Checkout Repository
       - name: Checkout Repository
         uses: actions/checkout@v3
 
-      # Dateien zusammenführen
-      - name: Concat files
-        run: cat sum.js nebenrechnung.js > merged.txt
+      # Run script
+      - name: Execute custom script
+        run: ./generate-single-html.sh
 
       # Änderungen committen und pushen
       - name: Commit and push changes
