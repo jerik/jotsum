@@ -119,7 +119,9 @@ class Nebenrechnung {
 		cur_line.remove();
 
 		// focus on the new element
-		new_focus.focus();
+		if (sheet.children.length > 1) {
+			new_focus.focus();
+		}
 
 		// create a new line, to avoid an empty sheet if last line was deleted
 		if (sheet.children.length == 0) {
