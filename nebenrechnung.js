@@ -1,246 +1,147 @@
-/** Add a new calculation line **/
-function add_calc_line(starter=0) {
-	const nr_line = document.createElement('nr-line');
-	nr_line.setAttribute('contenteditable', 'true'); 
-	console.log(starter)
-	if (starter) {
-		nr_line.textContent = starter; 
-	}
-	const nr_sum = document.createElement('nr-sum');
-	const nr_sheet = document.getElementById('sheet');
-	// console.log(nr_sheet);
-	nr_sheet.appendChild(nr_line); 
-	nr_sheet.appendChild(nr_sum); 
+class NrSheet extends HTMLElement {
+    constructor() {
+        super();
+        this.addEventListener('keyup', this.update_total);
+        this.addEventListener('line-deleted', this.update_total);
+        this.addEventListener('line-added', this.update_total);
+    }
 
-	nr_line.focus();
+    update_total() {
+        let total = 0;
+        const sums = this.querySelectorAll('nr-sum');
+        sums.forEach(sum => {
+            const value = parseFloat(sum.textContent);
+            if (!isNaN(value)) {
+                total += value;
+            }
+        });
+        document.getElementById('total').textContent = this.round(total);
+    }
+
+    round(num) {
+        if (num % 1 !== 0) {
+            return num.toFixed(4);
+        }
+        return num;
+    }
 }
 
-class Nebenrechnung {
-	total; 
-	subtotal;
+class NrLine extends HTMLElement {
+    constructor() {
+        super();
+        this.setAttribute('contenteditable', 'true');
+        this.addEventListener('keyup', this.recalculate);
+        this.addEventListener('keydown', this.handle_keys);
+    }
 
-	constructor() {
-		add_calc_line('7 apples + 4 pears'); 
-		this.#recalculate_all();
-		this.#key_listener(); 
-		this.#button_listener();
-	}
+    recalculate() {
+        const subtotal = this.calculate(this.textContent);
+        const sumElement = this.nextElementSibling;
+        if (sumElement && sumElement.tagName === 'NR-SUM') {
+            sumElement.textContent = this.round(subtotal);
+        }
+    }
 
-	#button_listener() {
-		document.getElementById("add_line").addEventListener('click', () => {
-			add_calc_line();
-			this.update_total();
-		});
-	}
+    calculate(expression) {
+        if (!expression || typeof expression !== 'string') {
+            return 0;
+        }
+        const sanitizedExpression = expression.replace(/[^0-9.+\-*/()\s]/g, '');
+        try {
+            const result = new Function('return ' + sanitizedExpression)();
+            return result === undefined ? 0 : result;
+        } catch (e) {
+            return 0;
+        }
+    }
 
-	#key_listener() {
-		// console.log('key_listener');
-		document.body.addEventListener('keyup', this.#keyups.bind(this));
-		document.body.addEventListener('keydown', this.#keydowns.bind(this));
-	}
+    round(num) {
+        if (num % 1 !== 0) {
+            return num.toFixed(4);
+        }
+        return num;
+    }
 
-	#keyups(e) {
-		if (e.target.tagName == 'NR-LINE') {
-			this.#read_line(e.target);
-			this.update_total();
-		}
-	}
+    handle_keys(e) {
+        if (e.which === 13) { // Enter
+            e.preventDefault();
+            if (e.ctrlKey) {
+                this.add_new_line_after();
+            } else {
+                const next_line = this.nextElementSibling.nextElementSibling;
+                if (next_line) {
+                    next_line.focus();
+                } else {
+                    this.add_new_line_after();
+                }
+            }
+        } else if (e.which === 38) { // ArrowUp
+            const prev_line = this.previousElementSibling.previousElementSibling;
+            if (prev_line) {
+                prev_line.focus();
+            }
+        } else if (e.which === 40) { // ArrowDown
+            const next_line = this.nextElementSibling.nextElementSibling;
+            if (next_line) {
+                next_line.focus();
+            }
+        } else if (e.which === 46 && e.ctrlKey) { // Ctrl+Delete
+            this.delete_line();
+        }
+    }
 
-	#keydowns(e) {
-		console.log(e.code, e.which);
-		// only act in tag element NR-LINE
-		if (e.target.tagName == 'NR-LINE') {
+    add_new_line_after() {
+        const new_line = document.createElement('nr-line');
+        const new_sum = document.createElement('nr-sum');
+        this.parentNode.insertBefore(new_line, this.nextElementSibling.nextElementSibling);
+        this.parentNode.insertBefore(new_sum, new_line.nextElementSibling);
+        new_line.focus();
+        this.dispatchEvent(new Event('line-added', { bubbles: true }));
+    }
 
-			// Enter action: create a new line if on the last line
-			if(e.which == 13) { // Enter, keycode 13;  @todo in IE e.keyCode ??
-				e.preventDefault(); // Avoid standard action, here make a carriage return in the text field
+    delete_line() {
+        const sumElement = this.nextElementSibling;
+        this.parentNode.removeChild(this);
+        if (sumElement) {
+            this.parentNode.removeChild(sumElement);
+        }
+        this.dispatchEvent(new Event('line-deleted', { bubbles: true }));
+    }
+}
 
-				// CTRL + Enter action: create new line after current line
-				if (e.ctrlKey) {
-					this.#line_new_in_between(); 
-				} 
+class NrSum extends HTMLElement {
+    constructor() {
+        super();
+    }
+}
 
-				// does not need to be in a else close, as next_line is populated and then the focus is shifted through line_movement(down)
-				// check if there is a next nr-line element, if not then I am on the last line and a new line is added
-				const cur_line = document.activeElement; 
-				const next_line =  cur_line.nextElementSibling.nextElementSibling; 
-				if (next_line == null)	{
-					add_calc_line();
-				} else {
-					this.line_movement('down');
-				}
-			}
+customElements.define('nr-sheet', NrSheet);
+customElements.define('nr-line', NrLine);
+customElements.define('nr-sum', NrSum);
 
-			// ArrowUp action: go one line up
-			// @todo error handling if I am on the first element. Perhaps circulate?
-			if (e.which == 38) { // ArrowUp
-				this.line_movement('up');
-			}
-
-			// ArrowDown action: go one line down
-			// @todo error handling if I am on the last element. Perhaps circulate?
-			if (e.which == 40) { // ArrowDown
-				this.line_movement('down');
-			}
-
-			// Ctrl + Delete Action: remove current line
-			if (e.which == 46) { // Delete
-				if (e.ctrlKey)  { 
-					this.line_delete();
-				}
-			}
-		}
-	}
-
-	#line_new_in_between() { 
-		const nr_line = document.createElement('nr-line');
-		nr_line.setAttribute('contenteditable', 'true'); 
-		const nr_sum = document.createElement('nr-sum');
-		
-		const cur_element = document.activeElement;
-
-		// insert line after the current element
-		cur_element.parentNode.insertBefore(nr_line, cur_element.nextSibling)
-		cur_element.parentNode.insertBefore(nr_sum, cur_element.nextSibling)
-		this.update_total();
-	}
-
-	line_delete() {
-		// Check how much elements are in the sheet
-		const sheet = document.querySelector('nr-sheet');
-		console.log(`sheet length: ${sheet.children.length}`);
-
-		// get the current element 
-		const cur_line = document.activeElement; 
-		let new_focus = cur_line.nextElementSibling.nextElementSibling;
-
-		if (sheet.children.length > 2) {
-			// check if there is a next Element, if not take the previous
-			if (! new_focus) {
-				new_focus = cur_line.previousElementSibling.previousElementSibling; 
-			}
-		}
-
-		cur_line.nextElementSibling.remove();
-		cur_line.remove();
-
-		// focus on the new element
-		if (sheet.children.length > 1) {
-			new_focus.focus();
-		}
-
-		// create a new line, to avoid an empty sheet if last line was deleted
-		if (sheet.children.length == 0) {
-			add_calc_line('New line 1 + 1');
-		}
-		this.update_total();
-	}
-
-	line_movement(direction) {
-		const cur_element = document.activeElement;
-		// console.log(cur_element);
-		let new_element = '';
-		if (direction == 'up') {
-			new_element = cur_element.previousElementSibling.previousElementSibling;
-		} else {
-			new_element = cur_element.nextElementSibling.nextElementSibling;
-		}
-		new_element.focus(); 
-		// console.log(new_element);
-	}
-
-	#recalculate_all() {
-		const sheet = document.querySelector('nr-sheet');
-
-		this.total = 0;
-		Array.from(sheet.children).forEach((child, index) => {
-			// console.log(`Element ${index + 1}:`, child.tagName, child.textContent.trim());
-			if (child.tagName == 'NR-LINE') {
-				this.#read_line(child); 
-			} else if (child.tagName == 'NR-SUM') {
-				// console.log(child);
-				this.#to_sum(child, index);
-			}
-
-	    });
-
-		const tag_total = document.getElementById('total');
-		tag_total.textContent = this.#round(this.total);
-	}
-
-	update_total() {
-		this.total = 0;
-		const sums = document.querySelectorAll('nr-sum');
-		sums.forEach(sum => {
-			const value = parseFloat(sum.textContent);
-			if (!isNaN(value)) {
-				this.total += value;
-			}
-		});
-		const tag_total = document.getElementById('total');
-		tag_total.textContent = this.#round(this.total);
-	}
-
-	#read_line(tag) {
-		this.subtotal = 0;
-		const calc = new Array();
-
-		const words = tag.textContent.split(' ');
-		words.forEach(function(item) {
-			let is_float = parseFloat(item);
-			
-			if (!isNaN(is_float)) {
-				calc.push(is_float);
-			} else if( item.length == 1 && item.match( /([-()+*/%])/ )) { 
-				calc.push(item);
-			} else {
-				// console.log(`ELSE: ${item}`);
-			}
-		})
-		console.log(calc);
-
-		this.subtotal = Nebenrechnung.calculate(calc.join(' '));
-		if (this.subtotal == undefined) {
-			this.subtotal = 0; // initialise subtotal if nr-line is empty
-		}
-		
-		this.#to_sum(tag.nextElementSibling);
-	}
-
-	static calculate(expression) {
-		if (!expression || typeof expression !== 'string') {
-			return 0;
-		}
-		try {
-			// Function to safely evaluate the expression
-			const result = new Function('return ' + expression)();
-			return result === undefined ? 0 : result;
-		} catch (e) {
-			return 0; // Return 0 if the expression is invalid
-		}
-	}
-
-	#to_sum(tag) {
-		tag.textContent = this.#round(this.subtotal); 
-	}
-
-	#round(num) {
-		console.log(num);
-		if (num % 1 !== 0) { // check if it is an decimal number
-			num = num.toFixed(4); // round to 4 decimals
-			console.log(num);
-		} 
-		return num; 
-	}
-
+function add_calc_line(starter = '') {
+    const nr_sheet = document.getElementById('sheet');
+    const nr_line = document.createElement('nr-line');
+    if (starter) {
+        nr_line.textContent = starter;
+    }
+    const nr_sum = document.createElement('nr-sum');
+    nr_sheet.appendChild(nr_line);
+    nr_sheet.appendChild(nr_sum);
+    nr_line.focus();
+    nr_line.recalculate();
+    nr_sheet.update_total();
 }
 
 if (typeof window !== 'undefined') {
     window.onload = function () {
-        const nr = new Nebenrechnung();
+        add_calc_line('7 apples + 4 pears');
+        document.getElementById("add_line").addEventListener('click', () => {
+            add_calc_line();
+        });
     }
 }
 
 if (typeof module !== 'undefined' && module.exports) {
-	module.exports = Nebenrechnung;
+    module.exports = { NrLine, NrSheet };
 }
