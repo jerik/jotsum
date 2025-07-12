@@ -1,4 +1,8 @@
 {
+  "scripts": {
+    "test": "npx playwright test",
+    "test:unit": "node tests/unit/calculator.test.js"
+  },
   "devDependencies": {
     "@playwright/test": "^1.49.1",
     "@types/node": "^22.10.2"

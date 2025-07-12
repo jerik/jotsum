@@ -179,13 +179,26 @@ class Nebenrechnung {
 		})
 		console.log(calc);
 
-		this.subtotal = eval(calc.join(' '));
+		this.subtotal = Nebenrechnung.calculate(calc.join(' '));
 		if (this.subtotal == undefined) {
 			this.subtotal = 0; // initialise subtotal if nr-line is empty
 		}
 		// console.log(this.subtotal);
 		this.total += this.subtotal; 
 		// console.log(this.total);
+	}
+
+	static calculate(expression) {
+		if (!expression || typeof expression !== 'string') {
+			return 0;
+		}
+		try {
+			// Function to safely evaluate the expression
+			const result = new Function('return ' + expression)();
+			return result === undefined ? 0 : result;
+		} catch (e) {
+			return 0; // Return 0 if the expression is invalid
+		}
 	}
 
 	#to_sum(tag, value) {
@@ -203,6 +216,12 @@ class Nebenrechnung {
 
 }
 
-window.onload = function () {
-	const nr = new Nebenrechnung(); 
+if (typeof window !== 'undefined') {
+    window.onload = function () {
+        const nr = new Nebenrechnung();
+    }
+}
+
+if (typeof module !== 'undefined' && module.exports) {
+	module.exports = Nebenrechnung;
 }
