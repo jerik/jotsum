@@ -21,16 +21,18 @@ class Nebenrechnung {
 
 	constructor() {
 		add_calc_line('7 apples + 4 pears'); 
-		this.#get_sheet();
+		this.#recalculate_all();
 		this.#key_listener(); 
-		// this.#button_listener();
+		this.#button_listener();
 	}
 
-	/* 
 	#button_listener() {
-		document.getElementById("addline").addEventListener('click', this.#line_new.bind(this)); // will not work, changed signature and naming of function
+		document.getElementById("add_line").addEventListener('click', () => {
+			add_calc_line();
+			this.update_total();
+		});
 	}
-	*/
+
 	#key_listener() {
 		// console.log('key_listener');
 		document.body.addEventListener('keyup', this.#keyups.bind(this));
@@ -38,9 +40,12 @@ class Nebenrechnung {
 	}
 
 	#keyups(e) {
-		// console.log(e.code);
-		this.#get_sheet();
+		if (e.target.tagName == 'NR-LINE') {
+			this.#read_line(e.target);
+			this.update_total();
+		}
 	}
+
 	#keydowns(e) {
 		console.log(e.code, e.which);
 		// only act in tag element NR-LINE
@@ -97,6 +102,7 @@ class Nebenrechnung {
 		// insert line after the current element
 		cur_element.parentNode.insertBefore(nr_line, cur_element.nextSibling)
 		cur_element.parentNode.insertBefore(nr_sum, cur_element.nextSibling)
+		this.update_total();
 	}
 
 	line_delete() {
@@ -127,6 +133,7 @@ class Nebenrechnung {
 		if (sheet.children.length == 0) {
 			add_calc_line('New line 1 + 1');
 		}
+		this.update_total();
 	}
 
 	line_movement(direction) {
@@ -142,7 +149,7 @@ class Nebenrechnung {
 		// console.log(new_element);
 	}
 
-	#get_sheet() {
+	#recalculate_all() {
 		const sheet = document.querySelector('nr-sheet');
 
 		this.total = 0;
@@ -157,6 +164,19 @@ class Nebenrechnung {
 
 	    });
 
+		const tag_total = document.getElementById('total');
+		tag_total.textContent = this.#round(this.total);
+	}
+
+	update_total() {
+		this.total = 0;
+		const sums = document.querySelectorAll('nr-sum');
+		sums.forEach(sum => {
+			const value = parseFloat(sum.textContent);
+			if (!isNaN(value)) {
+				this.total += value;
+			}
+		});
 		const tag_total = document.getElementById('total');
 		tag_total.textContent = this.#round(this.total);
 	}
@@ -183,9 +203,8 @@ class Nebenrechnung {
 		if (this.subtotal == undefined) {
 			this.subtotal = 0; // initialise subtotal if nr-line is empty
 		}
-		// console.log(this.subtotal);
-		this.total += this.subtotal; 
-		// console.log(this.total);
+		
+		this.#to_sum(tag.nextElementSibling);
 	}
 
 	static calculate(expression) {
@@ -201,7 +220,7 @@ class Nebenrechnung {
 		}
 	}
 
-	#to_sum(tag, value) {
+	#to_sum(tag) {
 		tag.textContent = this.#round(this.subtotal); 
 	}
 
