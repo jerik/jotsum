@@ -9,6 +9,7 @@ FIRST=first.txt
 HEAD=head.txt
 BODY=body.txt
 FINAL=index.html
+VERSION=$(git describe --tags --always --dirty)
 
 # get header from source html
 cat $SOURCE | grep -B 10000 '</style>' > $FIRST
@@ -24,7 +25,11 @@ cat $SOURCE | grep -A 1000 '</head>' > $BODY
 # create final html 
 cat $HEAD $BODY > $FINAL
 
+# inject version
+sed -i.bak "s|<span id=\"version\"></span>|<span id=\"version\">$VERSION</span>|" $FINAL
+
 # cleanup
 rm *.txt
+rm *.bak
 
 echo "created single file $FINAL"
