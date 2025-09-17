@@ -29,9 +29,14 @@ class NrSheet extends HTMLElement {
 class NrLine extends HTMLElement {
     constructor() {
         super();
-        this.setAttribute('contenteditable', 'true');
         this.addEventListener('keyup', this.recalculate);
         this.addEventListener('keydown', this.handle_keys);
+    }
+
+    connectedCallback() {
+        if (!this.hasAttribute('contenteditable')) {
+            this.setAttribute('contenteditable', 'true');
+        }
     }
 
     recalculate() {
@@ -46,13 +51,87 @@ class NrLine extends HTMLElement {
         if (!expression || typeof expression !== 'string') {
             return 0;
         }
+
         const sanitizedExpression = expression.replace(/[^0-9.+\-*/()\s]/g, '');
+
         try {
-            const result = new Function('return ' + sanitizedExpression)();
+            const tokens = sanitizedExpression.match(/(\d+\.?\d*)|[+\-*/()]/g) || [];
+            const RPN = this.shuntingYard(tokens);
+            const result = this.calculateRPN(RPN);
             return result === undefined ? 0 : result;
         } catch (e) {
             return 0;
         }
+    }
+
+    shuntingYard(tokens) {
+        const output = [];
+        const operators = [];
+        const precedence = {
+            '+': 1,
+            '-': 1,
+            '*': 2,
+            '/': 2,
+        };
+
+        for (const token of tokens) {
+            if (!isNaN(token)) {
+                output.push(parseFloat(token));
+            } else if (token in precedence) {
+                while (
+                    operators.length > 0 &&
+                    operators[operators.length - 1] in precedence &&
+                    precedence[operators[operators.length - 1]] >= precedence[token]
+                ) {
+                    output.push(operators.pop());
+                }
+                operators.push(token);
+            } else if (token === '(') {
+                operators.push(token);
+            } else if (token === ')') {
+                while (operators.length > 0 && operators[operators.length - 1] !== '(') {
+                    output.push(operators.pop());
+                }
+                if (operators[operators.length - 1] === '(') {
+                    operators.pop();
+                }
+            }
+        }
+
+        while (operators.length > 0) {
+            output.push(operators.pop());
+        }
+
+        return output;
+    }
+
+    calculateRPN(rpn) {
+        const stack = [];
+
+        for (const token of rpn) {
+            if (typeof token === 'number') {
+                stack.push(token);
+            } else {
+                const b = stack.pop();
+                const a = stack.pop();
+                switch (token) {
+                    case '+':
+                        stack.push(a + b);
+                        break;
+                    case '-':
+                        stack.push(a - b);
+                        break;
+                    case '*':
+                        stack.push(a * b);
+                        break;
+                    case '/':
+                        stack.push(a / b);
+                        break;
+                }
+            }
+        }
+
+        return stack[0];
     }
 
     round(num) {
@@ -100,11 +179,22 @@ class NrLine extends HTMLElement {
     }
 
     delete_line() {
+        const parent = this.parentNode;
         const sumElement = this.nextElementSibling;
-        this.parentNode.removeChild(this);
+        const nextLine = this.nextElementSibling ? this.nextElementSibling.nextElementSibling : null;
+        const prevLine = this.previousElementSibling ? this.previousElementSibling.previousElementSibling : null;
+
+        parent.removeChild(this);
         if (sumElement) {
-            this.parentNode.removeChild(sumElement);
+            parent.removeChild(sumElement);
         }
+
+        if (nextLine) {
+            nextLine.focus();
+        } else if (prevLine) {
+            prevLine.focus();
+        }
+
         this.dispatchEvent(new Event('line-deleted', { bubbles: true }));
     }
 }

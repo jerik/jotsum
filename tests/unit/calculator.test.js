@@ -1,29 +1,11 @@
 const assert = require('assert');
-const Nebenrechnung = require('../../nebenrechnung.js');
+const { NrLine } = require('../../nebenrechnung.js');
 
-// Mock the DOM environment
-if (typeof global.document === 'undefined') {
-    global.document = {
-        getElementById: () => ({}),
-        createElement: () => ({
-            setAttribute: () => {},
-            appendChild: () => {}
-        }),
-        querySelector: () => ({
-            children: []
-        }),
-        body: {
-            addEventListener: () => {}
-        }
-    };
-    global.window = {
-        onload: () => {}
-    };
-    global.add_calc_line = () => {};
-}
+
 
 
 function testCalculate() {
+    const nrLine = new NrLine();
     const tests = [
         { expression: '2 + 2', expected: 4 },
         { expression: '5 - 3', expected: 2 },
@@ -40,7 +22,7 @@ function testCalculate() {
     ];
 
     tests.forEach(test => {
-        const result = Nebenrechnung.calculate(test.expression);
+        const result = nrLine.calculate(test.expression);
         assert.strictEqual(result, test.expected, `Test failed for expression: "${test.expression}". Expected ${test.expected}, but got ${result}`);
     });
 
