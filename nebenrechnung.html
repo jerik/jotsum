@@ -68,6 +68,21 @@
 				padding: 10px; 
 				font-size: 20px; 
 			}
+
+			@media screen and (max-width: 600px) {
+				nr-sheet {
+					grid-template-columns: 70% auto; /* Keep the two-column layout */
+				}
+				nr-lastline {
+					grid-template-columns: 1fr; /* The total will take the full width */
+				}
+				nr-sum, nr-total {
+					text-align: right;
+				}
+				nr-spacer {
+					display: none; /* Hide the spacer on mobile */
+				}
+			}
 		</style>
 		<script type="text/javascript" src="./nebenrechnung.js" charset="utf-8"> </script>
 	</head>
