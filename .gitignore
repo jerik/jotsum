@@ -11,3 +11,4 @@ node_modules/
 
 # ignore ssl certs
 *.pem
+*-screenshot.png
