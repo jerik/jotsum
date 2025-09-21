@@ -174,7 +174,7 @@ class NrLine extends HTMLElement {
                 while (operators.length > 0 && operators[operators.length - 1] !== '(') {
                     output.push(operators.pop());
                 }
-                if (operators[operators.length - 1] === '(') {
+                if (operators.length > 0 && operators[operators.length - 1] === '(') {
                     operators.pop();
                 }
             }
