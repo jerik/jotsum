@@ -260,3 +260,62 @@ Wenn du willst, schreibe ich dir die konkreten Patches (inkl. kleiner UI-Hinweis
 
 [1]: https://github.com/jerik/jotsum "GitHub - jerik/jotsum: smart online calculations - your ancillary account"
 
+## zeilen diktat
+
+Kurzfassung: Auf dem iPhone feuert **Diktat** keine/kaum *Tastatur*-Events (`keydown/keyup`). Wenn deine Berechnung nur an solche Events gekoppelt ist, passiert nichts – erst wenn du manuell tippst. Lösung: an **„echte Eingabe“-Events** hängen und notfalls einen kleinen Fallback-Watcher einbauen.
+
+## Was du ändern solltest
+
+1. **Nicht** (nur) auf `keydown/keyup` hören, sondern auf diese Events:
+
+* `input` (Haupt-Event)
+* `beforeinput` (liefert `event.inputType`, z. B. `insertFromDictation`)
+* `change`, `paste`, `drop`, `compositionend`
+* optional: throttled `selectionchange` (iOS feuert das beim Diktat oft)
+
+2. **Debounce/Throttle**, damit bei langen Diktaten nicht dauernd gerechnet wird.
+
+3. **Fallback**: Ein leichter „Value-Watcher“, falls iOS in seltenen Fällen kein `input` liefert.
+
+## Beispiel (minimal & robust)
+
+```js
+// einmalig beim Initialisieren
+const ta = document.querySelector('#jotsum-input'); // dein Textfeld
+let lastVal = ta.value;
+const recalc = (() => {
+  let t;
+  return () => { clearTimeout(t); t = setTimeout(() => computeAll(ta.value), 120); };
+})();
+
+// 1) Primäre Eingabe-Events
+['input','beforeinput','change','paste','drop','compositionend']
+  .forEach(ev => ta.addEventListener(ev, recalc, {passive:true}));
+
+// 2) iOS-spezifisch: selectionchange (sparsam!)
+let selTick = 0;
+document.addEventListener('selectionchange', () => {
+  // nur wenn unser Feld aktiv ist – und nicht öfter als ~5x/Sek.
+  if (document.activeElement === ta && (++selTick % 6 === 0)) recalc();
+}, {passive:true});
+
+// 3) Fallback-Watcher (nur wenn Wert sich „heimlich“ ändert)
+setInterval(() => {
+  if (ta.value !== lastVal) {
+    lastVal = ta.value;
+    recalc();
+  }
+}, 500);
+```
+
+Optional: Wenn du mehrere Zeilenfelder hast, die gleiche Event-Liste pro Feld anhängen. In `beforeinput` kannst du außerdem gezielt auf Diktat reagieren:
+
+```js
+ta.addEventListener('beforeinput', (e) => {
+  if (e.inputType === 'insertFromDictation') recalc();
+}, {passive:true});
+```
+
+> TL;DR: Rechne auf `input`/`beforeinput` statt auf Tastatur-Events – und halte einen kleinen Fallback bereit. Dann werden Zeilen auch bei iOS-Diktat sofort verarbeitet.
+
+--> Das gilt auch für Android
