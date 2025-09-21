@@ -1,5 +1,5 @@
 const assert = require('assert');
-const { NrLine } = require('../../nebenrechnung.js');
+const { NrLine } = require('../../jotsum.js');
 
 
 

@@ -1,11 +1,11 @@
 # Next steps
 - funktion um ein neues rechnungsseite aufzurufen
 - die rechnungen im localstorage speichern
-- aus der zwischenablage ein mehrzeiligen text "importieren". jede zeile ist eine zeile in nebenrechnung mit automatischem calc
+- aus der zwischenablage ein mehrzeiligen text "importieren". jede zeile ist eine zeile in jotsum mit automatischem calc
 
 # Chat GPT Suggestions
 Super Projekt – ich hab’s mir angeschaut (Demo-Seite + Repo) und sehe schon ein paar mobile-Hebel. Auf der Page gibt’s z. B. den „Add line“-Button, die Versionsanzeige und den Hinweis „Just download this page for offline usage“, der Ansatz passt also gut für ein **leichtes, offline-fähiges** Tool im Browser. ([jerik.github.io][1])
-Im Repo liegen `index.html`, `nebenrechnung.html` und `nebenrechnung.js`, plus Tests/Playwright-Config – prima Grundlage für saubere Mobile-Optimierungen. ([GitHub][2])
+Im Repo liegen `index.html`, `jotsum.html` und `jotsum.js`, plus Tests/Playwright-Config – prima Grundlage für saubere Mobile-Optimierungen. ([GitHub][2])
 
 Hier meine kompakten, praxisnahen Verbesserungen speziell für Smartphone-Nutzung:
 
@@ -81,7 +81,7 @@ Hier meine kompakten, praxisnahen Verbesserungen speziell für Smartphone-Nutzun
 
   ```js
   async function shareResult(text){
-    const payload = { title: 'Nebenrechnung', text };
+    const payload = { title: 'jotsum', text };
     if (navigator.share) await navigator.share(payload);
     else downloadTxt(text); // Fallback
   }
@@ -90,7 +90,7 @@ Hier meine kompakten, praxisnahen Verbesserungen speziell für Smartphone-Nutzun
 
 ## 8) PWA: Installierbar + Offline ohne „Speichern“
 
-* `manifest.webmanifest` (Name, Icons in 192/512, Start-URL `nebenrechnung.html`).
+* `manifest.webmanifest` (Name, Icons in 192/512, Start-URL `jotsum.html`).
 * **Service Worker** (statisches Caching via „cache first“) → echte Offline-App statt „bitte speichern“.
   Die Seite erwähnt Offline-Nutzung bereits – mit PWA wird das für Endnutzer noch reibungsloser. ([jerik.github.io][1])
 
@@ -123,9 +123,9 @@ Hier meine kompakten, praxisnahen Verbesserungen speziell für Smartphone-Nutzun
 
 ```json
 {
-  "name": "Nebenrechnung",
-  "short_name": "Nebenrechnung",
-  "start_url": "nebenrechnung.html",
+  "name": "jotsum",
+  "short_name": "jotsum",
+  "start_url": "jotsum.html",
   "display": "standalone",
   "background_color": "#111827",
   "theme_color": "#111827",
@@ -139,8 +139,8 @@ Hier meine kompakten, praxisnahen Verbesserungen speziell für Smartphone-Nutzun
 **Minimaler Service-Worker (Cache-First)**
 
 ```js
-const CACHE = "nebenrechnung-v1";
-const ASSETS = ["/nebenrechnung.html","/nebenrechnung.js","/styles.css","/manifest.webmanifest"];
+const CACHE = "jotsum-v1";
+const ASSETS = ["/jotsum.html","/jotsum.js","/styles.css","/manifest.webmanifest"];
 self.addEventListener("install", e => e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS))));
 self.addEventListener("fetch", e => e.respondWith(caches.match(e.request).then(r => r || fetch(e.request))));
 ```
@@ -159,8 +159,8 @@ function updateTotal(t){
 
 ---
 
-Wenn du magst, bastle ich dir die **konkreten Diffs** für `nebenrechnung.html`/`.js` (Meta-Tags, Toolbar, PWA-Files) passend zu deiner Struktur – dann kannst du sie direkt ins Repo übernehmen.
+Wenn du magst, bastle ich dir die **konkreten Diffs** für `jotsum.html`/`.js` (Meta-Tags, Toolbar, PWA-Files) passend zu deiner Struktur – dann kannst du sie direkt ins Repo übernehmen.
 
-[1]: https://jerik.github.io/nebenrechnung/ "nebenrechnung"
-[2]: https://github.com/jerik/nebenrechnung "GitHub - jerik/nebenrechnung: smart online calculations - your ancillary account"
+[1]: https://jerik.github.io/jotsum/ "jotsum"
+[2]: https://github.com/jerik/jotsum "GitHub - jerik/jotsum: smart online calculations - your ancillary account"
 

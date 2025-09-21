@@ -9,12 +9,12 @@ test.use({
 });
 
 // https://playwright.dev/docs/writing-tests
-// test nebenrechnung
+// test jotsum
 test('initial start of page with line and sum', async ({ page }) => {
   await page.goto('https://localhost:8008');
 
   // Expect a title "to contain" a substring.
-  await expect(page).toHaveTitle(/nebenrechnung/);
+  await expect(page).toHaveTitle(/jotsum/);
 
   const nrl = await page.locator('//nr-line').count(); 
   const nrs = await page.locator('//nr-sum').count(); 

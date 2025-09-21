@@ -26,12 +26,12 @@ test.describe('simple suite test', () => {
 
 // simple unit test of function 
 // https://playwright.dev/docs/evaluating
-test.describe('test nebenrechnung', () => {
+test.describe('test jotsum', () => {
 
 	// insert javascript functions to test
 	test.beforeEach(async ({page}) => {
 		// console.log(`Current directory: ${process.cwd()}`);
-		await page.addScriptTag({path: 'nebenrechnung.js'});
+		await page.addScriptTag({path: 'jotsum.js'});
 	});
 
 	test('unit test', async ({ page }) => {

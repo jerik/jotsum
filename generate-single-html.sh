@@ -4,7 +4,7 @@ set -e
 
 echo "start merging javascript and html to one single file"
 
-SOURCE=nebenrechnung.html
+SOURCE=jotsum.html
 FIRST=first.txt
 HEAD=head.txt
 BODY=body.txt
@@ -16,7 +16,7 @@ cat $SOURCE | grep -B 10000 '</style>' > $FIRST
 echo '<script type="text/javascript" charset="utf-8">' >> $FIRST
 
 # include javascript 
-cat $FIRST nebenrechnung.js > $HEAD
+cat $FIRST jotsum.js > $HEAD
 echo '</script>' >> $HEAD
 
 # get body from source html

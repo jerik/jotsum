@@ -1,8 +1,8 @@
-# Nebenrechnung
+# jotsum
 
-**Nebenrechnung** is a simple browser-based tool for quick, line-by-line calculations.
+**jotsum** lets you jot down notes with numbers, and it sums them up instantly.
 
-You can freely mix text and numbers in each line, for example:
+It is a simple browser-based tool for quick, line-by-line calculations. You can freely mix text and numbers in each line, for example:
 
 ```
 3 apples + 4 pears
@@ -10,7 +10,7 @@ You can freely mix text and numbers in each line, for example:
 
 The numbers are extracted, calculated as a subtotal, and all subtotals are summed into a final total.
 
-**Try it directly in your browser:** [https://jerik.github.io/nebenrechnung/](https://jerik.github.io/nebenrechnung/)
+**Try it directly in your browser:** [https://jerik.github.io/jotsum/](https://jerik.github.io/jotsum/)
 
 ---
 
