@@ -12,3 +12,7 @@ node_modules/
 # ignore ssl certs
 *.pem
 *-screenshot.png
+
+# Datei die auf github gebaut werden
+# brauchen nicht eingecheckt zu werden
+index.html
