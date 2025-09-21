@@ -169,13 +169,16 @@ class NrLine extends HTMLElement {
         }
     }
 
-    add_new_line_after() {
+    add_new_line_after(content = '') {
         const new_line = document.createElement('nr-line');
+        new_line.textContent = content;
         const new_sum = document.createElement('nr-sum');
         this.parentNode.insertBefore(new_line, this.nextElementSibling.nextElementSibling);
         this.parentNode.insertBefore(new_sum, new_line.nextElementSibling);
         new_line.focus();
         this.dispatchEvent(new Event('line-added', { bubbles: true }));
+        new_line.recalculate();
+        return new_line;
     }
 
     delete_line() {
@@ -228,6 +231,40 @@ if (typeof window !== 'undefined') {
         add_calc_line('7 apples + 4 pears');
         document.getElementById("add_line").addEventListener('click', () => {
             add_calc_line();
+        });
+
+        document.addEventListener('paste', (event) => {
+            const active_element = document.activeElement;
+
+            // Only act if we are pasting into the sheet or a line
+            if (active_element && active_element.closest('nr-sheet, nr-line')) {
+                event.preventDefault();
+                const paste_data = event.clipboardData.getData('text/plain');
+                const lines = paste_data.split('\n').filter(line => line.trim() !== '');
+
+                if (lines.length === 0) return;
+
+                if (active_element.tagName === 'NR-LINE') {
+                    // Paste into an existing line
+                    active_element.textContent = lines[0];
+                    active_element.recalculate();
+
+                    let current_line = active_element;
+                    for (let i = 1; i < lines.length; i++) {
+                        current_line = current_line.add_new_line_after(lines[i]);
+                    }
+                    if (lines.length > 1) {
+                        current_line.focus();
+                    }
+                } else {
+                    // Paste into the sheet but not a specific line, append to end
+                    lines.forEach(line_content => {
+                        add_calc_line(line_content);
+                    });
+                }
+                
+                document.getElementById('sheet').update_total();
+            }
         });
     }
 }
