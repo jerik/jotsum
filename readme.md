@@ -1,19 +1,37 @@
 # Nebenrechnung
 
-A simple HTML page for auxiliary calculations.
-In the auxiliary calculation, text and calculation can be mixed in each line, e.g:
+**Nebenrechnung** is a simple browser-based tool for quick, line-by-line calculations.
 
-    3 apples + 4 pears
+You can freely mix text and numbers in each line, for example:
 
-The numbers and calculation operators are extracted from each line and calculated as a subtotal.
-All subtotals are added up to the final total. 
+```
+3 apples + 4 pears
+```
 
-Feel free to try it on https://jerik.github.io/nebenrechnung/
+The numbers are extracted, calculated as a subtotal, and all subtotals are summed into a final total.
+
+**Try it directly in your browser:** [https://jerik.github.io/nebenrechnung/](https://jerik.github.io/nebenrechnung/)
+
+---
+
+## How it works
+
+* Each line can contain both text and numbers with operators
+* Subtotals are calculated per line
+* All subtotals are automatically added up
+
+---
+
+## Paste behavior
+
+When you paste multi-line text, each line becomes its own calculation — and the results are instantly updated.
+
+---
 
 ## Keyboard shortcuts
 
-- `Enter`: Executed on the last line, create a new line. Otherwise move one line down
-- `Ctrl + Enter`: Create a new line under the current line
-- `Ctrl + Delete`: Remove the current line
-- `ArrowUp`: move one line up
-- `ArrowDown`: move one line down
+* **Enter**: On the last line → create a new line. Otherwise → move down one line
+* **Ctrl + Enter**: Insert a new line below the current one
+* **Ctrl + Delete**: Remove the current line
+* **Arrow Up / Down**: Move between lines
+
