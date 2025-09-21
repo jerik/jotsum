@@ -164,3 +164,99 @@ Wenn du magst, bastle ich dir die **konkreten Diffs** für `jotsum.html`/`.js` (
 [1]: https://jerik.github.io/jotsum/ "jotsum"
 [2]: https://github.com/jerik/jotsum "GitHub - jerik/jotsum: smart online calculations - your ancillary account"
 
+## Übergabe von Dateien
+
+Coole Idee — ja, es gibt mehrere Wege, die Live-Page so zu öffnen, dass eine Textdatei „mitkommt“ und zeilenweise eingelesen wird. Kurz die Optionen (von „am einfachsten“ bis „mächtiger“), plus wie du’s in **jotsum** einbaust:
+
+# 1) `?text=` Query-Parameter (kleine Inhalte)
+
+* **Wie:** `https://jerik.github.io/jotsum/?text=3%20apples%20%2B%204%0A2*7`
+* **Pro:** Kein zusätzlicher Host nötig, sofort startklar.
+* **Contra:** URL-Längenlimit (praktisch \~2–4 KB, browserabhängig).
+* **Implementierung (JS):**
+
+  ```js
+  const params = new URLSearchParams(location.search);
+  const text = params.get('text');
+  if (text) loadTextIntoJotSum(decodeURIComponent(text));
+  ```
+
+# 2) `?url=` Query-Parameter (größere Dateien per Fetch)
+
+* **Wie:** `https://jerik.github.io/jotsum/?url=https%3A%2F%2Fraw.githubusercontent.com%2Fuser%2Frepo%2Fbranch%2Ffile.txt`
+* **Pro:** Beliebig groß, Link bleibt kurz.
+* **Contra:** **CORS** muss erlauben, dass die Datei von dort gelesen werden darf. Raw-Links von GitHub/Gist funktionieren i. d. R. mit CORS.
+* **Implementierung:**
+
+  ```js
+  const url = new URLSearchParams(location.search).get('url');
+  if (url) {
+    fetch(url).then(r => r.text()).then(loadTextIntoJotSum)
+             .catch(err => alert('Laden fehlgeschlagen: ' + err));
+  }
+  ```
+* **Tipp:** Fehlermeldung anzeigen, wenn `fetch` wegen CORS scheitert; **keine** Proxys by default.
+
+# 3) `#text=` im URL-Fragment (Datenschutz + etwas mehr Platz)
+
+* **Wie:** `https://jerik.github.io/jotsum/#text=...` (optional **komprimiert** + Base64)
+* **Pro:** Fragment geht **nicht** an den Server; gut für sensiblere Daten.
+* **Contra:** Ähnliche Größenlimits wie Query, aber du kannst komprimieren (z. B. LZ-String).
+* **Implementierung (einfach):**
+
+  ```js
+  if (location.hash.startsWith('#text=')) {
+    const raw = decodeURIComponent(location.hash.slice(6));
+    loadTextIntoJotSum(raw);
+  }
+  ```
+
+  *(Optional Kompression: LZ-String Base64 im Hash.)*
+
+# 4) `data:`-URL über `?url=` (kompakt & ohne CORS)
+
+* **Wie:** Generiere clientseitig `data:text/plain;base64,....` und setze sie in `?url=`.
+* **Pro:** Kein CORS nötig, große Inhalte möglich (Browser-Grenzen beachtet).
+* **Contra:** Sehr lange URLs, kann unpraktisch sein.
+
+# 5) Datei-Upload / Drag-&-Drop (für lokale Files)
+
+* **Wie:** Button „Datei öffnen…“ (`<input type="file" accept=".txt">`) + Drag\&Drop-Zone.
+* **Pro:** Endnutzer-freundlich, kein Hosting/CORS.
+* **Contra:** Kein „ein-Klick-Link“; Nutzer muss die Datei auswählen.
+* **Implementierung:**
+
+  ```html
+  <input id="file" type="file" accept=".txt">
+  <script>
+  document.getElementById('file').addEventListener('change', e => {
+    const f = e.target.files[0];
+    if (!f) return;
+    const reader = new FileReader();
+    reader.onload = () => loadTextIntoJotSum(reader.result);
+    reader.readAsText(f);
+  });
+  </script>
+  ```
+
+# 6) PWA „Share Target“ (fortgeschritten, mobil genial)
+
+* **Wie:** JotSum als PWA mit `share_target` im Manifest registrieren; dann kann man in Android/iOS „Teilen → JotSum“ wählen, auch **Dateien**.
+* **Pro:** Super UX auf Mobilgeräten, direkte Übergabe von Dateien/Text.
+* **Contra:** Etwas Setup (Manifest + Service Worker, HTTPS hast du via GitHub Pages).
+
+---
+
+## Empfehlungen für JotSum (konkret)
+
+1. **Sofort umsetzbar:** Implementiere **(1) `?text=`** und **(2) `?url=`** – damit deckst du „klein & schnell“ und „groß & extern gehostet“ ab.
+2. **Nice-to-have:** **(5) Datei-Upload/Drag\&Drop** für lokale Dateien.
+3. **Bonus/Privacy:** **(3) `#text=`** (optional mit Kompression), damit Inhalte nicht im Server-Log landen.
+4. **Langfristig:** **(6) PWA Share Target** für mobiles „Teilen an JotSum“.
+
+Dein Repo & die Live-Page (Stand jetzt) zeigen noch keine Parameternutzung; du kannst die obigen Snippets in `jotsum.js` integrieren und beim Start prüfen, ob `text`, `url` oder `#text=` gesetzt sind, und dann in das bestehende Eingabefeld übernehmen. Danach läuft die normale zeilenweise Verarbeitung. ([GitHub][1])
+
+Wenn du willst, schreibe ich dir die konkreten Patches (inkl. kleiner UI-Hinweise: „Datei / Link laden“) für `jotsum.js` und `index.html`.
+
+[1]: https://github.com/jerik/jotsum "GitHub - jerik/jotsum: smart online calculations - your ancillary account"
+
