@@ -28,11 +28,11 @@ When you paste multi-line text, each line becomes its own calculation — and th
 
 ---
 
-### Start with a link
+## Start with a link
 You don’t even need to type or paste: JotSum can take a text directly from the URL. Just add `?text=...` at the end of the link, and your notes will appear instantly. Multi-line texts are split into rows, ready for calculation. 
 
 Example:  
-[https://jerik.github.io/jotsum/?text=3+apples+%2B+4%0A2*7](https://jerik.github.io/jotsum/?text=3+apples+%2B+4%0A2*7)
+[https://jerik.github.io/jotsum/?text=3+apples+%2B+4+pears%0A2+bananas+*+7+melons](https://jerik.github.io/jotsum/?text=3+apples+%2B+4+pears%0A2+bananas+*+7+melons)
 
 ---
 
