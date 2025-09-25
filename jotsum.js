@@ -226,9 +226,33 @@ function add_calc_line(starter = '') {
     nr_sheet.update_total();
 }
 
+function handle_url_params() {
+    const url_params = new URLSearchParams(window.location.search);
+    const text_param = url_params.get('text');
+
+    if (text_param) {
+        const lines = text_param.split('\n').filter(line => line.trim() !== '');
+        if (lines.length > 0) {
+            // Clear existing lines
+            const sheet = document.getElementById('sheet');
+            while (sheet.firstChild) {
+                sheet.removeChild(sheet.firstChild);
+            }
+
+            lines.forEach(line_content => {
+                add_calc_line(line_content);
+            });
+            document.getElementById('sheet').update_total();
+        }
+    } else {
+        // No text parameter, add an empty line
+        add_calc_line('');
+    }
+}
+
 if (typeof window !== 'undefined') {
     window.onload = function () {
-        add_calc_line('7 apples + 4 pears');
+        handle_url_params();
         document.getElementById("add_line").addEventListener('click', () => {
             add_calc_line();
         });
