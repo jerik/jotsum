@@ -9,7 +9,12 @@ FIRST=first.txt
 HEAD=head.txt
 BODY=body.txt
 FINAL=index.html
-VERSION=$(git describe --tags --always --dirty)
+
+# Build-Infos aus Git
+COUNT=$(git rev-list --count HEAD)
+SHORT=$(git rev-parse --short HEAD)
+DATE=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+VERSION="${COUNT}-g${SHORT}"
 
 # get header from source html
 cat $SOURCE | grep -B 10000 '</style>' > $FIRST
@@ -26,7 +31,7 @@ cat $SOURCE | grep -A 1000 '</head>' > $BODY
 cat $HEAD $BODY > $FINAL
 
 # inject version
-sed -i.bak "s|<span id=\"version\"></span>|<span id=\"version\">$VERSION</span>|" $FINAL
+sed -i.bak "s|<span id=\"version\"></span>|<span id=\"version\">$VERSION<br>$DATE</span>|" $FINAL
 
 # cleanup
 rm *.txt
