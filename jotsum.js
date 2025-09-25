@@ -52,16 +52,62 @@ class NrLine extends HTMLElement {
             return 0;
         }
 
-        const sanitizedExpression = expression.replace(/[^0-9.+\-*/()\s]/g, '');
-
         try {
-            const tokens = sanitizedExpression.match(/(\d+\.?\d*)|[+\-*/()]/g) || [];
+            const tokens = this.tokenize(expression);
             const RPN = this.shuntingYard(tokens);
             const result = this.calculateRPN(RPN);
             return result === undefined ? 0 : result;
         } catch (e) {
             return 0;
         }
+    }
+
+    tokenize(expression) {
+        const tokens = [];
+        let current_number = '';
+        let last_token_was_operator = true;
+
+        for (let i = 0; i < expression.length; i++) {
+            const char = expression[i];
+
+            if (char === ' ') {
+                continue;
+            }
+
+            if (!isNaN(char) || char === '.') {
+                current_number += char;
+                last_token_was_operator = false;
+            } else {
+                if (current_number !== '') {
+                    tokens.push(parseFloat(current_number));
+                    current_number = '';
+                }
+
+                if (char === '-' && last_token_was_operator) {
+                    tokens.push('u');
+                } else if (char === '+' && last_token_was_operator) {
+                    // ignore unary plus
+                } else {
+                    tokens.push(char);
+                }
+                last_token_was_operator = true;
+            }
+        }
+
+        if (current_number !== '') {
+            tokens.push(parseFloat(current_number));
+        }
+
+        // Implicit addition
+        const final_tokens = [];
+        for (let i = 0; i < tokens.length; i++) {
+            final_tokens.push(tokens[i]);
+            if (i < tokens.length - 1 && typeof tokens[i] === 'number' && typeof tokens[i+1] === 'number') {
+                final_tokens.push('+');
+            }
+        }
+
+        return final_tokens;
     }
 
     shuntingYard(tokens) {
@@ -72,11 +118,12 @@ class NrLine extends HTMLElement {
             '-': 1,
             '*': 2,
             '/': 2,
+            'u': 3, // Unary minus
         };
 
         for (const token of tokens) {
-            if (!isNaN(token)) {
-                output.push(parseFloat(token));
+            if (typeof token === 'number') {
+                output.push(token);
             } else if (token in precedence) {
                 while (
                     operators.length > 0 &&
@@ -111,6 +158,8 @@ class NrLine extends HTMLElement {
         for (const token of rpn) {
             if (typeof token === 'number') {
                 stack.push(token);
+            } else if (token === 'u') {
+                stack.push(-stack.pop());
             } else {
                 const b = stack.pop();
                 const a = stack.pop();
