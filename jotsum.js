@@ -246,8 +246,17 @@ function handle_url_params() {
         }
     } else {
         // No text parameter, add an empty line
-        add_calc_line('');
+        add_calc_line('3 apples + 4 pears');
     }
+}
+
+function reset_sheet() {
+    const sheet = document.getElementById('sheet');
+    while (sheet.firstChild) {
+        sheet.removeChild(sheet.firstChild);
+    }
+    add_calc_line('7 apples + 4 pears');
+    sheet.update_total();
 }
 
 if (typeof window !== 'undefined') {
@@ -255,6 +264,10 @@ if (typeof window !== 'undefined') {
         handle_url_params();
         document.getElementById("add_line").addEventListener('click', () => {
             add_calc_line();
+        });
+
+        document.getElementById("reset_sheet").addEventListener('click', () => {
+            reset_sheet();
         });
 
         document.addEventListener('paste', (event) => {
