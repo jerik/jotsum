@@ -38,6 +38,8 @@ function testCalculate() {
         { expression: '5 +5 + 5', expected: 15 },
         { expression: '- (5 + 5) * 2', expected: -20 },
         { expression: '- (-5 + 5) * 2', expected: 0 },
+        { expression: '10 * 8 höhner asdf ', expected: 80 }, // online kommt NaN raus, wegen dem letzten leerzeichen
+        { expression: 'das letzte leerzeichen   ', expected: 0 }, // online kommt NaN raus
     ];
 
     tests.forEach(test => {
