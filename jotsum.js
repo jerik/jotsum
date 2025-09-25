@@ -231,7 +231,8 @@ function handle_url_params() {
     const text_param = url_params.get('text');
 
     if (text_param) {
-        const lines = text_param.split('\n').filter(line => line.trim() !== '');
+        const decoded_text = decodeURIComponent(text_param);
+        const lines = decoded_text.split('\n').filter(line => line.trim() !== '');
         if (lines.length > 0) {
             // Clear existing lines
             const sheet = document.getElementById('sheet');
