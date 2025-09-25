@@ -90,7 +90,7 @@ class NrLine extends HTMLElement {
                 } else {
                     tokens.push(char);
                 }
-                last_token_was_operator = true;
+                last_token_was_operator = ['+', '-', '*', '/', '(', 'u'].includes(tokens[tokens.length-1]);
             }
         }
 
@@ -184,6 +184,9 @@ class NrLine extends HTMLElement {
     }
 
     round(num) {
+        if (num === -0) {
+            return 0;
+        }
         if (num % 1 !== 0) {
             return num.toFixed(4);
         }
