@@ -64,7 +64,7 @@
 				width: 30%;
 			}
 
-			#add_line {
+			#add_line, #reset_sheet {
 				padding: 10px; 
 				font-size: 20px; 
 			}
@@ -308,11 +308,49 @@ function add_calc_line(starter = '') {
     nr_sheet.update_total();
 }
 
+function handle_url_params() {
+    const url_params = new URLSearchParams(window.location.search);
+    const text_param = url_params.get('text');
+
+    if (text_param) {
+        const decoded_text = decodeURIComponent(text_param);
+        const lines = decoded_text.split('\n').filter(line => line.trim() !== '');
+        if (lines.length > 0) {
+            // Clear existing lines
+            const sheet = document.getElementById('sheet');
+            while (sheet.firstChild) {
+                sheet.removeChild(sheet.firstChild);
+            }
+
+            lines.forEach(line_content => {
+                add_calc_line(line_content);
+            });
+            document.getElementById('sheet').update_total();
+        }
+    } else {
+        // No text parameter, add an empty line
+        add_calc_line('3 apples + 4 pears');
+    }
+}
+
+function reset_sheet() {
+    const sheet = document.getElementById('sheet');
+    while (sheet.firstChild) {
+        sheet.removeChild(sheet.firstChild);
+    }
+    add_calc_line('3 apples + 4 pears');
+    sheet.update_total();
+}
+
 if (typeof window !== 'undefined') {
     window.onload = function () {
-        add_calc_line('7 apples + 4 pears');
+        handle_url_params();
         document.getElementById("add_line").addEventListener('click', () => {
             add_calc_line();
+        });
+
+        document.getElementById("reset_sheet").addEventListener('click', () => {
+            reset_sheet();
         });
 
         document.addEventListener('paste', (event) => {
@@ -365,9 +403,10 @@ if (typeof module !== 'undefined' && module.exports) {
 			<nr-total id='total'></nr-total>
 		</nr-lastline>
 		<button id="add_line">Add line</button>
+		<button id="reset_sheet">Reset</button>
 		<!-- button id="addline">Add line</button-->
 		<div style="padding-top: 30px; text-align:center">
-			<span id="version">v0.2.0-16-g6cdf165</span></br>
+			<span id="version">v0.2.0-25-g74ee2a2</span></br>
 			Just download this page for offline usage.</br>All source code and some documentation is available on <a href="https://github.com/jerik/jotsum">GitHub</a>.
 		</div>
 	</body>
