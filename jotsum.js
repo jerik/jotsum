@@ -255,7 +255,7 @@ function reset_sheet() {
     while (sheet.firstChild) {
         sheet.removeChild(sheet.firstChild);
     }
-    add_calc_line('7 apples + 4 pears');
+    add_calc_line('3 apples + 4 pears');
     sheet.update_total();
 }
 
