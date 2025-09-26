@@ -78,7 +78,7 @@ class NrLine extends HTMLElement {
                 continue;
             }
 
-            if (!isNaN(char) || char === '.') {
+            if (!isNaN(char) || (char === '.' && !((expression[i-1] && expression[i-1].match(/[a-zA-Z]/)) || (expression[i+1] && expression[i+1].match(/[a-zA-Z]/))))) {
                 if (char === '.' && current_number.includes('.')) {
                     tokens.push(parseFloat(current_number));
                     current_number = '';
@@ -90,18 +90,28 @@ class NrLine extends HTMLElement {
                 }
             } else {
                 if (current_number !== '') {
-                    tokens.push(parseFloat(current_number));
+                    if (!isNaN(current_number)) {
+                        tokens.push(parseFloat(current_number));
+                    }
                     current_number = '';
                 }
 
-                if (char === '-' && last_token_was_operator) {
-                    tokens.push('u');
-                } else if (char === '+' && last_token_was_operator) {
-                    // ignore unary plus
+                if (char === '-' && ((expression[i-1] && expression[i-1].match(/[a-zA-Z]/)) || (expression[i+1] && expression[i+1].match(/[a-zA-Z]/)))) {
+                    // ignore dash in word
+                    last_token_was_operator = false;
+                } else if (['+', '-', '*', '/', '(', ')'].includes(char)) {
+                    if (char === '-' && last_token_was_operator) {
+                        tokens.push('u');
+                    } else if (char === '+' && last_token_was_operator) {
+                        // ignore unary plus
+                    } else {
+                        tokens.push(char);
+                    }
+                    last_token_was_operator = true;
                 } else {
-                    tokens.push(char);
+                    // It's a letter or some other character, ignore it.
+                    last_token_was_operator = false;
                 }
-                last_token_was_operator = ['+', '-', '*', '/', '(', 'u'].includes(tokens[tokens.length-1]);
             }
         }
 

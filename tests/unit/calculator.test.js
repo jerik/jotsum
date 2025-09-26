@@ -43,7 +43,13 @@ function testCalculate() {
         { expression: '10 . 87', expected: 'NaN' }, 
         { expression: '10.87', expected: 10.87 }, 
         { expression: '3 apples + 4 pears ', expected: 7 }, 
-        { expression: '3 apples + 4 pears ', expected: 7 }, 
+        { expression: 'make-love-not-war', expected: 0 }, 
+        { expression: 'hin-her 10 + 10', expected: 20 }, 
+        { expression: 'hin@her 10 + 10', expected: 20 }, 
+        { expression: 'vorder- und rückseite ergeben 20 + 11', expected: 31 }, 
+        { expression: 'master -master 20 + 11', expected: 31 }, 
+        { expression: 'no. this is 20 + 11', expected: 31 }, 
+        { expression: 'no.this is 20 + 11', expected: 31 }, 
     ];
 
     tests.forEach(test => {
