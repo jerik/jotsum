@@ -40,7 +40,7 @@ class NrLine extends HTMLElement {
     }
 
     recalculate() {
-        const subtotal = this.calculate(this.textContent);
+        const subtotal = this.calculate(this.textContent.trim());
         const sumElement = this.nextElementSibling;
         if (sumElement && sumElement.tagName === 'NR-SUM') {
             sumElement.textContent = this.round(subtotal);

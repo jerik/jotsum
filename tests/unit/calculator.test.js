@@ -42,6 +42,8 @@ function testCalculate() {
         { expression: 'das letzte leerzeichen   ', expected: 0 }, // online kommt NaN raus
         { expression: '10 . 87', expected: 'NaN' }, 
         { expression: '10.87', expected: 10.87 }, 
+        { expression: '3 apples + 4 pears ', expected: 7 }, 
+        { expression: '3 apples + 4 pears ', expected: 7 }, 
     ];
 
     tests.forEach(test => {
