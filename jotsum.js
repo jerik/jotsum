@@ -71,12 +71,23 @@ class NrLine extends HTMLElement {
             const char = expression[i];
 
             if (char === ' ') {
+                if (current_number !== '') {
+                    tokens.push(parseFloat(current_number));
+                    current_number = '';
+                }
                 continue;
             }
 
             if (!isNaN(char) || char === '.') {
-                current_number += char;
-                last_token_was_operator = false;
+                if (char === '.' && current_number.includes('.')) {
+                    tokens.push(parseFloat(current_number));
+                    current_number = '';
+                    tokens.push(char);
+                    last_token_was_operator = true;
+                } else {
+                    current_number += char;
+                    last_token_was_operator = false;
+                }
             } else {
                 if (current_number !== '') {
                     tokens.push(parseFloat(current_number));

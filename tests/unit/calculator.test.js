@@ -46,7 +46,11 @@ function testCalculate() {
 
     tests.forEach(test => {
         const result = nrLine.calculate(test.expression);
-        assert.strictEqual(result === -0 ? 0 : result, test.expected, `Test failed for expression: "${test.expression}". Expected ${test.expected}, but got ${result}`);
+        if (test.expected === 'NaN') {
+            assert(isNaN(result), `Test failed for expression: "${test.expression}". Expected NaN, but got ${result}`);
+        } else {
+            assert.strictEqual(result === -0 ? 0 : result, test.expected, `Test failed for expression: "${test.expression}". Expected ${test.expected}, but got ${result}`);
+        }
     });
 
     console.log('All calculator tests passed!');
