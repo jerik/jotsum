@@ -1,84 +1,147 @@
 <!DOCTYPE html>
-<!-- 
-	custom html: https://matthewjamestaylor.com/custom-tags
--->
 <html>
-	<head>
-		<meta charset="UTF-8" />
-		<meta name="viewport" content="width=device-width" />
-		<title>jotsum</title>
-		<style type="text/css" media="screen">
-		/* https://www.w3schools.com/css/tryit.asp?filename=trycss_grid */
-			* {
-				font-family: Arial, sans-serif;
-			}
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width" />
+    <title>jotsum</title>
+    <style>
+      body {
+        margin: 0;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+      }
 
-			nr-line {
-				background-color: #f7f7f7;
-				/* background-color: rgba(255, 255, 255, 0.8); */ /* durchsichtig abgeschwächt mit 0.8 */
-				border-bottom: 1px solid #ffffff;
-				padding: 7px;
-				font-size: 20px;
-				text-align: left;
-			}
-			nr-sum {
-				background-color: rgba(255, 255, 255);
-				/* border: 1px solid rgba(0, 0, 0, 0.8); */
-				border-bottom: 1px solid #ffffff;
-				padding: 7px;
-				font-size: 20px;
-				text-align: left;
-			}
-			calc-line{
-				font-size: 12pt; 
-				height: 20px; 
-				border: solid silver; 
-				padding: 4px; 
-				width: 700px; 
-				display: block; 
-			}
-			nr-sheet {
-				display: grid;
-				grid-template-columns: 70% auto;
-				/* background-color: #2196F3; */
-				padding: 7px
-			}
-			nr-lastline {
-				display: grid;
-				grid-template-columns: 70% auto;
-				/* background-color: #2196F3; */
-				padding: 7px
-			}
-			nr-spacer {
-				/* background-color: rgba(255, 255, 255, 0.8); */ /* durchsichtig abgeschwächt mit 0.8 */
-				padding: 7px;
-			}
-			nr-total {
-				background-color: rgba(255, 255, 255);
-				/* border: 1px solid rgba(0, 0, 0, 0.8); */
-				border-top: 1px solid #000;
-				padding: 7px;
-				font-size: 20px;
-				font-weight: bold;
-				text-align: left;
-				width: 30%;
-			}
+      /* Header */
+      .site-header {
+        position: sticky; top: 0; z-index: 10;
+        background: #fff; border-bottom: 1px solid #d0d7de;
+      }
+      .wrap {
+        max-width: 1040px; margin: 0 auto;
+        padding: 10px 16px;
+        display: flex; align-items: center; gap: 12px;
+      }
+      .brand { font: 600 18px/1.2 inherit; margin: 0; }
+      .actions { margin-left: auto; display: flex; gap: 8px; flex-wrap: wrap; }
+      .btn {
+        border: 1px solid #d0d7de; background: transparent;
+        padding: 6px 10px; border-radius: 6px; font: 500 14px inherit;
+        cursor: pointer;
+      }
+      .btn:hover { background: #f6f8fa; }
+      .btn-primary { background: #1f883d; border-color: #1f883d; color:#fff; }
+      .btn-primary:hover { background:#1a7f37; }
+      a.btn { color: inherit; text-decoration: none; }
 
-			#add_line, #reset_sheet {
-				padding: 10px; 
-				font-size: 20px; 
-			}
+	  /* Grid / Layout – robust, auch in Safari */
+	  nr-sheet, nr-lastline {
+	    display: grid;
+	  
+	    /* Links: Text (1fr). Rechts: Summe (breite genug für Zahlen). */
+	    grid-template-columns: 1fr minmax(8ch, 14ch);
+	    column-gap: 12px;
+	  
+	    max-width: 1040px;
+	    margin: 20px auto 0;
+	    padding: 0 16px;
+	  }
+	  nr-lastline { margin-top: 0; }
+	  
+	  /* explizit auf Spalten pinnen – verhindert „Umklappen“ */
+	  nr-line     { grid-column: 1; }
+	  nr-sum      { grid-column: 2; }
+	  nr-spacer   { grid-column: 1; }
+	  nr-total    { grid-column: 2; }
+	  
+	  /* Mobile: Summe etwas schmaler, damit’s immer passt */
+	  @media (max-width: 600px) {
+	    .wrap { padding: 8px 12px; }
+	    nr-sheet, nr-lastline {
+	  	grid-template-columns: 1fr minmax(6ch, 12ch);
+	  	column-gap: 8px;
+	    }
+	  }
 
-			@media screen and (max-width: 600px) {
-				nr-sheet, nr-lastline {
-					grid-template-columns: 60% 40%;
-				}
-				nr-sum, nr-total {
-					text-align: right;
-					width: auto; /* Override the default width */
-				}
-			}
-		</style>
+      /* Typo & Zeilen */
+      nr-line, nr-sum, nr-total {
+        font-size: 18px;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+        padding: 7px;
+      }
+
+      nr-line {
+        background: #f7f7f7;
+        border-bottom: 1px solid #ffffff; /* weiße Trennlinie zwischen Zeilen */
+        text-align: left;
+      }
+      nr-sum {
+        background: #ffffff;
+        border-bottom: 1px solid #ffffff; /* gleiche Trennlinie rechts */
+        text-align: right;
+        white-space: nowrap;
+        font-variant-numeric: tabular-nums;
+      }
+      nr-spacer { 
+        padding: 7px; 
+        border-top: 1px solid #d0d7de; /* dein Abschlussstrich */
+      }
+      nr-total {
+        background: #ffffff;
+        text-align: right;
+        font-weight: bold;
+        border-top: 1px solid #d0d7de; /* passend zum Spacer */
+        white-space: nowrap;
+        font-variant-numeric: tabular-nums;
+      }
+
+	  /* Aktive Zeile: sehr dezentes Highlight + schmale Akzentleiste links */
+	  nr-line.is-active {
+	    background-color: #fffbe6;             /* heller als vorher */
+	    position: relative;
+	  }
+	  nr-line.is-active::before {
+	    content: "";
+	    position: absolute;
+	    left: 0; top: 0; bottom: 0;
+	    width: 3px;
+	    background: #d0d7de;                   /* GitHub-Grau als Akzent */
+	  }
+	  nr-line:focus { outline: none; }
+	  
+	  /* Dark Mode: noch dezenteres Highlight + etwas dunklere Akzentleiste */
+	  @media (prefers-color-scheme: dark){
+	    nr-line.is-active {
+	  	  background-color: rgba(255, 251, 230, 0.10);  /* zartes Gelb, transparent */
+	    }
+	    nr-line.is-active::before {
+	  	  background: #6e7781;                 /* Muted Grey im Dark Mode */
+	    }
+      /* nr-line:focus { outline: none; } */
+	  }
+
+
+      /* Mobile */
+      @media (max-width: 600px) {
+		.wrap { padding: 8px 12px; gap: 8px; }
+		.brand { font-size: 16px; }            /* vorher 18px */
+		.btn { padding: 5px 8px; font-size: 13px; }
+
+        /* Summe bleibt kompakt; Text bekommt den restlichen Platz */
+        nr-sheet, nr-lastline {
+          grid-template-columns: 1fr minmax(6ch, fit-content(12ch));
+          column-gap: 8px;
+        }
+      }
+
+      /* Footer */
+      footer {
+        max-width: 1040px; margin: 40px auto; padding: 0 16px;
+        text-align: center; font-size: 13px; color: #6e7781;
+      }
+      footer a { color: inherit; }
+      .version {
+        display: block; margin-bottom: 8px; font-size: 12px; color: #6e7781;
+      }
+    </style>
 <script type="text/javascript" charset="utf-8">
 class NrSheet extends HTMLElement {
     constructor() {
@@ -102,18 +165,30 @@ class NrSheet extends HTMLElement {
 
     round(num) {
         if (num % 1 !== 0) {
-            return num.toFixed(4);
+            return num.toFixed(2);
         }
         return num;
     }
 }
 
 class NrLine extends HTMLElement {
-    constructor() {
-        super();
-        this.addEventListener('keyup', this.recalculate);
-        this.addEventListener('keydown', this.handle_keys);
-    }
+	constructor() {
+		super();
+		this.addEventListener('input', this.recalculate);
+		this.addEventListener('beforeinput', this.recalculate);
+		this.addEventListener('keyup', this.recalculate);
+		this.addEventListener('keydown', this.handle_keys);
+
+		// ✨ Aktiv-Markierung
+		this._onFocus = () => {
+		  // andere aktive Zeile(n) abräumen
+		  document.querySelectorAll('nr-line.is-active').forEach(el => { if (el !== this) el.classList.remove('is-active'); });
+		  this.classList.add('is-active');
+		};
+		this._onBlur = () => { this.classList.remove('is-active'); };
+		this.addEventListener('focus', this._onFocus);
+		this.addEventListener('blur', this._onBlur);
+  }
 
     connectedCallback() {
         if (!this.hasAttribute('contenteditable')) {
@@ -291,7 +366,7 @@ class NrLine extends HTMLElement {
             return 0;
         }
         if (num % 1 !== 0) {
-            return num.toFixed(4);
+            return num.toFixed(2);
         }
         return num;
     }
@@ -418,6 +493,7 @@ function reset_sheet() {
 if (typeof window !== 'undefined') {
     window.onload = function () {
         handle_url_params();
+		/** Not used anymore ? removed buttons from the bottom, the upper once do the stuff now
         document.getElementById("add_line").addEventListener('click', () => {
             add_calc_line();
         });
@@ -425,6 +501,7 @@ if (typeof window !== 'undefined') {
         document.getElementById("reset_sheet").addEventListener('click', () => {
             reset_sheet();
         });
+		**/
 
         document.addEventListener('paste', (event) => {
             const active_element = document.activeElement;
@@ -466,21 +543,33 @@ if (typeof module !== 'undefined' && module.exports) {
     module.exports = { NrLine, NrSheet };
 }
 </script>
-	</head>
-	<body>
-		<h1>jotsum</h1>
-		<nr-sheet id="sheet">
-		</nr-sheet>
-		<nr-lastline>
-			<nr-spacer></nr-spacer>
-			<nr-total id='total'></nr-total>
-		</nr-lastline>
-		<button id="add_line">Add line</button>
-		<button id="reset_sheet">Reset</button>
-		<!-- button id="addline">Add line</button-->
-		<div style="padding-top: 30px; text-align:center">
-			<span id="version">146-gc41eb22<br>2025-09-26T20:52:41Z</span></br></br>
-			Just download this page for offline usage.</br>All source code and some documentation is available on <a href="https://github.com/jerik/jotsum">GitHub</a>.
-		</div>
-	</body>
+  </head>
+  <body>
+    <!-- Header -->
+    <header class="site-header">
+      <div class="wrap">
+        <h1 class="brand">JotSum</h1>
+        <nav class="actions">
+          <!--a class="btn" href="https://github.com/jerik/jotsum" target="_blank">Repository</a-->
+          <button class="btn btn-primary" onclick="add_calc_line()">Add line</button>
+          <button class="btn" onclick="reset_sheet()">Reset</button>
+        </nav>
+      </div>
+    </header>
+
+    <!-- Sheet -->
+    <nr-sheet id="sheet">
+    </nr-sheet>
+    <nr-lastline>
+      <nr-spacer></nr-spacer>
+      <nr-total id="total"></nr-total>
+    </nr-lastline>
+
+    <!-- Footer -->
+    <footer>
+      <span id="version" class="version"></span>
+      Download for offline use • Source and docs on <a href="https://github.com/jerik/jotsum">GitHub</a>
+    </footer>
+  </body>
 </html>
+
