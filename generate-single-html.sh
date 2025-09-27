@@ -31,7 +31,7 @@ cat $SOURCE | grep -A 1000 '</head>' > $BODY
 cat $HEAD $BODY > $FINAL
 
 # inject version
-sed -i.bak "s|<span id=\"version\"></span>|<span id=\"version\">$VERSION<br>$DATE</span>|" $FINAL
+sed -i.bak "s|<span id=\"version\"></span>|<span id=\"version\">$DATE<br>$VERSION</span>|" $FINAL
 
 # cleanup
 rm *.txt
