@@ -1,0 +1,443 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width" />
+  <title>jotsum - gitstyle</title>
+
+  <style>
+    /* ---- GitHub-ish Design Tokens ---- */
+    :root{
+      --bg:#fff; --surface:#fff; --text:#24292f; --muted:#6e7781;
+      --border:#d0d7de; --accent:#fd8c73; --btn:#f6f8fa; --btn-hover:#eef1f4;
+      --btn-border:#d0d7de; --primary:#1f883d; --shadow:0 1px 0 rgba(27,31,36,.04);
+      --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+      --sans: -apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,ui-sans-serif,Apple Color Emoji,Segoe UI Emoji;
+    }
+    @media (prefers-color-scheme:dark){
+      :root{
+        --bg:#0d1117; --surface:#0d1117; --text:#e6edf3; --muted:#7d8590;
+        --border:#30363d; --btn:#161b22; --btn-hover:#1c2128; --btn-border:#30363d;
+        --primary:#2ea043; --shadow:none;
+      }
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{margin:0; font:14px/1.5 var(--sans); background:var(--bg); color:var(--text)}
+
+    /* ---- Generic layout ---- */
+    .container{max-width:1040px; margin:0 auto; padding:0 16px}
+
+    /* ---- Header (GitHub-like) ---- */
+    .site-header{
+      position:sticky; top:0; z-index:10; background:var(--surface);
+      border-bottom:1px solid var(--border); box-shadow:var(--shadow);
+    }
+    .header-row{display:flex; align-items:center; gap:12px; min-height:56px}
+    .brand{display:flex; align-items:center; gap:10px; min-width:0}
+    .brand-title{font-size:18px; font-weight:600; margin:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+    .badge{font-size:12px; color:var(--muted); border:1px solid var(--border); border-radius:999px; padding:2px 8px; background:rgba(175,184,193,.1)}
+    .actions{margin-left:auto; display:flex; gap:8px; align-items:center; flex-wrap:wrap}
+    .btn{appearance:none; border:1px solid var(--btn-border); background:var(--btn); padding:6px 10px; border-radius:6px; font-weight:500; cursor:pointer}
+    .btn:hover{background:var(--btn-hover)}
+    .btn-primary{background:var(--primary); color:#fff; border-color:transparent}
+    .btn-link{background:transparent}
+    a.btn{color:inherit; text-decoration:none}
+
+    /* ---- Panel / Section ---- */
+    .content{padding:20px 0 40px}
+    .panel{border:1px solid var(--border); border-radius:8px; background:var(--surface)}
+    .panel-header{padding:14px 16px 6px; border-bottom:1px solid var(--border)}
+    .panel-title{font-weight:600; display:flex; align-items:center; gap:8px; position:relative; padding-bottom:10px}
+    .panel-title::after{content:""; position:absolute; left:0; bottom:-1px; height:2px; width:120px; background:var(--accent)}
+
+    /* ---- Dein Editor: Custom Elements ---- */
+    nr-sheet, nr-line, nr-sum, nr-lastline, nr-spacer, nr-total { display:block; }
+
+    /* Sheet + Lastline wie zweispaltiges Grid (Inhalt | Summe) */
+    nr-sheet{
+      display:grid; grid-template-columns: 70% auto; padding:0; border:1px solid var(--border);
+      border-radius:8px; background:var(--bg); overflow:hidden;
+    }
+    nr-lastline{
+      display:grid; grid-template-columns: 70% auto; padding:0; margin-top:8px;
+    }
+    @media (max-width: 600px){
+      nr-sheet, nr-lastline{ grid-template-columns: 60% 40%; }
+    }
+
+    /* Einzelzeilen & Summen */
+    nr-line, nr-sum{
+      padding:8px 10px; line-height:1.5; font-size:16px; border-bottom:1px solid var(--border);
+    }
+    nr-line{
+      background-color:#f7f7f7;
+      /* Monospace gibt „Rechenblock“-Gefühl, optional: */
+      font-family: var(--mono);
+    }
+    nr-sum{ background-color:var(--surface); }
+
+    /* Hover / Focus (aktive Zeile optional via Klasse .is-active setzen) */
+    nr-line:hover, nr-sum:hover{ background:rgba(175,184,193,.10); }
+    @media (prefers-color-scheme:dark){
+      nr-line:hover, nr-sum:hover{ background:rgba(110,119,129,.12); }
+    }
+    nr-line.is-active{ outline:2px solid #0969da44; outline-offset:-2px; }
+
+    /* Spacer & Total */
+    nr-spacer{ padding:8px 10px; }
+    nr-total{
+      background:var(--surface); border-top:1px solid #0000; padding:8px 10px;
+      font-size:18px; font-weight:700; text-align:left;
+    }
+
+    /* Controls unter dem Editor (falls genutzt) */
+    .controls{display:flex; gap:8px; flex-wrap:wrap; margin:12px 0}
+    .muted{color:var(--muted); font-size:12px}
+
+    /* Zusatz: ausgewählte Elemente (vom Add-on) */
+    .imageye-selected{ outline:2px solid black !important; box-shadow:0 0 10px rgba(0,0,0,.5) !important; }
+  </style>
+</head>
+
+<body>
+  <!-- Header -->
+  <header class="site-header">
+    <div class="container header-row">
+      <div class="brand">
+        <h1 class="brand-title">JotSum</h1>
+        <span class="badge">public</span>
+      </div>
+      <nav class="actions">
+        <a class="btn btn-link" href="https://github.com/jerik/jotsum" target="_blank" rel="noopener">Repository</a>
+        <button class="btn" id="btn-share" title="Create shareable link">Share</button>
+        <button class="btn" id="btn-load" title="Load text file">Load</button>
+        <button class="btn btn-primary" id="btn-new" title="New sheet">New</button>
+        <input type="file" id="file-input" accept=".txt,text/plain" style="display:none" />
+      </nav>
+    </div>
+  </header>
+
+  <!-- Main content -->
+  <main class="container content">
+    <section class="panel">
+      <div class="panel-header">
+        <div class="panel-title">README</div>
+      </div>
+
+      <!-- Dein Editor -->
+      <nr-sheet id="sheet"></nr-sheet>
+
+      <nr-lastline>
+        <nr-spacer></nr-spacer>
+        <nr-total id="total">0</nr-total>
+      </nr-lastline>
+
+      <div class="controls">
+        <!-- Deine alten Buttons bleiben optional verfügbar -->
+        <button class="btn" id="add_line">Add line</button>
+        <button class="btn" id="reset_sheet">Reset</button>
+        <span class="muted">Tip: Paste multi-line text or use the Share link.</span>
+      </div>
+
+      <div style="padding:20px 0; text-align:center">
+        <span id="version">__BUILD_VERSION__<br>__BUILD_DATE__</span><br><br>
+        Just download this page for offline usage.<br>
+        All source code and some documentation is available on
+        <a href="https://github.com/jerik/jotsum">GitHub</a>.
+      </div>
+    </section>
+  </main>
+
+  <script>
+/* ========= Original Logik + Verbesserungen (IME/Diktat) ========= */
+class NrSheet extends HTMLElement {
+  constructor() {
+    super();
+    // Rechne neu bei Eingaben & Struktur-Events
+    this.addEventListener('keyup', this.update_total);
+    this.addEventListener('input', this.update_total);
+    this.addEventListener('beforeinput', this.update_total);
+    this.addEventListener('line-deleted', this.update_total);
+    this.addEventListener('line-added', this.update_total);
+  }
+  update_total() {
+    let total = 0;
+    const sums = this.querySelectorAll('nr-sum');
+    sums.forEach(sum => {
+      const value = parseFloat(sum.textContent);
+      if (!isNaN(value)) total += value;
+    });
+    document.getElementById('total').textContent = NrSheet.round(total);
+  }
+  static round(num) {
+    if (num % 1 !== 0) return num.toFixed(4);
+    return num;
+  }
+}
+
+class NrLine extends HTMLElement {
+  constructor() {
+    super();
+    // Sofortige Neukalkulation bei IME/Diktat/Paste
+    this.addEventListener('input', this.recalculate);
+    this.addEventListener('beforeinput', this.recalculate);
+    this.addEventListener('keyup', this.recalculate);
+    this.addEventListener('keydown', this.handle_keys);
+  }
+  connectedCallback() {
+    if (!this.hasAttribute('contenteditable')) this.setAttribute('contenteditable', 'true');
+  }
+  recalculate() {
+    const subtotal = this.calculate(this.textContent.trim());
+    const sumElement = this.nextElementSibling;
+    if (sumElement && sumElement.tagName === 'NR-SUM') sumElement.textContent = this.round(subtotal);
+  }
+  calculate(expression) {
+    if (!expression || typeof expression !== 'string') return 0;
+    try {
+      const tokens = this.tokenize(expression);
+      const RPN = this.shuntingYard(tokens);
+      const result = this.calculateRPN(RPN);
+      return result === undefined ? 0 : result;
+    } catch (e) { return 0; }
+  }
+  tokenize(expression) {
+    const tokens = [];
+    let current_number = '';
+    let last_token_was_operator = true;
+    for (let i = 0; i < expression.length; i++) {
+      const char = expression[i];
+      if (char === ' ') {
+        if (current_number !== '') { tokens.push(parseFloat(current_number)); current_number = ''; }
+        continue;
+      }
+      if (!isNaN(char) || (char === '.' && !((expression[i-1] && /[a-zA-Z]/.test(expression[i-1])) || (expression[i+1] && /[a-zA-Z]/.test(expression[i+1]))))) {
+        if (char === '.' && current_number.includes('.')) {
+          tokens.push(parseFloat(current_number)); current_number = ''; tokens.push(char); last_token_was_operator = true;
+        } else { current_number += char; last_token_was_operator = false; }
+      } else {
+        if (current_number !== '') { if (!isNaN(current_number)) tokens.push(parseFloat(current_number)); current_number = ''; }
+        if (char === '-' && ((expression[i-1] && /[a-zA-Z]/.test(expression[i-1])) || (expression[i+1] && /[a-zA-Z]/.test(expression[i+1])))) {
+          last_token_was_operator = false;
+        } else if (['+', '-', '*', '/', '(', ')'].includes(char)) {
+          if (char === '-' && last_token_was_operator) tokens.push('u');
+          else if (char === '+' && last_token_was_operator) { /* ignore unary plus */ }
+          else tokens.push(char);
+          last_token_was_operator = true;
+        } else { last_token_was_operator = false; }
+      }
+    }
+    if (current_number !== '') tokens.push(parseFloat(current_number));
+
+    // Implizite Addition  (… 3 4 … -> 3 + 4 …)
+    const final_tokens = [];
+    for (let i = 0; i < tokens.length; i++) {
+      final_tokens.push(tokens[i]);
+      if (i < tokens.length - 1 && typeof tokens[i] === 'number' && typeof tokens[i+1] === 'number') {
+        final_tokens.push('+');
+      }
+    }
+    return final_tokens;
+  }
+  shuntingYard(tokens) {
+    const output = [], operators = [];
+    const precedence = { '+':1, '-':1, '*':2, '/':2, 'u':3 };
+    for (const token of tokens) {
+      if (typeof token === 'number') output.push(token);
+      else if (token in precedence) {
+        while (operators.length>0 && (operators[operators.length-1] in precedence) &&
+               precedence[operators[operators.length-1]] >= precedence[token]) {
+          output.push(operators.pop());
+        }
+        operators.push(token);
+      } else if (token === '(') operators.push(token);
+      else if (token === ')') {
+        while (operators.length>0 && operators[operators.length-1] !== '(') output.push(operators.pop());
+        if (operators[operators.length-1] === '(') operators.pop();
+      }
+    }
+    while (operators.length>0) output.push(operators.pop());
+    return output;
+  }
+  calculateRPN(rpn) {
+    const stack = [];
+    for (const token of rpn) {
+      if (typeof token === 'number') stack.push(token);
+      else if (token === 'u') stack.push(-stack.pop());
+      else {
+        const b = stack.pop(), a = stack.pop();
+        switch(token){ case '+': stack.push(a+b); break; case '-': stack.push(a-b); break;
+          case '*': stack.push(a*b); break; case '/': stack.push(a/b); break; }
+      }
+    }
+    return stack[0];
+  }
+  round(num) {
+    if (num === -0) return 0;
+    if (num % 1 !== 0) return num.toFixed(4);
+    return num;
+  }
+  handle_keys(e) {
+    if (e.which === 13) { // Enter
+      e.preventDefault();
+      if (e.ctrlKey) this.add_new_line_after();
+      else {
+        const next_line = this.nextElementSibling?.nextElementSibling;
+        if (next_line) next_line.focus(); else this.add_new_line_after();
+      }
+    } else if (e.which === 38) { // Up
+      const prev_line = this.previousElementSibling?.previousElementSibling;
+      if (prev_line) prev_line.focus();
+    } else if (e.which === 40) { // Down
+      const next_line = this.nextElementSibling?.nextElementSibling;
+      if (next_line) next_line.focus();
+    } else if (e.which === 46 && e.ctrlKey) { // Ctrl+Del
+      this.delete_line();
+    }
+  }
+  add_new_line_after(content=''){
+    const new_line = document.createElement('nr-line');
+    new_line.textContent = content;
+    const new_sum = document.createElement('nr-sum');
+    this.parentNode.insertBefore(new_line, this.nextElementSibling.nextElementSibling);
+    this.parentNode.insertBefore(new_sum, new_line.nextElementSibling);
+    new_line.focus();
+    this.dispatchEvent(new Event('line-added', { bubbles:true }));
+    new_line.recalculate();
+    return new_line;
+  }
+  delete_line(){
+    const parent = this.parentNode;
+    const sumElement = this.nextElementSibling;
+    const nextLine = this.nextElementSibling ? this.nextElementSibling.nextElementSibling : null;
+    const prevLine = this.previousElementSibling ? this.previousElementSibling.previousElementSibling : null;
+    parent.removeChild(this); if (sumElement) parent.removeChild(sumElement);
+    if (nextLine) nextLine.focus(); else if (prevLine) prevLine.focus();
+    this.dispatchEvent(new Event('line-deleted', { bubbles:true }));
+  }
+}
+
+class NrSum extends HTMLElement { constructor(){ super(); } }
+
+customElements.define('nr-sheet', NrSheet);
+customElements.define('nr-line', NrLine);
+customElements.define('nr-sum', NrSum);
+
+/* ========= Helper / App-Funktionen ========= */
+function add_calc_line(starter=''){
+  const nr_sheet = document.getElementById('sheet');
+  const nr_line = document.createElement('nr-line');
+  if (starter) nr_line.textContent = starter;
+  const nr_sum = document.createElement('nr-sum');
+  nr_sheet.appendChild(nr_line);
+  nr_sheet.appendChild(nr_sum);
+  nr_line.focus();
+  nr_line.recalculate();
+  nr_sheet.update_total();
+}
+
+function clear_sheet(){
+  const sheet = document.getElementById('sheet');
+  while (sheet.firstChild) sheet.removeChild(sheet.firstChild);
+}
+
+function reset_sheet(){
+  clear_sheet();
+  add_calc_line('3 apples + 4 pears');
+  document.getElementById('sheet').update_total();
+}
+
+function handle_url_params(){
+  const url_params = new URLSearchParams(window.location.search);
+  const text_param = url_params.get('text');
+  if (text_param){
+    const decoded = decodeURIComponent(text_param);
+    const lines = decoded.split('\n').filter(l => l.trim() !== '');
+    clear_sheet();
+    if (lines.length === 0){ add_calc_line('3 apples + 4 pears'); }
+    else { lines.forEach(line => add_calc_line(line)); }
+    document.getElementById('sheet').update_total();
+  } else {
+    add_calc_line('3 apples + 4 pears');
+  }
+}
+
+/* Share: erzeugt URL mit ?text=… aus aktuellen Zeilen und kopiert sie */
+async function share_as_url(){
+  const lines = Array.from(document.querySelectorAll('nr-sheet > nr-line'))
+    .map(n => (n.textContent || '').trim())
+    .filter(s => s.length > 0);
+  const text = lines.join('\n');
+  const url = new URL(location.href.split('?')[0]);
+  url.searchParams.set('text', text);
+  const shareUrl = url.toString();
+
+  try {
+    await navigator.clipboard.writeText(shareUrl);
+    alert('Share link copied to clipboard!');
+  } catch {
+    prompt('Copy this URL', shareUrl);
+  }
+}
+
+/* Load: Textdatei einlesen */
+function load_file_from_input(file){
+  const reader = new FileReader();
+  reader.onload = () => {
+    const data = (reader.result || '').toString();
+    const lines = data.split('\n').filter(l => l.trim() !== '');
+    clear_sheet();
+    if (lines.length === 0) add_calc_line('');
+    else lines.forEach(l => add_calc_line(l));
+    document.getElementById('sheet').update_total();
+  };
+  reader.readAsText(file);
+}
+
+/* ========= Boot ========= */
+window.onload = function(){
+  handle_url_params();
+
+  document.getElementById('add_line')?.addEventListener('click', () => add_calc_line());
+  document.getElementById('reset_sheet')?.addEventListener('click', reset_sheet);
+
+  document.getElementById('btn-new')?.addEventListener('click', reset_sheet);
+  document.getElementById('btn-share')?.addEventListener('click', share_as_url);
+  document.getElementById('btn-load')?.addEventListener('click', () => document.getElementById('file-input').click());
+  document.getElementById('file-input')?.addEventListener('change', (e) => {
+    const f = e.target.files && e.target.files[0];
+    if (f) load_file_from_input(f);
+    e.target.value = '';
+  });
+
+  // Global Paste (bestehende Logik, minimal angepasst)
+  document.addEventListener('paste', (event) => {
+    const active = document.activeElement;
+    if (active && active.closest('nr-sheet, nr-line')) {
+      event.preventDefault();
+      const paste = event.clipboardData.getData('text/plain');
+      const lines = paste.split('\n').filter(line => line.trim() !== '');
+      if (lines.length === 0) return;
+
+      if (active.tagName === 'NR-LINE') {
+        active.textContent = lines[0];
+        active.recalculate();
+        let cur = active;
+        for (let i = 1; i < lines.length; i++) cur = cur.add_new_line_after(lines[i]);
+        if (lines.length > 1) cur.focus();
+      } else {
+        lines.forEach(line => add_calc_line(line));
+      }
+      document.getElementById('sheet').update_total();
+    }
+  });
+};
+
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = { NrLine, NrSheet };
+}
+  </script>
+</body>
+</html>
+

@@ -32,104 +32,61 @@
       .btn-primary:hover { background:#1a7f37; }
       a.btn { color: inherit; text-decoration: none; }
 
-	  /* Grid / Layout – robust, auch in Safari */
-	  nr-sheet, nr-lastline {
-	    display: grid;
-	  
-	    /* Links: Text (1fr). Rechts: Summe (breite genug für Zahlen). */
-	    grid-template-columns: 1fr minmax(8ch, 14ch);
-	    column-gap: 12px;
-	  
-	    max-width: 1040px;
-	    margin: 20px auto 0;
-	    padding: 0 16px;
-	  }
-	  nr-lastline { margin-top: 0; }
-	  
-	  /* explizit auf Spalten pinnen – verhindert „Umklappen“ */
-	  nr-line     { grid-column: 1; }
-	  nr-sum      { grid-column: 2; }
-	  nr-spacer   { grid-column: 1; }
-	  nr-total    { grid-column: 2; }
-	  
-	  /* Mobile: Summe etwas schmaler, damit’s immer passt */
-	  @media (max-width: 600px) {
-	    .wrap { padding: 8px 12px; }
-	    nr-sheet, nr-lastline {
-	  	grid-template-columns: 1fr minmax(6ch, 12ch);
-	  	column-gap: 8px;
-	    }
-	  }
+      /* Grid / Layout */
+      nr-sheet {
+        display: grid;
+        grid-template-columns: 70% auto;
+        max-width: 1040px;
+        margin: 20px auto 0;           /* Abstand unter Header */
+        padding: 0 16px;               /* bündig mit Header */
+      }
+      nr-lastline {
+        display: grid;
+        grid-template-columns: 70% auto;
+        max-width: 1040px;
+        margin: 0 auto;
+        padding: 0 16px;
+      }
 
       /* Typo & Zeilen */
       nr-line, nr-sum, nr-total {
         font-size: 18px;
         font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
         padding: 7px;
+        text-align: left;
       }
 
       nr-line {
         background: #f7f7f7;
         border-bottom: 1px solid #ffffff; /* weiße Trennlinie zwischen Zeilen */
-        text-align: left;
       }
       nr-sum {
         background: #ffffff;
         border-bottom: 1px solid #ffffff; /* gleiche Trennlinie rechts */
-        text-align: right;
-        white-space: nowrap;
-        font-variant-numeric: tabular-nums;
+        /* kein border-left */
       }
       nr-spacer { 
-        padding: 7px; 
-        border-top: 1px solid #d0d7de; /* dein Abschlussstrich */
-      }
+		padding: 7px; 
+        border-top: 2px solid #d0d7de;
+	  }
       nr-total {
         background: #ffffff;
-        text-align: right;
+        /* kein border-left, kein border-top (kein dunkler Schlussstrich) */
         font-weight: bold;
-        border-top: 1px solid #d0d7de; /* passend zum Spacer */
-        white-space: nowrap;
-        font-variant-numeric: tabular-nums;
+        border-top: 2px solid #d0d7de;
       }
 
-	  /* Aktive Zeile: sehr dezentes Highlight + schmale Akzentleiste links */
-	  nr-line.is-active {
-	    background-color: #fffbe6;             /* heller als vorher */
-	    position: relative;
-	  }
-	  nr-line.is-active::before {
-	    content: "";
-	    position: absolute;
-	    left: 0; top: 0; bottom: 0;
-	    width: 3px;
-	    background: #d0d7de;                   /* GitHub-Grau als Akzent */
-	  }
-	  nr-line:focus { outline: none; }
-	  
-	  /* Dark Mode: noch dezenteres Highlight + etwas dunklere Akzentleiste */
-	  @media (prefers-color-scheme: dark){
-	    nr-line.is-active {
-	  	  background-color: rgba(255, 251, 230, 0.10);  /* zartes Gelb, transparent */
-	    }
-	    nr-line.is-active::before {
-	  	  background: #6e7781;                 /* Muted Grey im Dark Mode */
-	    }
-      /* nr-line:focus { outline: none; } */
-	  }
+      /* Aktive Zeile */
+      nr-line.is-active { background-color: #fff8c5; }
+      @media (prefers-color-scheme: dark){
+        nr-line.is-active { background-color: #3a2e13; }
+      }
+      nr-line:focus { outline: none; }
 
-
-      /* Mobile */
       @media (max-width: 600px) {
-		.wrap { padding: 8px 12px; gap: 8px; }
-		.brand { font-size: 16px; }            /* vorher 18px */
-		.btn { padding: 5px 8px; font-size: 13px; }
-
-        /* Summe bleibt kompakt; Text bekommt den restlichen Platz */
-        nr-sheet, nr-lastline {
-          grid-template-columns: 1fr minmax(6ch, fit-content(12ch));
-          column-gap: 8px;
-        }
+        nr-sheet, nr-lastline { grid-template-columns: 60% 40%; }
+        nr-sum, nr-total { text-align: right; }
+        .wrap { padding: 8px 12px; }
       }
 
       /* Footer */
@@ -150,7 +107,7 @@
       <div class="wrap">
         <h1 class="brand">JotSum</h1>
         <nav class="actions">
-          <!--a class="btn" href="https://github.com/jerik/jotsum" target="_blank">Repository</a-->
+          <a class="btn" href="https://github.com/jerik/jotsum" target="_blank">Repository</a>
           <button class="btn btn-primary" onclick="add_calc_line()">Add line</button>
           <button class="btn" onclick="reset_sheet()">Reset</button>
         </nav>
@@ -159,6 +116,8 @@
 
     <!-- Sheet -->
     <nr-sheet id="sheet">
+      <nr-line contenteditable="true">10 * 8 -8</nr-line>
+      <nr-sum>72</nr-sum>
     </nr-sheet>
     <nr-lastline>
       <nr-spacer></nr-spacer>
