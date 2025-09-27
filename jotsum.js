@@ -20,7 +20,7 @@ class NrSheet extends HTMLElement {
 
     round(num) {
         if (num % 1 !== 0) {
-            return num.toFixed(4);
+            return num.toFixed(2);
         }
         return num;
     }
@@ -221,7 +221,7 @@ class NrLine extends HTMLElement {
             return 0;
         }
         if (num % 1 !== 0) {
-            return num.toFixed(4);
+            return num.toFixed(2);
         }
         return num;
     }
