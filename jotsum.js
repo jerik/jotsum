@@ -27,11 +27,23 @@ class NrSheet extends HTMLElement {
 }
 
 class NrLine extends HTMLElement {
-    constructor() {
-        super();
-        this.addEventListener('keyup', this.recalculate);
-        this.addEventListener('keydown', this.handle_keys);
-    }
+	constructor() {
+		super();
+		this.addEventListener('input', this.recalculate);
+		this.addEventListener('beforeinput', this.recalculate);
+		this.addEventListener('keyup', this.recalculate);
+		this.addEventListener('keydown', this.handle_keys);
+
+		// ✨ Aktiv-Markierung
+		this._onFocus = () => {
+		  // andere aktive Zeile(n) abräumen
+		  document.querySelectorAll('nr-line.is-active').forEach(el => { if (el !== this) el.classList.remove('is-active'); });
+		  this.classList.add('is-active');
+		};
+		this._onBlur = () => { this.classList.remove('is-active'); };
+		this.addEventListener('focus', this._onFocus);
+		this.addEventListener('blur', this._onBlur);
+  }
 
     connectedCallback() {
         if (!this.hasAttribute('contenteditable')) {
@@ -336,6 +348,7 @@ function reset_sheet() {
 if (typeof window !== 'undefined') {
     window.onload = function () {
         handle_url_params();
+		/** Not used anymore ? removed buttons from the bottom, the upper once do the stuff now
         document.getElementById("add_line").addEventListener('click', () => {
             add_calc_line();
         });
@@ -343,6 +356,7 @@ if (typeof window !== 'undefined') {
         document.getElementById("reset_sheet").addEventListener('click', () => {
             reset_sheet();
         });
+		**/
 
         document.addEventListener('paste', (event) => {
             const active_element = document.activeElement;
