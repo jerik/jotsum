@@ -5,6 +5,9 @@ on:
   push:
     branches:
       - master
+    paths: 
+      - 'jotsum.html'
+      - 'jotsum.js'
 
 jobs:
   run-script:
