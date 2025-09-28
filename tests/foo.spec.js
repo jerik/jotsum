@@ -37,10 +37,10 @@ test.describe('test jotsum', () => {
 	test('unit test', async ({ page }) => {
 
 		await page.setContent(` 
-			<nr-sheet id="sheet">
-				<nr-line contenteditable>I have 3 apples + 4 cherries </nr-line>
-				<nr-sum ></nr-sum>
-			</nr-sheet>
+			<jo-sheet id="sheet">
+				<jo-line contenteditable>I have 3 apples + 4 cherries </jo-line>
+				<jo-sum ></jo-sum>
+			</jo-sheet>
 			`);
 		let bar = await page.content();
 		console.log(bar);

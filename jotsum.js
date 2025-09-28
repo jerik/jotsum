@@ -1,4 +1,4 @@
-class NrSheet extends HTMLElement {
+class JoSheet extends HTMLElement {
     constructor() {
         super();
         this.addEventListener('keyup', this.update_total);
@@ -8,7 +8,7 @@ class NrSheet extends HTMLElement {
 
     update_total() {
         let total = 0;
-        const sums = this.querySelectorAll('nr-sum');
+        const sums = this.querySelectorAll('jo-sum');
         sums.forEach(sum => {
             const value = parseFloat(sum.textContent);
             if (!isNaN(value)) {
@@ -26,7 +26,7 @@ class NrSheet extends HTMLElement {
     }
 }
 
-class NrLine extends HTMLElement {
+class JoLine extends HTMLElement {
 	constructor() {
 		super();
 		this.addEventListener('input', this.recalculate);
@@ -37,7 +37,7 @@ class NrLine extends HTMLElement {
 		// ✨ Aktiv-Markierung
 		this._onFocus = () => {
 		  // andere aktive Zeile(n) abräumen
-		  document.querySelectorAll('nr-line.is-active').forEach(el => { if (el !== this) el.classList.remove('is-active'); });
+		  document.querySelectorAll('jo-line.is-active').forEach(el => { if (el !== this) el.classList.remove('is-active'); });
 		  this.classList.add('is-active');
 		};
 		this._onBlur = () => { this.classList.remove('is-active'); };
@@ -54,7 +54,7 @@ class NrLine extends HTMLElement {
     recalculate() {
         const subtotal = this.calculate(this.textContent.trim());
         const sumElement = this.nextElementSibling;
-        if (sumElement && sumElement.tagName === 'NR-SUM') {
+        if (sumElement && sumElement.tagName === 'JO-SUM') {
             sumElement.textContent = this.round(subtotal);
         }
     }
@@ -255,9 +255,9 @@ class NrLine extends HTMLElement {
     }
 
     add_new_line_after(content = '') {
-        const new_line = document.createElement('nr-line');
+        const new_line = document.createElement('jo-line');
         new_line.textContent = content;
-        const new_sum = document.createElement('nr-sum');
+        const new_sum = document.createElement('jo-sum');
         this.parentNode.insertBefore(new_line, this.nextElementSibling.nextElementSibling);
         this.parentNode.insertBefore(new_sum, new_line.nextElementSibling);
         new_line.focus();
@@ -287,28 +287,28 @@ class NrLine extends HTMLElement {
     }
 }
 
-class NrSum extends HTMLElement {
+class JoSum extends HTMLElement {
     constructor() {
         super();
     }
 }
 
-customElements.define('nr-sheet', NrSheet);
-customElements.define('nr-line', NrLine);
-customElements.define('nr-sum', NrSum);
+customElements.define('jo-sheet', JoSheet);
+customElements.define('jo-line', JoLine);
+customElements.define('jo-sum', JoSum);
 
 function add_calc_line(starter = '') {
-    const nr_sheet = document.getElementById('sheet');
-    const nr_line = document.createElement('nr-line');
+    const jo_sheet = document.getElementById('sheet');
+    const jo_line = document.createElement('jo-line');
     if (starter) {
-        nr_line.textContent = starter;
+        jo_line.textContent = starter;
     }
-    const nr_sum = document.createElement('nr-sum');
-    nr_sheet.appendChild(nr_line);
-    nr_sheet.appendChild(nr_sum);
-    nr_line.focus();
-    nr_line.recalculate();
-    nr_sheet.update_total();
+    const jo_sum = document.createElement('jo-sum');
+    jo_sheet.appendChild(jo_line);
+    jo_sheet.appendChild(jo_sum);
+    jo_line.focus();
+    jo_line.recalculate();
+    jo_sheet.update_total();
 }
 
 function handle_url_params() {
@@ -362,14 +362,14 @@ if (typeof window !== 'undefined') {
             const active_element = document.activeElement;
 
             // Only act if we are pasting into the sheet or a line
-            if (active_element && active_element.closest('nr-sheet, nr-line')) {
+            if (active_element && active_element.closest('jo-sheet, jo-line')) {
                 event.preventDefault();
                 const paste_data = event.clipboardData.getData('text/plain');
                 const lines = paste_data.split('\n').filter(line => line.trim() !== '');
 
                 if (lines.length === 0) return;
 
-                if (active_element.tagName === 'NR-LINE') {
+                if (active_element.tagName === 'JO-LINE') {
                     // Paste into an existing line
                     active_element.textContent = lines[0];
                     active_element.recalculate();
@@ -395,5 +395,5 @@ if (typeof window !== 'undefined') {
 }
 
 if (typeof module !== 'undefined' && module.exports) {
-    module.exports = { NrLine, NrSheet };
+    module.exports = { JoLine, JoSheet };
 }

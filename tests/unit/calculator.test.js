@@ -1,11 +1,11 @@
 const assert = require('assert');
-const { NrLine } = require('../../jotsum.js');
+const { JoLine } = require('../../jotsum.js');
 
 
 
 
 function testCalculate() {
-    const nrLine = new NrLine();
+    const joLine = new JoLine();
     const tests = [
         { expression: '2 + 2', expected: 4 },
         { expression: '5 - 3', expected: 2 },
@@ -53,7 +53,7 @@ function testCalculate() {
     ];
 
     tests.forEach(test => {
-        const result = nrLine.calculate(test.expression);
+        const result = joLine.calculate(test.expression);
         if (test.expected === 'NaN') {
             assert(isNaN(result), `Test failed for expression: "${test.expression}". Expected NaN, but got ${result}`);
         } else {

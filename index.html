@@ -33,7 +33,7 @@
       a.btn { color: inherit; text-decoration: none; }
 
 	  /* Grid / Layout – robust, auch in Safari */
-	  nr-sheet, nr-lastline {
+	  jo-sheet, nr-lastline {
 	    display: grid;
 	  
 	    /* Links: Text (1fr). Rechts: Summe (breite genug für Zahlen). */
@@ -47,33 +47,33 @@
 	  nr-lastline { margin-top: 0; }
 	  
 	  /* explizit auf Spalten pinnen – verhindert „Umklappen“ */
-	  nr-line     { grid-column: 1; }
-	  nr-sum      { grid-column: 2; }
+	  jo-line     { grid-column: 1; }
+	  jo-sum      { grid-column: 2; }
 	  nr-spacer   { grid-column: 1; }
-	  nr-total    { grid-column: 2; }
+	  jo-total    { grid-column: 2; }
 	  
 	  /* Mobile: Summe etwas schmaler, damit’s immer passt */
 	  @media (max-width: 600px) {
 	    .wrap { padding: 8px 12px; }
-	    nr-sheet, nr-lastline {
+	    jo-sheet, nr-lastline {
 	  	grid-template-columns: 1fr minmax(6ch, 12ch);
 	  	column-gap: 8px;
 	    }
 	  }
 
       /* Typo & Zeilen */
-      nr-line, nr-sum, nr-total {
+      jo-line, jo-sum, jo-total {
         font-size: 18px;
         font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
         padding: 7px;
       }
 
-      nr-line {
+      jo-line {
         background: #f7f7f7;
         border-bottom: 1px solid #ffffff; /* weiße Trennlinie zwischen Zeilen */
         text-align: left;
       }
-      nr-sum {
+      jo-sum {
         background: #ffffff;
         border-bottom: 1px solid #ffffff; /* gleiche Trennlinie rechts */
         text-align: right;
@@ -84,7 +84,7 @@
         padding: 7px; 
         border-top: 1px solid #d0d7de; /* dein Abschlussstrich */
       }
-      nr-total {
+      jo-total {
         background: #ffffff;
         text-align: right;
         font-weight: bold;
@@ -94,28 +94,28 @@
       }
 
 	  /* Aktive Zeile: sehr dezentes Highlight + schmale Akzentleiste links */
-	  nr-line.is-active {
+	  jo-line.is-active {
 	    background-color: #fffbe6;             /* heller als vorher */
 	    position: relative;
 	  }
-	  nr-line.is-active::before {
+	  jo-line.is-active::before {
 	    content: "";
 	    position: absolute;
 	    left: 0; top: 0; bottom: 0;
 	    width: 3px;
 	    background: #d0d7de;                   /* GitHub-Grau als Akzent */
 	  }
-	  nr-line:focus { outline: none; }
+	  jo-line:focus { outline: none; }
 	  
 	  /* Dark Mode: noch dezenteres Highlight + etwas dunklere Akzentleiste */
 	  @media (prefers-color-scheme: dark){
-	    nr-line.is-active {
+	    jo-line.is-active {
 	  	  background-color: rgba(255, 251, 230, 0.10);  /* zartes Gelb, transparent */
 	    }
-	    nr-line.is-active::before {
+	    jo-line.is-active::before {
 	  	  background: #6e7781;                 /* Muted Grey im Dark Mode */
 	    }
-      /* nr-line:focus { outline: none; } */
+      /* jo-line:focus { outline: none; } */
 	  }
 
 
@@ -126,7 +126,7 @@
 		.btn { padding: 5px 8px; font-size: 13px; }
 
         /* Summe bleibt kompakt; Text bekommt den restlichen Platz */
-        nr-sheet, nr-lastline {
+        jo-sheet, nr-lastline {
           grid-template-columns: 1fr minmax(6ch, fit-content(12ch));
           column-gap: 8px;
         }
@@ -154,7 +154,7 @@ class NrSheet extends HTMLElement {
 
     update_total() {
         let total = 0;
-        const sums = this.querySelectorAll('nr-sum');
+        const sums = this.querySelectorAll('jo-sum');
         sums.forEach(sum => {
             const value = parseFloat(sum.textContent);
             if (!isNaN(value)) {
@@ -183,7 +183,7 @@ class NrLine extends HTMLElement {
 		// ✨ Aktiv-Markierung
 		this._onFocus = () => {
 		  // andere aktive Zeile(n) abräumen
-		  document.querySelectorAll('nr-line.is-active').forEach(el => { if (el !== this) el.classList.remove('is-active'); });
+		  document.querySelectorAll('jo-line.is-active').forEach(el => { if (el !== this) el.classList.remove('is-active'); });
 		  this.classList.add('is-active');
 		};
 		this._onBlur = () => { this.classList.remove('is-active'); };
@@ -401,9 +401,9 @@ class NrLine extends HTMLElement {
     }
 
     add_new_line_after(content = '') {
-        const new_line = document.createElement('nr-line');
+        const new_line = document.createElement('jo-line');
         new_line.textContent = content;
-        const new_sum = document.createElement('nr-sum');
+        const new_sum = document.createElement('jo-sum');
         this.parentNode.insertBefore(new_line, this.nextElementSibling.nextElementSibling);
         this.parentNode.insertBefore(new_sum, new_line.nextElementSibling);
         new_line.focus();
@@ -439,17 +439,17 @@ class NrSum extends HTMLElement {
     }
 }
 
-customElements.define('nr-sheet', NrSheet);
-customElements.define('nr-line', NrLine);
-customElements.define('nr-sum', NrSum);
+customElements.define('jo-sheet', NrSheet);
+customElements.define('jo-line', NrLine);
+customElements.define('jo-sum', NrSum);
 
 function add_calc_line(starter = '') {
     const nr_sheet = document.getElementById('sheet');
-    const nr_line = document.createElement('nr-line');
+    const nr_line = document.createElement('jo-line');
     if (starter) {
         nr_line.textContent = starter;
     }
-    const nr_sum = document.createElement('nr-sum');
+    const nr_sum = document.createElement('jo-sum');
     nr_sheet.appendChild(nr_line);
     nr_sheet.appendChild(nr_sum);
     nr_line.focus();
@@ -508,7 +508,7 @@ if (typeof window !== 'undefined') {
             const active_element = document.activeElement;
 
             // Only act if we are pasting into the sheet or a line
-            if (active_element && active_element.closest('nr-sheet, nr-line')) {
+            if (active_element && active_element.closest('jo-sheet, jo-line')) {
                 event.preventDefault();
                 const paste_data = event.clipboardData.getData('text/plain');
                 const lines = paste_data.split('\n').filter(line => line.trim() !== '');
@@ -559,11 +559,11 @@ if (typeof module !== 'undefined' && module.exports) {
     </header>
 
     <!-- Sheet -->
-    <nr-sheet id="sheet">
-    </nr-sheet>
+    <jo-sheet id="sheet">
+    </jo-sheet>
     <nr-lastline>
       <nr-spacer></nr-spacer>
-      <nr-total id="total"></nr-total>
+      <jo-total id="total"></jo-total>
     </nr-lastline>
 
     <!-- Footer -->
