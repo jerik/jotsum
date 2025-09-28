@@ -4,7 +4,12 @@
 - aus der zwischenablage ein mehrzeiligen text "importieren". jede zeile ist eine zeile in jotsum mit automatischem calc
 - nur minus oder plus zahl muss auch funktionieren in einer zeile. Bspw. -200 oder +200
 
-# Chat GPT Suggestions
+## helper
+### finding elements for playwright 
+In the developer console: 
+$x("//jo-line")
+
+## Chat GPT Suggestions
 Super Projekt – ich hab’s mir angeschaut (Demo-Seite + Repo) und sehe schon ein paar mobile-Hebel. Auf der Page gibt’s z. B. den „Add line“-Button, die Versionsanzeige und den Hinweis „Just download this page for offline usage“, der Ansatz passt also gut für ein **leichtes, offline-fähiges** Tool im Browser. ([jerik.github.io][1])
 Im Repo liegen `index.html`, `jotsum.html` und `jotsum.js`, plus Tests/Playwright-Config – prima Grundlage für saubere Mobile-Optimierungen. ([GitHub][2])
 

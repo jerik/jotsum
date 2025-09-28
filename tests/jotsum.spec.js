@@ -8,9 +8,11 @@ const { test, expect } = require('@playwright/test');
 
 // https://playwright.dev/docs/writing-tests
 // test jotsum
-test('initial start of page with line and sum', async ({ page }) => {
-  await page.goto('/');
+test.beforeEach(async ({ page }) => {
+  await page.goto('/jotsum.html');
+});
 
+test('initial start of page with line and sum', async ({ page }) => {
   // Expect a title "to contain" a substring.
   await expect(page).toHaveTitle(/jotsum/);
 
@@ -18,12 +20,15 @@ test('initial start of page with line and sum', async ({ page }) => {
   const jos = await page.locator('//jo-sum').count(); 
   await expect(jol).toBe(1); 
   await expect(jos).toBe(1); 
+
+  // first jo-line setup: add_calc_line('3 apples + 4 pears');
+  // @todo does not work
+  // await expect(jos).toHaveText('7');
+  
 });
 
 // https://playwright.dev/docs/running-tests
-test('button creates new calc entry', async ({ page }) => {
-  await page.goto('/');
-
+test('button creates new empty input field', async ({ page }) => {
   const jol_before = await page.locator('//jo-line').count(); 
   const jos_before = await page.locator('//jo-sum').count(); 
   // console.log(before); 
@@ -38,4 +43,20 @@ test('button creates new calc entry', async ({ page }) => {
   await expect(jol_after).toBe(jol_before + 1); 
   await expect(jos_after).toBe(jos_before + 1); 
 });
+
+test('add a new calculation', async ({page}) => {
+  await expect(page).toHaveTitle(/jotsum/);
+  await page.locator('button:text("Add line")').click();
+
+  await expect(page.locator('jo-line')).toHaveCount(2);
+  await expect(page.locator('//jo-line')).toHaveCount(2);
+
+  const secondLine = page.locator('//jo-line [2]');
+  await secondLine.click(); 
+  await secondLine.fill('2 eyes + 1 nose');
+
+  const secondSum = secondLine.locator('xpath=following-sibling::jo-sum[1]');
+  await expect(secondSum).toHaveText('3'); // 2+1 -> 3
+  
+}); 
 
