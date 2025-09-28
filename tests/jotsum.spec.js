@@ -4,14 +4,12 @@ const { test, expect } = require('@playwright/test');
 // @todo setup web server with correct ssl, perhaps via docker?
 // disable HTTPS errors
 // https://stackoverflow.com/a/75547151/1933185
-test.use({
-  ignoreHTTPSErrors: true,
-});
+
 
 // https://playwright.dev/docs/writing-tests
 // test jotsum
 test('initial start of page with line and sum', async ({ page }) => {
-  await page.goto('https://localhost:8008');
+  await page.goto('/');
 
   // Expect a title "to contain" a substring.
   await expect(page).toHaveTitle(/jotsum/);
@@ -24,7 +22,7 @@ test('initial start of page with line and sum', async ({ page }) => {
 
 // https://playwright.dev/docs/running-tests
 test('button creates new calc entry', async ({ page }) => {
-  await page.goto('https://localhost:8008');
+  await page.goto('/');
 
   const jol_before = await page.locator('//jo-line').count(); 
   const jos_before = await page.locator('//jo-sum').count(); 

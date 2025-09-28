@@ -24,31 +24,4 @@ test.describe('simple suite test', () => {
 
 });
 
-// simple unit test of function 
-// https://playwright.dev/docs/evaluating
-test.describe('test jotsum', () => {
-
-	// insert javascript functions to test
-	test.beforeEach(async ({page}) => {
-		// console.log(`Current directory: ${process.cwd()}`);
-		await page.addScriptTag({path: 'jotsum.js'});
-	});
-
-	test('unit test', async ({ page }) => {
-
-		await page.setContent(` 
-			<jo-sheet id="sheet">
-				<jo-line contenteditable>I have 3 apples + 4 cherries </jo-line>
-				<jo-sum ></jo-sum>
-			</jo-sheet>
-			`);
-		let bar = await page.content();
-		console.log(bar);
-		const data = await page.evaluate(() => window.foo('woha'));
-		// await seems not to be needed, but I use it anyway
-		await expect(data).toBe('woha'); // 1+2*7=15
-		// console.log(data); 
-		
-	});
-
-}); 
+ 
