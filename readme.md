@@ -1,111 +1,124 @@
 # jotsum
 
-**jotsum** lets you jot down notes with numbers, and it sums them up instantly.
+jotsum lets you jot down notes with numbers, and it sums them up instantly.
 
 It is a simple browser-based tool for quick, line-by-line calculations. You can freely mix text and numbers in each line, for example:
 
 ```
-3 apples + 4 pears
+Tickets 2 * 49           98
+Hotel 3 nights * 120    360
+Fuel there and back      80
+                        538
 ```
 
-The numbers are extracted, calculated as a subtotal, and all subtotals are summed into a final total.
+The numbers are extracted, calculated as a line result, and all line results are summed into a final total.
 
-**Try it directly in your browser:** [https://jerik.github.io/jotsum/](https://jerik.github.io/jotsum/)
+Try it directly in your browser: **[jerik.github.io/jotsum](https://jerik.github.io/jotsum/)** — no account, no installation. The page can be saved for offline use.
 
 ---
 
-## How it works
+## At a glance
 
-* Each line can contain both text and numbers with operators
-* Numbers always need an operator between them — `18 + 12 note 20 + 10` is two finished sums glued together by a word, so jotsum reports it instead of guessing
-* Subtotals are calculated per line
-* All subtotals are automatically added up
-
----
-
-## Paste behavior
-
-When you paste multi-line text, each line becomes its own calculation — and the results are instantly updated.
-
----
-
-## Signed numbers
-
-Lines can end with a signed amount (positive or negative), even if there's text before it:
-
-```
-Fuel -45.50 EUR
-Refund +200
-```
-
-Both lines are extracted and included in the total.
+| | |
+| --- | --- |
+| Line result | Each line is evaluated on its own; the result appears on the right |
+| Total | All line results are summed at the bottom |
+| Escaping | `'2024` keeps a number out of the calculation |
+| Variables | `:rate = 85`, used later as `12 * :rate` |
+| Subtotals | A `---` line sums the block above it and stores it as `:SUBTOTAL-n` |
+| Error hints | Structurally broken lines show `?` and stay out of the total |
+| Input | Type, paste multiple lines at once, or pass text in the URL |
 
 ---
 
-## Skipping numbers
+## Writing a calculation
 
-Prefix a number with a single quote (`'`) to exclude it from calculations — just like in Excel. The quote works only directly before a digit; words like `don't` are unaffected:
+A line is evaluated left to right with the usual precedence; parentheses work as expected. Text between the numbers is dropped before evaluation, so labels cost nothing.
 
 ```
-Invoice '2024 Material 500       → 500
+Coffee beans 2 * 8.50     17
+Filters 4.20            4.20
+                       21.20
 ```
 
-Only `500` is counted; `2024` is skipped.
+An apostrophe directly before a digit keeps that number out of the calculation:
+
+```
+Invoice '2024 Material 500     500
+```
+
+Only `500` is counted. The apostrophe has to sit directly in front of a digit, so words like `don't` are unaffected.
 
 ---
 
 ## Variables
 
-Define a variable with `:name = expression`. Later lines can use it by writing `:name`. Variable definitions are not included in the total:
+A line of the form `:name = value` defines a variable. Any later line can read it as `:name`. Definition lines are greyed out and do not count towards the total.
 
 ```
-:rate = 85
-Consulting 12 * :rate            → 1020
+:rate = 85                85
+Consulting 12 * :rate   1020
+Workshop 4 * :rate       340
+                        1360
 ```
+
+Variables are resolved in document order, so a definition has to come before its use. A name may contain dashes; 
 
 ---
 
 ## Subtotals
 
-A line containing only `---` shows the sum of all values since the last `---` and stores it as `:SUBTOTAL-1`, `:SUBTOTAL-2`, etc. Subtotals themselves are not double-counted in the final total:
+A line containing only `---` sums the line results since the previous `---` and stores that value as `:SUBTOTAL-1`, `:SUBTOTAL-2`, and so on.
 
 ```
-Position A 100
-Position B 200
----                              → 300, saved as :SUBTOTAL-1
-VAT :SUBTOTAL-1 * 0.19           → 57
+Design 12 * 85           1020
+Development 30 * 85      2550
+---                      3570
+VAT :SUBTOTAL-1 * 0.19  678.30
+                       4248.30
 ```
+
+A subtotal only reads lines that are already part of the total, so it is not added a second time.
 
 ---
 
-## Error hints
+## When a line is broken
 
-jotsum is intentionally lenient with text — `apples` yields 0 and `3 apples + 4 pears` yields 7, which is by design, not an error. However, when a line has a structural problem, jotsum now shows a hint instead of silently producing a plausible but incorrect result. The sum column displays `?` instead of a number, the line is subtly marked, and the explanation appears in a tooltip. The line does not contribute to the final total; the rest of the sheet calculates normally.
+Text alone is not an error: `apples` evaluates to 0 by design. A line is only flagged when its structure cannot be resolved. The sum column then shows `?`, the line is marked, and the reason appears in the tooltip. The line is excluded from the total; the rest of the sheet is unaffected.
 
-Recognized cases:
+| Case | Example |
+| --- | --- |
+| Missing operator between two numbers | `(2+3) (4+5)` |
+| Operator without a value | `5 +` |
+| Unbalanced parentheses | `(2+3` |
+| Undefined variable | `12 * :rate` |
+| Division by zero | `10 / 0` |
 
-- **Missing operator** — `(2+3) (4+5)` or `18 + 12 note 20 + 10` (two numbers with nothing joining them)
-- **Missing value** — `5 +` (operator lacks a value)
-- **Unbalanced parentheses** — `(2+3` (unclosed bracket)
-- **Unknown variable** — `12 * :rate` (if `:rate` was never defined)
-- **Division by zero** — `10 / 0`
-
-Note: While typing in a line, no error is displayed — the hint appears only after you leave the line. Otherwise every line would briefly flash while you type.
+No hint is shown while the caret is in the line, since a half-typed line is broken more often than not. It appears once the line loses focus.
 
 ---
 
-## Start with a link
-You don’t even need to type or paste: JotSum can take a text directly from the URL. Just add `?text=...` at the end of the link, and your notes will appear instantly. Multi-line texts are split into rows, ready for calculation. 
+## Input
 
-**Try the example**:  
-[https://jerik.github.io/jotsum/?text=3+apples+%2B+4+pears%0A2+bananas+*+7+melons](https://jerik.github.io/jotsum/?text=3+apples+%2B+4+pears%0A2+bananas+*+7+melons)
+**Paste.** Pasting multi-line text creates one line per row and evaluates all of them.
+
+**URL.** `?text=...` fills the sheet on load, with `%0A` as the line break:
+
+[`?text=3+apples+%2B+4+pears%0A2+bananas+*+7+melons`](https://jerik.github.io/jotsum/?text=3+apples+%2B+4+pears%0A2+bananas+*+7+melons)
+
+**Offline.** Saving the page stores one self-contained HTML file, including the script, so it runs without a connection.
 
 ---
 
 ## Keyboard shortcuts
 
-* **Enter**: On the last line → create a new line. Otherwise → move down one line
-* **Ctrl + Enter**: Insert a new line below the current one
-* **Ctrl + Delete**: Remove the current line
-* **Arrow Up / Down**: Move between lines
+| Key | Action |
+| --- | --- |
+| `Enter` | On the last line: new line. Otherwise: move down |
+| `Ctrl + Enter` | Insert a new line below the current one |
+| `Ctrl + Delete` | Remove the current line |
+| `↑` / `↓` | Move between lines |
 
+---
+
+Source and issues on [GitHub](https://github.com/jerik/jotsum).
