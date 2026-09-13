@@ -106,7 +106,23 @@
 	    background: #d0d7de;                   /* GitHub-Grau als Akzent */
 	  }
 	  jo-line:focus { outline: none; }
-	  
+
+	  /* Variablen & Zwischensummen */
+	  jo-sum.is-muted {
+	    color: #6e7781; /* gedimmt, passend zum Footer */
+	  }
+	  jo-line.is-definition {
+	    font-style: italic;
+	    color: #6e7781;
+	  }
+	  jo-line.is-separator,
+	  jo-line.is-separator + jo-sum {
+	    border-top: 1px solid #d0d7de; /* feine Trennlinie, wie bei jo-spacer/jo-total */
+	  }
+	  jo-line.is-separator + jo-sum {
+	    font-weight: bold;
+	  }
+
 	  /* Dark Mode: noch dezenteres Highlight + etwas dunklere Akzentleiste */
 	  @media (prefers-color-scheme: dark){
 	    jo-line.is-active {
@@ -116,6 +132,17 @@
 	  	  background: #6e7781;                 /* Muted Grey im Dark Mode */
 	    }
       /* jo-line:focus { outline: none; } */
+
+	    jo-sum.is-muted {
+	      color: #8b949e; /* etwas heller, damit es im Dark Mode lesbar bleibt */
+	    }
+	    jo-line.is-definition {
+	      color: #8b949e;
+	    }
+	    jo-line.is-separator,
+	    jo-line.is-separator + jo-sum {
+	      border-top-color: #30363d;
+	    }
 	  }
 
 

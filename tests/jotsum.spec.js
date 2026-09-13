@@ -57,6 +57,91 @@ test('add a new calculation', async ({page}) => {
 
   const secondSum = secondLine.locator('xpath=following-sibling::jo-sum[1]');
   await expect(secondSum).toHaveText('3'); // 2+1 -> 3
-  
-}); 
+
+});
+
+test('negative amount keeps its sign in the sum and total', async ({ page }) => {
+  const text = 'Tanken -45.50 EUR';
+  await page.goto('/jotsum.html?text=' + encodeURIComponent(text));
+
+  const line = page.locator('jo-line').first();
+  const sum = line.locator('xpath=following-sibling::jo-sum[1]');
+  await expect(sum).toHaveText('-45.50');
+  await expect(page.locator('#total')).toHaveText('-45.50');
+});
+
+test('apostrophe escapes a number so it is not counted', async ({ page }) => {
+  const text = "Rechnung '2024 Material 500";
+  await page.goto('/jotsum.html?text=' + encodeURIComponent(text));
+
+  const line = page.locator('jo-line').first();
+  const sum = line.locator('xpath=following-sibling::jo-sum[1]');
+  await expect(sum).toHaveText('500');
+});
+
+test('a variable defined on one line is usable on a later line', async ({ page }) => {
+  const text = ':rate = 85\nConsulting 12 * :rate';
+  await page.goto('/jotsum.html?text=' + encodeURIComponent(text));
+
+  const lines = page.locator('jo-line');
+  await expect(lines).toHaveCount(2);
+
+  const defLine = lines.nth(0);
+  const defSum = defLine.locator('xpath=following-sibling::jo-sum[1]');
+  await expect(defLine).toHaveClass(/is-definition/);
+  await expect(defSum).toHaveClass(/is-muted/);
+
+  const secondLine = lines.nth(1);
+  const secondSum = secondLine.locator('xpath=following-sibling::jo-sum[1]');
+  await expect(secondSum).toHaveText('1020');
+  await expect(page.locator('#total')).toHaveText('1020');
+});
+
+test('a separator line shows a subtotal that is not double counted', async ({ page }) => {
+  const text = 'A 100\nB 200\n---\nC 50';
+  await page.goto('/jotsum.html?text=' + encodeURIComponent(text));
+
+  const lines = page.locator('jo-line');
+  await expect(lines).toHaveCount(4);
+
+  const sepLine = lines.nth(2);
+  await expect(sepLine).toHaveClass(/is-separator/);
+  const sepSum = sepLine.locator('xpath=following-sibling::jo-sum[1]');
+  await expect(sepSum).toHaveText('300');
+
+  await expect(page.locator('#total')).toHaveText('350'); // not 650
+});
+
+test('the SUBTOTAL variable references the preceding subtotal block', async ({ page }) => {
+  const text = 'A 100\n---\nVAT :SUBTOTAL-1 * 0.19';
+  await page.goto('/jotsum.html?text=' + encodeURIComponent(text));
+
+  const lines = page.locator('jo-line');
+  await expect(lines).toHaveCount(3);
+
+  const lastLine = lines.nth(2);
+  const lastSum = lastLine.locator('xpath=following-sibling::jo-sum[1]');
+  await expect(lastSum).toHaveText('19');
+
+  await expect(page.locator('#total')).toHaveText('119');
+});
+
+test('editing an earlier line live-recalculates a later line through a variable', async ({ page }) => {
+  const text = ':rate = 10\nx 2 * :rate';
+  await page.goto('/jotsum.html?text=' + encodeURIComponent(text));
+
+  const lines = page.locator('jo-line');
+  await expect(lines).toHaveCount(2);
+
+  const firstLine = lines.nth(0);
+  const secondSum = lines.nth(1).locator('xpath=following-sibling::jo-sum[1]');
+  await expect(secondSum).toHaveText('20');
+
+  await firstLine.click();
+  await page.keyboard.press('Control+a');
+  await page.keyboard.press('Delete');
+  await page.keyboard.type(':rate = 20');
+
+  await expect(secondSum).toHaveText('40');
+});
 

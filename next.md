@@ -2,14 +2,14 @@
 - funktion um ein neues rechnungsseite aufzurufen
 - die rechnungen im localstorage speichern
 - aus der zwischenablage ein mehrzeiligen text "importieren". jede zeile ist eine zeile in jotsum mit automatischem calc
-- nur minus oder plus zahl muss auch funktionieren in einer zeile. Bspw. -200 oder +200
+- [x] nur minus oder plus zahl muss auch funktionieren in einer zeile. Bspw. -200 oder +200
 - Rechnung fix wegspeichern (shortsave). Links eine neue Sidebar machen, wo die shortsaves zu sehen sind. Von dort aus kann man diese immer wieder aufrufen; Die erste Zeile gibt den shortsave namen an. Button [speichern + neu] für shortsaves; gebraucht hätte ich das bei der Rechnungsprüfung
 - Oberste Zeile Einfügen, damit man Überschrift machen kann, wenn man das vergessen hat
 - Export und import der shorsave shortsaves. Dabei ist in der Textdatei ---- der trenner zwischen den shortsaves
-- escapen von Zahlen die nicht in der line berechnet werden sollen, bspw. '12 wie bei Excel? 
-- variablen ermöglichen. variablen definition :auto = 120 EUR. :xxx muss immer zu beginn stehen, gefolgt von einem =-zeichen
-- variablen können dann in anderen zeilen mit 12 * :auto genutzt werden
-- Zwischensumme mit --- erzeugen, die werte der zwischensummen werden in automatisch variablen gespeichert :SUBTOTAL-1 
+- [x] escapen von Zahlen die nicht in der line berechnet werden sollen, bspw. '12 wie bei Excel? 
+- [x] variablen ermöglichen. variablen definition :auto = 120 EUR. :xxx muss immer zu beginn stehen, gefolgt von einem =-zeichen
+- [x] variablen können dann in anderen zeilen mit 12 * :auto genutzt werden
+- [x] Zwischensumme mit --- erzeugen, die werte der zwischensummen werden in automatisch variablen gespeichert :SUBTOTAL-1 
 - Währung umrechnung sollte lokal passieren. täglich die wichtigsten umrechnungskurse holen :EUR-USD und bereitstellen? 
 - Längenumrechnungen, was könnte ich da machen?
 

@@ -7,14 +7,31 @@ class JoSheet extends HTMLElement {
     }
 
     update_total() {
-        let total = 0;
-        const sums = this.querySelectorAll('jo-sum');
-        sums.forEach(sum => {
-            const value = parseFloat(sum.textContent);
-            if (!isNaN(value)) {
-                total += value;
+        const lines = Array.from(this.querySelectorAll('jo-line'));
+        const texts = lines.map(line => line.textContent.trim());
+        const { sums, types, total } = evaluate_sheet(texts);
+
+        lines.forEach((line, i) => {
+            const type = types[i];
+
+            line.classList.remove('is-definition', 'is-separator');
+            if (type === 'definition') {
+                line.classList.add('is-definition');
+            } else if (type === 'separator') {
+                line.classList.add('is-separator');
+            }
+
+            const sumElement = line.nextElementSibling;
+            if (sumElement && sumElement.tagName === 'JO-SUM') {
+                sumElement.textContent = this.round(sums[i]);
+                if (type === 'definition' || type === 'separator') {
+                    sumElement.classList.add('is-muted');
+                } else {
+                    sumElement.classList.remove('is-muted');
+                }
             }
         });
+
         document.getElementById('total').textContent = this.round(total);
     }
 
@@ -52,6 +69,13 @@ class JoLine extends HTMLElement {
     }
 
     recalculate() {
+        const sheet = typeof this.closest === 'function' ? this.closest('jo-sheet') : null;
+        if (sheet) {
+            sheet.update_total();
+            return;
+        }
+
+        // Fallback for isolated/mocked lines without an enclosing jo-sheet.
         const subtotal = this.calculate(this.textContent.trim());
         const sumElement = this.nextElementSibling;
         if (sumElement && sumElement.tagName === 'JO-SUM') {
@@ -59,13 +83,13 @@ class JoLine extends HTMLElement {
         }
     }
 
-    calculate(expression) {
+    calculate(expression, context = null) {
         if (!expression || typeof expression !== 'string') {
             return 0;
         }
 
         try {
-            const tokens = this.tokenize(expression);
+            const tokens = this.tokenize(expression, context);
             const RPN = this.shuntingYard(tokens);
             const result = this.calculateRPN(RPN);
             return result === undefined ? 0 : result;
@@ -74,17 +98,40 @@ class JoLine extends HTMLElement {
         }
     }
 
-    tokenize(expression) {
+    // A dash is part of a word (e-mail, make-love-not-war) when a letter sits
+    // next to it. Exception: directly after a variable reference the letter on
+    // the left belongs to the variable name, so only the right side counts -
+    // that keeps ":SUBTOTAL-1-50" and ":a- 5" working as subtractions.
+    is_dash_in_word(expression, i, variable_end) {
+        const next_is_letter = expression[i+1] && expression[i+1].match(/[a-zA-Z]/);
+        if (i === variable_end) {
+            return !!next_is_letter;
+        }
+        const prev_is_letter = expression[i-1] && expression[i-1].match(/[a-zA-Z]/);
+        return !!(prev_is_letter || next_is_letter);
+    }
+
+    tokenize(expression, context = null) {
         const tokens = [];
         let current_number = '';
-        let last_token_was_operator = true;
+        // true only once we actually have an operand available (a number was
+        // pushed, or a ')' was processed) - used to decide whether a
+        // following '-'/'+' is unary or binary.
+        let has_operand = false;
+        let variable_end = -1;
+        let escape_next_number = false;
 
         for (let i = 0; i < expression.length; i++) {
             const char = expression[i];
 
             if (char === ' ') {
                 if (current_number !== '') {
-                    tokens.push(parseFloat(current_number));
+                    if (escape_next_number) {
+                        escape_next_number = false;
+                    } else {
+                        tokens.push(parseFloat(current_number));
+                        has_operand = true;
+                    }
                     current_number = '';
                 }
                 continue;
@@ -92,43 +139,90 @@ class JoLine extends HTMLElement {
 
             if (!isNaN(char) || (char === '.' && !((expression[i-1] && expression[i-1].match(/[a-zA-Z]/)) || (expression[i+1] && expression[i+1].match(/[a-zA-Z]/))))) {
                 if (char === '.' && current_number.includes('.')) {
-                    tokens.push(parseFloat(current_number));
+                    if (escape_next_number) {
+                        escape_next_number = false;
+                    } else {
+                        tokens.push(parseFloat(current_number));
+                        has_operand = false;
+                    }
                     current_number = '';
                     tokens.push(char);
-                    last_token_was_operator = true;
                 } else {
                     current_number += char;
-                    last_token_was_operator = false;
                 }
             } else {
                 if (current_number !== '') {
-                    if (!isNaN(current_number)) {
+                    if (escape_next_number) {
+                        escape_next_number = false;
+                    } else if (!isNaN(current_number)) {
                         tokens.push(parseFloat(current_number));
+                        has_operand = true;
                     }
                     current_number = '';
                 }
 
-                if (char === '-' && ((expression[i-1] && expression[i-1].match(/[a-zA-Z]/)) || (expression[i+1] && expression[i+1].match(/[a-zA-Z]/)))) {
+                if (char === "'" && expression[i+1] && /[0-9]/.test(expression[i+1])) {
+                    // apostrophe directly before a digit escapes the following number
+                    escape_next_number = true;
+                } else if (char === ':') {
+                    // Variable reference. A dash may belong to the name
+                    // (:SUBTOTAL-1), but it may just as well be a subtraction
+                    // (:SUBTOTAL-1-50). So read greedily, then shorten at dash
+                    // boundaries until a defined variable matches - longest
+                    // match wins, the rest stays for the operator logic.
+                    let j = i + 1;
+                    let raw = '';
+                    while (j < expression.length && /[A-Za-z0-9_-]/.test(expression[j])) {
+                        raw += expression[j];
+                        j++;
+                    }
+
+                    const vars = context && context.vars;
+                    let taken = -1;
+                    for (let k = raw.length; k > 0 && taken === -1; k--) {
+                        // only cut at the end or right before a dash
+                        if (k < raw.length && raw[k] !== '-') continue;
+                        const candidate = raw.slice(0, k);
+                        if (candidate.endsWith('-')) continue;
+                        if (vars && vars.has(candidate)) {
+                            tokens.push(vars.get(candidate));
+                            has_operand = true;
+                            taken = k;
+                        }
+                    }
+
+                    if (taken === -1) {
+                        // Unknown name: consume the first segment only and
+                        // ignore it like an unknown word, so a trailing
+                        // "-50" still works as an operator. Never push NaN.
+                        const dash = raw.indexOf('-');
+                        taken = dash === -1 ? raw.length : dash;
+                    }
+                    i = i + taken; // ':' plus the consumed name characters
+                    variable_end = i + 1; // a dash right here is an operator, not a word dash
+                } else if (char === '-' && this.is_dash_in_word(expression, i, variable_end)) {
                     // ignore dash in word
-                    last_token_was_operator = false;
                 } else if (['+', '-', '*', '/', '(', ')'].includes(char)) {
-                    if (char === '-' && last_token_was_operator) {
+                    if (char === '-' && !has_operand) {
                         tokens.push('u');
-                    } else if (char === '+' && last_token_was_operator) {
+                    } else if (char === '+' && !has_operand) {
                         // ignore unary plus
                     } else {
                         tokens.push(char);
                     }
-                    last_token_was_operator = true;
+                    has_operand = (char === ')');
                 } else {
                     // It's a letter or some other character, ignore it.
-                    last_token_was_operator = false;
                 }
             }
         }
 
         if (current_number !== '') {
-            tokens.push(parseFloat(current_number));
+            if (escape_next_number) {
+                escape_next_number = false;
+            } else {
+                tokens.push(parseFloat(current_number));
+            }
         }
 
         // Implicit addition
@@ -297,6 +391,57 @@ customElements.define('jo-sheet', JoSheet);
 customElements.define('jo-line', JoLine);
 customElements.define('jo-sum', JoSum);
 
+function classify_line(text) {
+    if (/^-{3,}$/.test(text)) {
+        return { type: 'separator' };
+    }
+
+    const definition_match = text.match(/^:([A-Za-z_][A-Za-z0-9_-]*)\s*=\s*(.*)$/);
+    if (definition_match) {
+        return { type: 'definition', name: definition_match[1], expr: definition_match[2] };
+    }
+
+    return { type: 'value' };
+}
+
+function evaluate_sheet(lines) {
+    const context = { vars: new Map(), block_sum: 0, subtotal_index: 0 };
+    const sums = new Array(lines.length);
+    const types = new Array(lines.length);
+    let total = 0;
+
+    for (let i = 0; i < lines.length; i++) {
+        const text = (lines[i] || '').trim();
+        const classified = classify_line(text);
+        types[i] = classified.type;
+
+        if (classified.type === 'separator') {
+            context.subtotal_index++;
+            context.vars.set('SUBTOTAL-' + context.subtotal_index, context.block_sum);
+            sums[i] = context.block_sum;
+            context.block_sum = 0;
+        } else if (classified.type === 'definition') {
+            const wert = JoLine.prototype.calculate.call(JoLine.prototype, classified.expr, context);
+            // Same NaN guard as for value lines: a broken definition must not
+            // show NaN, and must not poison every line that uses the variable.
+            const safe = isFinite(wert) ? wert : 0;
+            context.vars.set(classified.name, safe);
+            sums[i] = safe;
+        } else {
+            const wert = JoLine.prototype.calculate.call(JoLine.prototype, text, context);
+            // Display never shows NaN, even though a dangling operator (e.g.
+            // an unresolved :var used before its definition) can produce one.
+            sums[i] = isFinite(wert) ? wert : 0;
+            if (isFinite(wert)) {
+                total += wert;
+                context.block_sum += wert;
+            }
+        }
+    }
+
+    return { sums, total, types, vars: context.vars };
+}
+
 function add_calc_line(starter = '') {
     const jo_sheet = document.getElementById('sheet');
     const jo_line = document.createElement('jo-line');
@@ -395,5 +540,5 @@ if (typeof window !== 'undefined') {
 }
 
 if (typeof module !== 'undefined' && module.exports) {
-    module.exports = { JoLine, JoSheet };
+    module.exports = { JoLine, JoSheet, classify_line, evaluate_sheet };
 }
