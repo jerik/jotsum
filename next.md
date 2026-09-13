@@ -18,6 +18,13 @@
 - vorbelegung der ersten Zeile mit dem beispiel. aktuell ist das ein echter test, wenn man reinklickt, soll sich die zeile leeren.
   muss nicht echt sein, kann auch nur zum schein sein, damit die nutezr wissen was zu tun ist. 
 
+## build
+`index.html` wird von `generate-single-html.sh` aus `jotsum.html` + `jotsum.js` erzeugt und von der
+GitHub Action bei jedem Push auf master neu gebaut und committet. Lokal nur zum Testen bauen, nicht
+committen - der Versionsstempel enthaelt Zeit und Commit-Hash, zwei Builds sind daher nie identisch
+und beide Seiten schreiben dieselben Zeilen. Ein pre-commit-Hook in `.githooks/` nimmt die Datei
+automatisch wieder aus dem Commit heraus (aktiv ueber `git config core.hooksPath .githooks`).
+
 ## helper
 ### finding elements for playwright 
 In the developer console: 
