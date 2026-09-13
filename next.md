@@ -7,7 +7,11 @@
 - Oberste Zeile Einfügen, damit man Überschrift machen kann, wenn man das vergessen hat
 - Export und import der shorsave shortsaves. Dabei ist in der Textdatei ---- der trenner zwischen den shortsaves
 - escapen von Zahlen die nicht in der line berechnet werden sollen, bspw. '12 wie bei Excel? 
-
+- variablen ermöglichen. variablen definition :auto = 120 EUR. :xxx muss immer zu beginn stehen, gefolgt von einem =-zeichen
+- variablen können dann in anderen zeilen mit 12 * :auto genutzt werden
+- Zwischensumme mit --- erzeugen, die werte der zwischensummen werden in automatisch variablen gespeichert :SUBTOTAL-1 
+- Währung umrechnung sollte lokal passieren. täglich die wichtigsten umrechnungskurse holen :EUR-USD und bereitstellen? 
+- Längenumrechnungen, was könnte ich da machen?
 
 ## helper
 ### finding elements for playwright 
