@@ -103,6 +103,10 @@ class JoLine extends HTMLElement {
 		// focus event - catch the press itself as well.
 		this.addEventListener('pointerdown', () => this._drop_hint());
 		this.addEventListener('mousedown', () => this._drop_hint());
+		// Typing counts as touching it too - otherwise the hint would come
+		// back the moment someone clears the line again.
+		this.addEventListener('beforeinput', () => this._drop_hint());
+		this.addEventListener('input', () => this._drop_hint());
 
 		// ✨ Aktiv-Markierung
 		this._onFocus = () => {

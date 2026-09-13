@@ -125,9 +125,17 @@
 
 	  /* Beispiel-Hinweis auf dem leeren Blatt: nur Optik, kein Inhalt.
 	     ::after, weil ::before bereits der Akzentstreifen ist. */
+	  jo-line.is-placeholder {
+	    position: relative;
+	  }
 	  jo-line.is-placeholder::after {
 	    content: attr(data-placeholder);
+	    /* absolut, damit ein von contenteditable hinterlassenes <br> den
+	       Hinweis nicht in eine zweite Zeile schiebt */
+	    position: absolute;
+	    left: 7px; top: 7px;
 	    color: #8c959f;
+	    pointer-events: none;
 	  }
 	  jo-sum.is-placeholder,
 	  jo-total.is-placeholder {
@@ -319,6 +327,10 @@ class JoLine extends HTMLElement {
 		// focus event - catch the press itself as well.
 		this.addEventListener('pointerdown', () => this._drop_hint());
 		this.addEventListener('mousedown', () => this._drop_hint());
+		// Typing counts as touching it too - otherwise the hint would come
+		// back the moment someone clears the line again.
+		this.addEventListener('beforeinput', () => this._drop_hint());
+		this.addEventListener('input', () => this._drop_hint());
 
 		// ✨ Aktiv-Markierung
 		this._onFocus = () => {
@@ -955,7 +967,7 @@ if (typeof module !== 'undefined' && module.exports) {
     <!-- Footer -->
     <footer>
       Download for offline use • Source and docs on <a href="https://github.com/jerik/jotsum">GitHub</a>
-      <span id="version">2026-09-13T16:59:07Z<br>173-gf4610d3</span>
+      <span id="version">2026-09-13T17:00:46Z<br>174-g9a1bc2c</span>
     </footer>
   </body>
 </html>

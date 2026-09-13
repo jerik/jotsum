@@ -182,3 +182,24 @@ test('the example on an empty sheet is a hint, not text you have to delete', asy
   await expect(firstSum).toHaveText('-45.50');
   await expect(page.locator('#total')).toHaveText('-45.50');
 });
+
+test('the hint does not come back after typing and clearing the line', async ({ page }) => {
+  const firstLine = page.locator('jo-line').first();
+
+  // Typing straight away, without clicking first - the line already has focus.
+  await page.keyboard.type('abc 12');
+  await expect(firstLine).not.toHaveClass(/is-placeholder/);
+
+  // Clearing it again must leave an empty line, not the hint.
+  for (let i = 0; i < 8; i++) {
+    await page.keyboard.press('Backspace');
+  }
+  await expect(firstLine).toHaveText('');
+  await expect(firstLine).not.toHaveClass(/is-placeholder/);
+  await expect(firstLine).not.toHaveAttribute('data-placeholder', /.*/);
+  await expect(page.locator('jo-sum').first()).toHaveText('0');
+
+  // And the line stays a single row - a leftover <br> must not stack the hint.
+  const box = await firstLine.boundingBox();
+  expect(box.height).toBeLessThan(45);
+});

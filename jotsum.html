@@ -125,9 +125,17 @@
 
 	  /* Beispiel-Hinweis auf dem leeren Blatt: nur Optik, kein Inhalt.
 	     ::after, weil ::before bereits der Akzentstreifen ist. */
+	  jo-line.is-placeholder {
+	    position: relative;
+	  }
 	  jo-line.is-placeholder::after {
 	    content: attr(data-placeholder);
+	    /* absolut, damit ein von contenteditable hinterlassenes <br> den
+	       Hinweis nicht in eine zweite Zeile schiebt */
+	    position: absolute;
+	    left: 7px; top: 7px;
 	    color: #8c959f;
+	    pointer-events: none;
 	  }
 	  jo-sum.is-placeholder,
 	  jo-total.is-placeholder {
