@@ -19,6 +19,7 @@
   muss nicht echt sein, kann auch nur zum schein sein, damit die nutezr wissen was zu tun ist. 
 - Zur Doku hinzufügen: Variablen können nicht mit einer Zahl starten. :1Test geht nicht. Variablen sind case-sensitive. 
 - , als dezimal delimiter. wie kann man das am besten einbringen?  
+- firfox und webkit wieder in tests mitreinnehmen (installation notwendig)
 
 ## build
 `index.html` wird von `generate-single-html.sh` aus `jotsum.html` + `jotsum.js` erzeugt und von der
