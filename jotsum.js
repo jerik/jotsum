@@ -601,7 +601,7 @@ function add_calc_line(starter = '') {
 // The empty sheet shows a greyed out example instead of real text. It is a
 // hint, not content: one click and it is gone, so nobody has to delete it
 // first. The numbers next to it are illustrative, never calculated.
-const EXAMPLE_HINT = '3 apples + 4 pears';
+const EXAMPLE_HINT = 'Start typing, e.g. 3 apples + 4 pears';
 const EXAMPLE_HINT_SUM = '7';
 
 function add_example_hint_line() {

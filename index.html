@@ -130,10 +130,6 @@
 	  }
 	  jo-line.is-placeholder::after {
 	    content: attr(data-placeholder);
-	    /* absolut, damit ein von contenteditable hinterlassenes <br> den
-	       Hinweis nicht in eine zweite Zeile schiebt */
-	    position: absolute;
-	    left: 7px; top: 7px;
 	    color: #8c959f;
 	    pointer-events: none;
 	  }
@@ -826,7 +822,7 @@ function add_calc_line(starter = '') {
 // The empty sheet shows a greyed out example instead of real text. It is a
 // hint, not content: one click and it is gone, so nobody has to delete it
 // first. The numbers next to it are illustrative, never calculated.
-const EXAMPLE_HINT = '3 apples + 4 pears';
+const EXAMPLE_HINT = 'Start typing, e.g. 3 apples + 4 pears';
 const EXAMPLE_HINT_SUM = '7';
 
 function add_example_hint_line() {
@@ -953,8 +949,8 @@ if (typeof module !== 'undefined' && module.exports) {
 
     <!-- Footer -->
     <footer>
-      Download for offline use • Source and docs on <a href="https://github.com/jerik/jotsum">GitHub</a>
-      <span id="version">2026-09-13T20:57:58Z<br>182-g08bde17</span>
+      Use the operators + - * / ( ) • Download for offline use • Source and docs on <a href="https://github.com/jerik/jotsum">GitHub</a>
+      <span id="version">2026-09-13T20:58:05Z<br>183-g59020f6</span>
     </footer>
   </body>
 </html>

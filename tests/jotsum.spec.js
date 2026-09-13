@@ -21,7 +21,7 @@ test('initial start of page with line and sum', async ({ page }) => {
   await expect(jol).toBe(1); 
   await expect(jos).toBe(1); 
 
-  // first jo-line setup: add_calc_line('3 apples + 4 pears');
+  // first jo-line setup: add_calc_line('Start typing, e.g. 3 apples + 4 pears');
   // @todo does not work
   // await expect(jos).toHaveText('7');
   
@@ -168,7 +168,7 @@ test('the example on an empty sheet is a hint, not text you have to delete', asy
 
   // The hint is shown, but the line itself is empty - nothing to delete.
   await expect(firstLine).toHaveClass(/is-placeholder/);
-  await expect(firstLine).toHaveAttribute('data-placeholder', '3 apples + 4 pears');
+  await expect(firstLine).toHaveAttribute('data-placeholder', 'Start typing, e.g. 3 apples + 4 pears');
   await expect(firstLine).toHaveText('');
   await expect(firstSum).toHaveText('7');
   await expect(firstSum).toHaveClass(/is-placeholder/);
@@ -264,6 +264,6 @@ test('the hint survives a focus that arrives after the page was built', async ({
   await firstLine.focus();
 
   await expect(firstLine).toHaveClass(/is-placeholder/);
-  await expect(firstLine).toHaveAttribute('data-placeholder', '3 apples + 4 pears');
+  await expect(firstLine).toHaveAttribute('data-placeholder', 'Start typing, e.g. 3 apples + 4 pears');
   await expect(page.locator('jo-sum').first()).toHaveText('7');
 });

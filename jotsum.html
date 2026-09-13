@@ -130,10 +130,6 @@
 	  }
 	  jo-line.is-placeholder::after {
 	    content: attr(data-placeholder);
-	    /* absolut, damit ein von contenteditable hinterlassenes <br> den
-	       Hinweis nicht in eine zweite Zeile schiebt */
-	    position: absolute;
-	    left: 7px; top: 7px;
 	    color: #8c959f;
 	    pointer-events: none;
 	  }
@@ -247,7 +243,7 @@
 
     <!-- Footer -->
     <footer>
-      Download for offline use • Source and docs on <a href="https://github.com/jerik/jotsum">GitHub</a>
+      Use the operators + - * / ( ) • Download for offline use • Source and docs on <a href="https://github.com/jerik/jotsum">GitHub</a>
       <span id="version"></span>
     </footer>
   </body>
