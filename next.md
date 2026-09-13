@@ -13,10 +13,12 @@
 - [x] Hinweis auf fehlerhafte Zeilen (fehlender Operator, fehlender Wert, unbalancierte Klammern, unbekannte Variable, Division durch Null) statt stiller Falschergebnisse; Anzeige ? in der Summenspalte, Zeile zählt nicht in die Gesamtsumme
 - [x] implizite Addition entfernt: zwischen zwei Zahlen muss immer ein Operator stehen, sonst Fehlerhinweis (kam aus 1e55f08, war nie beabsichtigt)
 - Währung umrechnung sollte lokal passieren. täglich die wichtigsten umrechnungskurse holen :EUR-USD und bereitstellen? 
-- Längenumrechnungen, was könnte ich da machen?
+- Längenumrechnungen, was könnte ich da machen? mapping-tabelle. 
 - markdown parsing für header. dafür muss am zeilenanfang mit einem oder mehreren # beginnen
 - vorbelegung der ersten Zeile mit dem beispiel. aktuell ist das ein echter test, wenn man reinklickt, soll sich die zeile leeren.
   muss nicht echt sein, kann auch nur zum schein sein, damit die nutezr wissen was zu tun ist. 
+- Zur Doku hinzufügen: Variablen können nicht mit einer Zahl starten. :1Test geht nicht. Variablen sind case-sensitive. 
+- , als dezimal delimiter. wie kann man das am besten einbringen?  
 
 ## build
 `index.html` wird von `generate-single-html.sh` aus `jotsum.html` + `jotsum.js` erzeugt und von der
