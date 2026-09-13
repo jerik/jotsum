@@ -48,15 +48,10 @@ module.exports = defineConfig({
       use: { ...devices['Desktop Chrome'] },
     },
 
-    {
-      name: 'firefox',
-      use: { ...devices['Desktop Firefox'] },
-    },
-
-    {
-      name: 'webkit',
-      use: { ...devices['Desktop Safari'] },
-    },
+    /* firefox und webkit sind bewusst raus: ihre Browser sind hier nicht
+       installiert, und `playwright install` bleibt auf diesem System
+       reproduzierbar beim Entpacken haengen. Wieder aufnehmen, sobald die
+       Browser da sind - die Tests selbst sind nicht chromium-spezifisch. */
 
     /* Test against mobile viewports. */
     // {
