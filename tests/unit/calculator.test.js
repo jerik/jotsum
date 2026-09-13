@@ -118,21 +118,21 @@ function testCalculateWithContext() {
     joLine.calculate('5 :unknown 3', { vars: new Map([['auto', 120]]) }, unknown_report);
     assert.strictEqual(unknown_report.error && unknown_report.error.code, 'unknown-variable', `Expected unknown-variable, but got ${JSON.stringify(unknown_report.error)}`);
 
-    // Dash belongs to the variable name (needed for :SUBTOTAL-1 style names).
-    const dashed_name = joLine.calculate(':SUBTOTAL-1 + 1', { vars: new Map([['SUBTOTAL-1', 300]]) });
-    assert.strictEqual(dashed_name, 301, `Expected 301, but got ${dashed_name}`);
+    // Underscores are part of a name, which is what :SUBTOTAL_1 relies on.
+    const underscore_name = joLine.calculate(':SUBTOTAL_1 + 1', { vars: new Map([['SUBTOTAL_1', 300]]) });
+    assert.strictEqual(underscore_name, 301, `Expected 301, but got ${underscore_name}`);
 
-    // A dash after a variable name may also be a subtraction. Longest defined
-    // name wins, the rest stays for the operator logic.
+    // A dash is never part of a name - it is always the operator, with nothing
+    // left to guess about.
     const dash_cases = [
-        { expression: ':SUBTOTAL-1-50', vars: [['SUBTOTAL-1', 300]], expected: 250 },
-        { expression: ':SUBTOTAL-1-50 + 5', vars: [['SUBTOTAL-1', 300]], expected: 255 },
+        { expression: ':SUBTOTAL_1-50', vars: [['SUBTOTAL_1', 300]], expected: 250 },
+        { expression: ':SUBTOTAL_1-50 + 5', vars: [['SUBTOTAL_1', 300]], expected: 255 },
         { expression: ':a- 5', vars: [['a', 7]], expected: 2 },
         { expression: ':a -5', vars: [['a', 7]], expected: 2 },
         { expression: ':a-:b', vars: [['a', 7], ['b', 5]], expected: 2 },
-        // 'b' is not a defined name, so ':a-b' reads as variable a plus a word.
+        // 'b' is only a word, so the dash next to it stays a word dash.
         { expression: ':a-b', vars: [['a', 7]], expected: 7 },
-        // Unknown name: only the first segment is swallowed, '-50' stays an operator.
+        // Unknown name, and '-50' is still an operator plus a number.
         { expression: ':unknown-50', vars: [['a', 1]], expected: -50 },
     ];
 

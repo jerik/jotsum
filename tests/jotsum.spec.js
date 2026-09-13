@@ -113,7 +113,7 @@ test('a separator line shows a subtotal that is not double counted', async ({ pa
 });
 
 test('the SUBTOTAL variable references the preceding subtotal block', async ({ page }) => {
-  const text = 'A 100\n---\nVAT :SUBTOTAL-1 * 0.19';
+  const text = 'A 100\n---\nVAT :SUBTOTAL_1 * 0.19';
   await page.goto('/jotsum.html?text=' + encodeURIComponent(text));
 
   const lines = page.locator('jo-line');
@@ -232,4 +232,20 @@ test('two numbers without an operator between them are an error', async ({ page 
   // The same line with an operator in place calculates normally.
   await expect(sums.nth(1)).toHaveText('60');
   await expect(page.locator('#total')).toHaveText('60');
+});
+
+test('the error explanation sits on the ? as well as on the line', async ({ page }) => {
+  // The "?" is what you point at, so the tooltip has to be there too.
+  await page.goto('/jotsum.html?text=' + encodeURIComponent('Split 10 / 0\nB 50'));
+  await page.locator('jo-line').first().blur();
+
+  const line = page.locator('jo-line').first();
+  const sum = page.locator('jo-sum').first();
+
+  await expect(sum).toHaveText('?');
+  await expect(sum).toHaveAttribute('title', 'Division by zero');
+  await expect(line).toHaveAttribute('title', 'Division by zero');
+
+  // A healthy line carries no leftover tooltip.
+  await expect(page.locator('jo-sum').nth(1)).not.toHaveAttribute('title', /.*/);
 });

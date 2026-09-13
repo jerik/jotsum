@@ -25,7 +25,7 @@ Try it directly in your browser: **[jerik.github.io/jotsum](https://jerik.github
 | Total | All line results are summed at the bottom |
 | Escaping | `'2024` keeps a number out of the calculation |
 | Variables | `:rate = 85`, used later as `12 * :rate` |
-| Subtotals | A `---` line sums the block above it and stores it as `:SUBTOTAL-n` |
+| Subtotals | A `---` line sums the block above it and stores it as `:SUBTOTAL_n` |
 | Error hints | Structurally broken lines show `?` and stay out of the total |
 | Input | Type, paste multiple lines at once, or pass text in the URL |
 
@@ -62,19 +62,19 @@ Workshop 4 * :rate       340
                         1360
 ```
 
-Variables are resolved in document order, so a definition has to come before its use. A name may contain dashes; 
+Variables are resolved in document order, so a definition has to come before its use. A name is made of letters, digits and underscores — a dash is always the operator, so `:SUBTOTAL_1-50` is a subtraction.
 
 ---
 
 ## Subtotals
 
-A line containing only `---` sums the line results since the previous `---` and stores that value as `:SUBTOTAL-1`, `:SUBTOTAL-2`, and so on.
+A line containing only `---` sums the line results since the previous `---` and stores that value as `:SUBTOTAL_1`, `:SUBTOTAL_2`, and so on.
 
 ```
 Design 12 * 85           1020
 Development 30 * 85      2550
 ---                      3570
-VAT :SUBTOTAL-1 * 0.19  678.30
+VAT :SUBTOTAL_1 * 0.19  678.30
                        4248.30
 ```
 

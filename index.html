@@ -159,6 +159,7 @@
 	  jo-sum.is-error {
 	    color: #cf222e;
 	    text-align: right;
+	    cursor: help;   /* zeigt, dass am ? eine Erklaerung haengt */
 	  }
 
 	  /* Dark Mode: noch dezenteres Highlight + etwas dunklere Akzentleiste */
@@ -273,11 +274,16 @@ class JoSheet extends HTMLElement {
                 if (show_error) {
                     sumElement.classList.add('is-error');
                     sumElement.textContent = '?';
+                    // The "?" is what anyone points at, so it carries the
+                    // explanation too - not just the line.
+                    sumElement.setAttribute('title', error.message);
                 } else if (show_hint) {
                     sumElement.classList.remove('is-error');
+                    sumElement.removeAttribute('title');
                     sumElement.textContent = line.getAttribute('data-placeholder-sum');
                 } else {
                     sumElement.classList.remove('is-error');
+                    sumElement.removeAttribute('title');
                     sumElement.textContent = this.round(sums[i]);
                 }
 
@@ -425,7 +431,7 @@ class JoLine extends HTMLElement {
     // A dash is part of a word (e-mail, make-love-not-war) when a letter sits
     // next to it. Exception: directly after a variable reference the letter on
     // the left belongs to the variable name, so only the right side counts -
-    // that keeps ":SUBTOTAL-1-50" and ":a- 5" working as subtractions.
+    // that keeps ":SUBTOTAL_1-50" and ":a- 5" working as subtractions.
     is_dash_in_word(expression, i, variable_end) {
         const next_is_letter = expression[i+1] && expression[i+1].match(/[a-zA-Z]/);
         if (i === variable_end) {
@@ -493,45 +499,30 @@ class JoLine extends HTMLElement {
                     // apostrophe directly before a digit escapes the following number
                     escape_next_number = true;
                 } else if (char === ':') {
-                    // Variable reference. A dash may belong to the name
-                    // (:SUBTOTAL-1), but it may just as well be a subtraction
-                    // (:SUBTOTAL-1-50). So read greedily, then shorten at dash
-                    // boundaries until a defined variable matches - longest
-                    // match wins, the rest stays for the operator logic.
+                    // Variable reference. Names are letters, digits and
+                    // underscores - deliberately no dash, because a dash is an
+                    // operator and ":SUBTOTAL_1-50" has to be a subtraction
+                    // with nothing left to guess.
                     let j = i + 1;
-                    let raw = '';
-                    while (j < expression.length && /[A-Za-z0-9_-]/.test(expression[j])) {
-                        raw += expression[j];
+                    let name = '';
+                    while (j < expression.length && /[A-Za-z0-9_]/.test(expression[j])) {
+                        name += expression[j];
                         j++;
                     }
 
                     const vars = context && context.vars;
-                    let taken = -1;
-                    for (let k = raw.length; k > 0 && taken === -1; k--) {
-                        // only cut at the end or right before a dash
-                        if (k < raw.length && raw[k] !== '-') continue;
-                        const candidate = raw.slice(0, k);
-                        if (candidate.endsWith('-')) continue;
-                        if (vars && vars.has(candidate)) {
-                            tokens.push(vars.get(candidate));
-                            has_operand = true;
-                            taken = k;
-                        }
-                    }
+                    const taken = name.length;
 
-                    if (taken === -1) {
-                        // Unknown name: consume the first segment only and
-                        // ignore it like an unknown word, so a trailing
-                        // "-50" still works as an operator. Never push NaN.
-                        const dash = raw.indexOf('-');
-                        taken = dash === -1 ? raw.length : dash;
-
-                        if (raw.length > 0) {
+                    if (vars && vars.has(name)) {
+                        tokens.push(vars.get(name));
+                        has_operand = true;
+                    } else {
+                        // Unknown name: ignored like an unknown word, never NaN.
+                        if (name.length > 0) {
                             if (vars) {
                                 // A context WITH vars was given, but nothing
                                 // matched - that is a genuine unknown variable.
-                                const attempted_name = raw.slice(0, taken);
-                                this._set_error(report, 'unknown-variable', `Unknown variable :${attempted_name}`);
+                                this._set_error(report, 'unknown-variable', `Unknown variable :${name}`);
                             } else if (report) {
                                 // No context at all: we cannot tell whether the
                                 // name would resolve, so - same as the existing
@@ -787,7 +778,7 @@ function evaluate_sheet(lines) {
             // Nothing gets parsed for a separator, so it can never be errorous.
             errors[i] = null;
             context.subtotal_index++;
-            context.vars.set('SUBTOTAL-' + context.subtotal_index, context.block_sum);
+            context.vars.set('SUBTOTAL_' + context.subtotal_index, context.block_sum);
             sums[i] = context.block_sum;
             context.block_sum = 0;
         } else if (classified.type === 'definition') {
@@ -966,7 +957,7 @@ if (typeof module !== 'undefined' && module.exports) {
     <!-- Footer -->
     <footer>
       Download for offline use • Source and docs on <a href="https://github.com/jerik/jotsum">GitHub</a>
-      <span id="version">2026-09-13T18:53:43Z<br>177-g01d0b91</span>
+      <span id="version">2026-09-13T20:26:31Z<br>179-g9b3ec55</span>
     </footer>
   </body>
 </html>
