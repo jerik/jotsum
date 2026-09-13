@@ -21,7 +21,7 @@ Try it directly in your browser: **[jerik.github.io/jotsum](https://jerik.github
 
 | | |
 | --- | --- |
-| Line result | Each line is evaluated on its own; the result appears on the right |
+| Line result | Each line is evaluated on its own; the result appears on the right, rounded to two decimals |
 | Total | All line results are summed at the bottom |
 | Escaping | `'2024` keeps a number out of the calculation |
 | Variables | `:rate = 85`, used later as `12 * :rate` |
@@ -40,6 +40,8 @@ Coffee beans 2 * 8.50     17
 Filters 4.20            4.20
                        21.20
 ```
+
+Results are shown rounded to two decimals, whole numbers without any. Only the display is rounded — the calculation keeps full precision, so three lines of `1 / 3` each show `0.33` while the total shows `1`.
 
 An apostrophe directly before a digit keeps that number out of the calculation:
 

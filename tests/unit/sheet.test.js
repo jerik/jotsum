@@ -1,5 +1,5 @@
 const assert = require('assert');
-const { classify_line, evaluate_sheet } = require('../../jotsum.js');
+const { classify_line, evaluate_sheet, JoSheet } = require('../../jotsum.js');
 
 
 
@@ -130,6 +130,25 @@ function testEvaluateSheetErrors() {
     console.log('All evaluate_sheet error tests passed!');
 }
 
+// Rounding is display only: the total is summed at full precision, so the
+// rounded line results on screen need not add up to the rounded total.
+function testRoundingIsDisplayOnly() {
+    const round = JoSheet.prototype.round;
+
+    assert.strictEqual(round(2.348), '2.35');
+    assert.strictEqual(round(2.341), '2.34');
+    assert.strictEqual(round(0.999), '1.00');
+    assert.strictEqual(round(10), 10, 'whole numbers keep no decimals');
+    assert.strictEqual(round(10.5), '10.50');
+
+    const result = evaluate_sheet(['a 1 / 3', 'b 1 / 3', 'c 1 / 3']);
+    result.sums.forEach(value => assert.strictEqual(round(value), '0.33'));
+    assert.strictEqual(round(result.total), 1, 'total is summed before rounding');
+
+    console.log('All rounding tests passed!');
+}
+
 testClassifyLine();
 testEvaluateSheet();
 testEvaluateSheetErrors();
+testRoundingIsDisplayOnly();
