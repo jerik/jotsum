@@ -18,6 +18,14 @@ class JoSheet extends HTMLElement {
             // for a moment (e.g. "5 +"), so no error is shown for it - flicker
             // would be unbearable.
             const is_active = line.classList.contains('is-active');
+            // The example hint only stands as long as the line is untouched
+            // and empty. It is illustrative, so it never enters any sum.
+            const show_hint = !!line.getAttribute('data-placeholder') && texts[i] === '';
+            if (show_hint) {
+                line.classList.add('is-placeholder');
+            } else {
+                line.classList.remove('is-placeholder');
+            }
 
             line.classList.remove('is-definition', 'is-separator');
             if (type === 'definition') {
@@ -41,9 +49,18 @@ class JoSheet extends HTMLElement {
                 if (show_error) {
                     sumElement.classList.add('is-error');
                     sumElement.textContent = '?';
+                } else if (show_hint) {
+                    sumElement.classList.remove('is-error');
+                    sumElement.textContent = line.getAttribute('data-placeholder-sum');
                 } else {
                     sumElement.classList.remove('is-error');
                     sumElement.textContent = this.round(sums[i]);
+                }
+
+                if (show_hint) {
+                    sumElement.classList.add('is-placeholder');
+                } else {
+                    sumElement.classList.remove('is-placeholder');
                 }
 
                 if (type === 'definition' || type === 'separator') {
@@ -54,7 +71,17 @@ class JoSheet extends HTMLElement {
             }
         });
 
-        document.getElementById('total').textContent = this.round(total);
+        // A lone hint line would otherwise read "7" next to a total of 0,
+        // which looks broken. Show the illustrative total, greyed out.
+        const hint_only = lines.length === 1 && lines[0].classList.contains('is-placeholder');
+        const total_element = document.getElementById('total');
+        if (hint_only) {
+            total_element.textContent = lines[0].getAttribute('data-placeholder-sum');
+            total_element.classList.add('is-placeholder');
+        } else {
+            total_element.textContent = this.round(total);
+            total_element.classList.remove('is-placeholder');
+        }
     }
 
     round(num) {
@@ -72,12 +99,17 @@ class JoLine extends HTMLElement {
 		this.addEventListener('beforeinput', this.recalculate);
 		this.addEventListener('keyup', this.recalculate);
 		this.addEventListener('keydown', this.handle_keys);
+		// The hint line is already focused on load, so a click on it fires no
+		// focus event - catch the press itself as well.
+		this.addEventListener('pointerdown', () => this._drop_hint());
+		this.addEventListener('mousedown', () => this._drop_hint());
 
 		// ✨ Aktiv-Markierung
 		this._onFocus = () => {
 		  // andere aktive Zeile(n) abräumen
 		  document.querySelectorAll('jo-line.is-active').forEach(el => { if (el !== this) el.classList.remove('is-active'); });
 		  this.classList.add('is-active');
+		  this._drop_hint();
 		  // The error display depends on which line is active, so the sheet
 		  // must re-sweep on every focus change too (not just on typing).
 		  const sheet = typeof this.closest === 'function' ? this.closest('jo-sheet') : null;
@@ -95,6 +127,21 @@ class JoLine extends HTMLElement {
 		this.addEventListener('focus', this._onFocus);
 		this.addEventListener('blur', this._onBlur);
   }
+
+    // The example hint has done its job the moment the line is touched.
+    // Dropping the attributes keeps it from reappearing mid-editing.
+    _drop_hint() {
+        if (!this.hasAttribute || !this.hasAttribute('data-placeholder')) {
+            return;
+        }
+        this.removeAttribute('data-placeholder');
+        this.removeAttribute('data-placeholder-sum');
+        this.classList.remove('is-placeholder');
+        const sheet = typeof this.closest === 'function' ? this.closest('jo-sheet') : null;
+        if (sheet) {
+            sheet.update_total();
+        }
+    }
 
     connectedCallback() {
         if (!this.hasAttribute('contenteditable')) {
@@ -558,6 +605,26 @@ function add_calc_line(starter = '') {
     jo_line.focus();
     jo_line.recalculate();
     jo_sheet.update_total();
+    return jo_line;
+}
+
+// The empty sheet shows a greyed out example instead of real text. It is a
+// hint, not content: one click and it is gone, so nobody has to delete it
+// first. The numbers next to it are illustrative, never calculated.
+const EXAMPLE_HINT = '3 apples + 4 pears';
+const EXAMPLE_HINT_SUM = '7';
+
+function add_example_hint_line() {
+    const jo_line = add_calc_line('');
+    if (jo_line && jo_line.setAttribute) {
+        jo_line.setAttribute('data-placeholder', EXAMPLE_HINT);
+        jo_line.setAttribute('data-placeholder-sum', EXAMPLE_HINT_SUM);
+        const sheet = document.getElementById('sheet');
+        if (sheet && sheet.update_total) {
+            sheet.update_total();
+        }
+    }
+    return jo_line;
 }
 
 function handle_url_params() {
@@ -580,8 +647,8 @@ function handle_url_params() {
             document.getElementById('sheet').update_total();
         }
     } else {
-        // No text parameter, add an empty line
-        add_calc_line('3 apples + 4 pears');
+        // No text parameter: show the greyed out example hint
+        add_example_hint_line();
     }
 }
 
@@ -590,7 +657,7 @@ function reset_sheet() {
     while (sheet.firstChild) {
         sheet.removeChild(sheet.firstChild);
     }
-    add_calc_line('3 apples + 4 pears');
+    add_example_hint_line();
     sheet.update_total();
 }
 

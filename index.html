@@ -106,7 +106,53 @@
 	    background: #d0d7de;                   /* GitHub-Grau als Akzent */
 	  }
 	  jo-line:focus { outline: none; }
-	  
+
+	  /* Variablen & Zwischensummen */
+	  jo-sum.is-muted {
+	    color: #6e7781; /* gedimmt, passend zum Footer */
+	  }
+	  jo-line.is-definition {
+	    font-style: italic;
+	    color: #6e7781;
+	  }
+	  jo-line.is-separator,
+	  jo-line.is-separator + jo-sum {
+	    border-top: 1px solid #d0d7de; /* feine Trennlinie, wie bei jo-spacer/jo-total */
+	  }
+	  jo-line.is-separator + jo-sum {
+	    font-weight: bold;
+	  }
+
+	  /* Beispiel-Hinweis auf dem leeren Blatt: nur Optik, kein Inhalt.
+	     ::after, weil ::before bereits der Akzentstreifen ist. */
+	  jo-line.is-placeholder::after {
+	    content: attr(data-placeholder);
+	    color: #8c959f;
+	  }
+	  jo-sum.is-placeholder,
+	  jo-total.is-placeholder {
+	    color: #8c959f;
+	    font-weight: normal;
+	  }
+
+	  /* Fehlerhafte Zeilen: roter Akzentstreifen links, analog zur aktiven Zeile.
+	     Bewusst KEINE Unterstreichung - die waere von den roten Wellenlinien
+	     der Browser-Rechtschreibpruefung nicht zu unterscheiden. */
+	  jo-line.is-error {
+	    position: relative;
+	  }
+	  jo-line.is-error::before {
+	    content: "";
+	    position: absolute;
+	    left: 0; top: 0; bottom: 0;
+	    width: 3px;
+	    background: #cf222e;
+	  }
+	  jo-sum.is-error {
+	    color: #cf222e;
+	    text-align: right;
+	  }
+
 	  /* Dark Mode: noch dezenteres Highlight + etwas dunklere Akzentleiste */
 	  @media (prefers-color-scheme: dark){
 	    jo-line.is-active {
@@ -116,6 +162,30 @@
 	  	  background: #6e7781;                 /* Muted Grey im Dark Mode */
 	    }
       /* jo-line:focus { outline: none; } */
+
+	    jo-sum.is-muted {
+	      color: #8b949e; /* etwas heller, damit es im Dark Mode lesbar bleibt */
+	    }
+	    jo-line.is-definition {
+	      color: #8b949e;
+	    }
+	    jo-line.is-separator,
+	    jo-line.is-separator + jo-sum {
+	      border-top-color: #30363d;
+	    }
+
+	    jo-line.is-placeholder::after,
+	    jo-sum.is-placeholder,
+	    jo-total.is-placeholder {
+	      color: #6e7781;
+	    }
+
+	    jo-line.is-error::before {
+	      background: #ff7b72;
+	    }
+	    jo-sum.is-error {
+	      color: #ff7b72;
+	    }
 	  }
 
 
@@ -153,15 +223,81 @@ class JoSheet extends HTMLElement {
     }
 
     update_total() {
-        let total = 0;
-        const sums = this.querySelectorAll('jo-sum');
-        sums.forEach(sum => {
-            const value = parseFloat(sum.textContent);
-            if (!isNaN(value)) {
-                total += value;
+        const lines = Array.from(this.querySelectorAll('jo-line'));
+        const texts = lines.map(line => line.textContent.trim());
+        const { sums, types, total, errors } = evaluate_sheet(texts);
+
+        lines.forEach((line, i) => {
+            const type = types[i];
+            const error = errors[i];
+            // While a line is actively being edited it is routinely broken
+            // for a moment (e.g. "5 +"), so no error is shown for it - flicker
+            // would be unbearable.
+            const is_active = line.classList.contains('is-active');
+            // The example hint only stands as long as the line is untouched
+            // and empty. It is illustrative, so it never enters any sum.
+            const show_hint = !!line.getAttribute('data-placeholder') && texts[i] === '';
+            if (show_hint) {
+                line.classList.add('is-placeholder');
+            } else {
+                line.classList.remove('is-placeholder');
+            }
+
+            line.classList.remove('is-definition', 'is-separator');
+            if (type === 'definition') {
+                line.classList.add('is-definition');
+            } else if (type === 'separator') {
+                line.classList.add('is-separator');
+            }
+
+            const sumElement = line.nextElementSibling;
+            const show_error = !!error && !is_active;
+
+            if (show_error) {
+                line.classList.add('is-error');
+                line.setAttribute('title', error.message);
+            } else {
+                line.classList.remove('is-error');
+                line.removeAttribute('title');
+            }
+
+            if (sumElement && sumElement.tagName === 'JO-SUM') {
+                if (show_error) {
+                    sumElement.classList.add('is-error');
+                    sumElement.textContent = '?';
+                } else if (show_hint) {
+                    sumElement.classList.remove('is-error');
+                    sumElement.textContent = line.getAttribute('data-placeholder-sum');
+                } else {
+                    sumElement.classList.remove('is-error');
+                    sumElement.textContent = this.round(sums[i]);
+                }
+
+                if (show_hint) {
+                    sumElement.classList.add('is-placeholder');
+                } else {
+                    sumElement.classList.remove('is-placeholder');
+                }
+
+                if (type === 'definition' || type === 'separator') {
+                    sumElement.classList.add('is-muted');
+                } else {
+                    sumElement.classList.remove('is-muted');
+                }
             }
         });
-        document.getElementById('total').textContent = this.round(total);
+
+        // A lone hint line would otherwise read "7" next to a total of 0,
+        // which looks broken. Show the illustrative total, greyed out.
+        const hint_only = lines.length === 1 && lines[0].classList.contains('is-placeholder');
+        const total_element = document.getElementById('total');
+        if (hint_only) {
+            total_element.textContent = lines[0].getAttribute('data-placeholder-sum');
+            total_element.classList.add('is-placeholder');
+        } else {
+            total_element.textContent = this.round(total);
+            total_element.classList.remove('is-placeholder');
+        }
     }
 
     round(num) {
@@ -179,25 +315,69 @@ class JoLine extends HTMLElement {
 		this.addEventListener('beforeinput', this.recalculate);
 		this.addEventListener('keyup', this.recalculate);
 		this.addEventListener('keydown', this.handle_keys);
+		// The hint line is already focused on load, so a click on it fires no
+		// focus event - catch the press itself as well.
+		this.addEventListener('pointerdown', () => this._drop_hint());
+		this.addEventListener('mousedown', () => this._drop_hint());
 
 		// ✨ Aktiv-Markierung
 		this._onFocus = () => {
 		  // andere aktive Zeile(n) abräumen
 		  document.querySelectorAll('jo-line.is-active').forEach(el => { if (el !== this) el.classList.remove('is-active'); });
 		  this.classList.add('is-active');
+		  this._drop_hint();
+		  // The error display depends on which line is active, so the sheet
+		  // must re-sweep on every focus change too (not just on typing).
+		  const sheet = typeof this.closest === 'function' ? this.closest('jo-sheet') : null;
+		  if (sheet) {
+		    sheet.update_total();
+		  }
 		};
-		this._onBlur = () => { this.classList.remove('is-active'); };
+		this._onBlur = () => {
+		  this.classList.remove('is-active');
+		  const sheet = typeof this.closest === 'function' ? this.closest('jo-sheet') : null;
+		  if (sheet) {
+		    sheet.update_total();
+		  }
+		};
 		this.addEventListener('focus', this._onFocus);
 		this.addEventListener('blur', this._onBlur);
   }
+
+    // The example hint has done its job the moment the line is touched.
+    // Dropping the attributes keeps it from reappearing mid-editing.
+    _drop_hint() {
+        if (!this.hasAttribute || !this.hasAttribute('data-placeholder')) {
+            return;
+        }
+        this.removeAttribute('data-placeholder');
+        this.removeAttribute('data-placeholder-sum');
+        this.classList.remove('is-placeholder');
+        const sheet = typeof this.closest === 'function' ? this.closest('jo-sheet') : null;
+        if (sheet) {
+            sheet.update_total();
+        }
+    }
 
     connectedCallback() {
         if (!this.hasAttribute('contenteditable')) {
             this.setAttribute('contenteditable', 'true');
         }
+        // A sheet full of amounts and part numbers is not prose - the red
+        // squiggles would only compete with the error marker.
+        if (!this.hasAttribute('spellcheck')) {
+            this.setAttribute('spellcheck', 'false');
+        }
     }
 
     recalculate() {
+        const sheet = typeof this.closest === 'function' ? this.closest('jo-sheet') : null;
+        if (sheet) {
+            sheet.update_total();
+            return;
+        }
+
+        // Fallback for isolated/mocked lines without an enclosing jo-sheet.
         const subtotal = this.calculate(this.textContent.trim());
         const sumElement = this.nextElementSibling;
         if (sumElement && sumElement.tagName === 'JO-SUM') {
@@ -205,32 +385,65 @@ class JoLine extends HTMLElement {
         }
     }
 
-    calculate(expression) {
+    calculate(expression, context = null, report = null) {
         if (!expression || typeof expression !== 'string') {
             return 0;
         }
 
         try {
-            const tokens = this.tokenize(expression);
-            const RPN = this.shuntingYard(tokens);
-            const result = this.calculateRPN(RPN);
+            const tokens = this.tokenize(expression, context, report);
+            const RPN = this.shuntingYard(tokens, report);
+            const result = this.calculateRPN(RPN, report);
             return result === undefined ? 0 : result;
         } catch (e) {
             return 0;
         }
     }
 
-    tokenize(expression) {
+    // Records the first structural problem found for a line, if the caller
+    // asked for diagnostics via `report`. Never overwrites an earlier error
+    // - the first one found wins - and never touches the return value of
+    // calculate()/tokenize()/shuntingYard()/calculateRPN().
+    _set_error(report, code, message) {
+        if (report && !report.error) {
+            report.error = { code, message };
+        }
+    }
+
+    // A dash is part of a word (e-mail, make-love-not-war) when a letter sits
+    // next to it. Exception: directly after a variable reference the letter on
+    // the left belongs to the variable name, so only the right side counts -
+    // that keeps ":SUBTOTAL-1-50" and ":a- 5" working as subtractions.
+    is_dash_in_word(expression, i, variable_end) {
+        const next_is_letter = expression[i+1] && expression[i+1].match(/[a-zA-Z]/);
+        if (i === variable_end) {
+            return !!next_is_letter;
+        }
+        const prev_is_letter = expression[i-1] && expression[i-1].match(/[a-zA-Z]/);
+        return !!(prev_is_letter || next_is_letter);
+    }
+
+    tokenize(expression, context = null, report = null) {
         const tokens = [];
         let current_number = '';
-        let last_token_was_operator = true;
+        // true only once we actually have an operand available (a number was
+        // pushed, or a ')' was processed) - used to decide whether a
+        // following '-'/'+' is unary or binary.
+        let has_operand = false;
+        let variable_end = -1;
+        let escape_next_number = false;
 
         for (let i = 0; i < expression.length; i++) {
             const char = expression[i];
 
             if (char === ' ') {
                 if (current_number !== '') {
-                    tokens.push(parseFloat(current_number));
+                    if (escape_next_number) {
+                        escape_next_number = false;
+                    } else {
+                        tokens.push(parseFloat(current_number));
+                        has_operand = true;
+                    }
                     current_number = '';
                 }
                 continue;
@@ -238,43 +451,108 @@ class JoLine extends HTMLElement {
 
             if (!isNaN(char) || (char === '.' && !((expression[i-1] && expression[i-1].match(/[a-zA-Z]/)) || (expression[i+1] && expression[i+1].match(/[a-zA-Z]/))))) {
                 if (char === '.' && current_number.includes('.')) {
-                    tokens.push(parseFloat(current_number));
+                    if (escape_next_number) {
+                        escape_next_number = false;
+                    } else {
+                        tokens.push(parseFloat(current_number));
+                        has_operand = false;
+                    }
                     current_number = '';
                     tokens.push(char);
-                    last_token_was_operator = true;
                 } else {
                     current_number += char;
-                    last_token_was_operator = false;
                 }
             } else {
                 if (current_number !== '') {
-                    if (!isNaN(current_number)) {
+                    if (escape_next_number) {
+                        escape_next_number = false;
+                    } else if (!isNaN(current_number)) {
                         tokens.push(parseFloat(current_number));
+                        has_operand = true;
                     }
                     current_number = '';
                 }
 
-                if (char === '-' && ((expression[i-1] && expression[i-1].match(/[a-zA-Z]/)) || (expression[i+1] && expression[i+1].match(/[a-zA-Z]/)))) {
+                if (char === "'" && expression[i+1] && /[0-9]/.test(expression[i+1])) {
+                    // apostrophe directly before a digit escapes the following number
+                    escape_next_number = true;
+                } else if (char === ':') {
+                    // Variable reference. A dash may belong to the name
+                    // (:SUBTOTAL-1), but it may just as well be a subtraction
+                    // (:SUBTOTAL-1-50). So read greedily, then shorten at dash
+                    // boundaries until a defined variable matches - longest
+                    // match wins, the rest stays for the operator logic.
+                    let j = i + 1;
+                    let raw = '';
+                    while (j < expression.length && /[A-Za-z0-9_-]/.test(expression[j])) {
+                        raw += expression[j];
+                        j++;
+                    }
+
+                    const vars = context && context.vars;
+                    let taken = -1;
+                    for (let k = raw.length; k > 0 && taken === -1; k--) {
+                        // only cut at the end or right before a dash
+                        if (k < raw.length && raw[k] !== '-') continue;
+                        const candidate = raw.slice(0, k);
+                        if (candidate.endsWith('-')) continue;
+                        if (vars && vars.has(candidate)) {
+                            tokens.push(vars.get(candidate));
+                            has_operand = true;
+                            taken = k;
+                        }
+                    }
+
+                    if (taken === -1) {
+                        // Unknown name: consume the first segment only and
+                        // ignore it like an unknown word, so a trailing
+                        // "-50" still works as an operator. Never push NaN.
+                        const dash = raw.indexOf('-');
+                        taken = dash === -1 ? raw.length : dash;
+
+                        if (raw.length > 0) {
+                            if (vars) {
+                                // A context WITH vars was given, but nothing
+                                // matched - that is a genuine unknown variable.
+                                const attempted_name = raw.slice(0, taken);
+                                this._set_error(report, 'unknown-variable', `Unknown variable :${attempted_name}`);
+                            } else if (report) {
+                                // No context at all: we cannot tell whether the
+                                // name would resolve, so - same as the existing
+                                // unit tests - it is silently ignored like any
+                                // other word. Remember that though, so the
+                                // operator this leaves dangling (e.g. "12 * :auto")
+                                // is not mistaken for a genuine missing-value gap
+                                // (e.g. "5 +") further down in calculateRPN.
+                                report._softIgnoredVariable = true;
+                            }
+                        }
+                    }
+                    i = i + taken; // ':' plus the consumed name characters
+                    variable_end = i + 1; // a dash right here is an operator, not a word dash
+                } else if (char === '-' && this.is_dash_in_word(expression, i, variable_end)) {
                     // ignore dash in word
-                    last_token_was_operator = false;
                 } else if (['+', '-', '*', '/', '(', ')'].includes(char)) {
-                    if (char === '-' && last_token_was_operator) {
+                    if (char === '-' && !has_operand) {
                         tokens.push('u');
-                    } else if (char === '+' && last_token_was_operator) {
+                    } else if (char === '+' && !has_operand) {
                         // ignore unary plus
                     } else {
                         tokens.push(char);
                     }
-                    last_token_was_operator = true;
+                    has_operand = (char === ')');
                 } else {
                     // It's a letter or some other character, ignore it.
-                    last_token_was_operator = false;
                 }
             }
         }
 
         if (current_number !== '') {
-            tokens.push(parseFloat(current_number));
+            if (escape_next_number) {
+                escape_next_number = false;
+            } else {
+                tokens.push(parseFloat(current_number));
+            }
         }
 
         // Implicit addition
@@ -289,7 +567,7 @@ class JoLine extends HTMLElement {
         return final_tokens;
     }
 
-    shuntingYard(tokens) {
+    shuntingYard(tokens, report = null) {
         const output = [];
         const operators = [];
         const precedence = {
@@ -320,6 +598,9 @@ class JoLine extends HTMLElement {
                 }
                 if (operators[operators.length - 1] === '(') {
                     operators.pop();
+                } else {
+                    // Closing paren with nothing open to match it.
+                    this._set_error(report, 'unbalanced-parens', 'Unbalanced parentheses');
                 }
             }
         }
@@ -328,11 +609,22 @@ class JoLine extends HTMLElement {
             output.push(operators.pop());
         }
 
+        if (output.includes('(')) {
+            // An open paren that never got closed ends up stranded in the
+            // output (see the loop above) instead of being consumed by a ')'.
+            this._set_error(report, 'unbalanced-parens', 'Unbalanced parentheses');
+        }
+
         return output;
     }
 
-    calculateRPN(rpn) {
+    calculateRPN(rpn, report = null) {
         const stack = [];
+        // A ':variable' that was silently ignored because no context was
+        // given (see tokenize) can leave an operator without a real second
+        // operand. That is not a genuine structural error, so it must not
+        // surface as missing-value.
+        const suppress_missing_value = !!(report && report._softIgnoredVariable);
 
         for (const token of rpn) {
             if (typeof token === 'number') {
@@ -342,6 +634,9 @@ class JoLine extends HTMLElement {
             } else {
                 const b = stack.pop();
                 const a = stack.pop();
+                if ((a === undefined || b === undefined) && !suppress_missing_value) {
+                    this._set_error(report, 'missing-value', 'Missing a value for the operator');
+                }
                 switch (token) {
                     case '+':
                         stack.push(a + b);
@@ -353,10 +648,19 @@ class JoLine extends HTMLElement {
                         stack.push(a * b);
                         break;
                     case '/':
+                        if (b === 0) {
+                            this._set_error(report, 'division-by-zero', 'Division by zero');
+                        }
                         stack.push(a / b);
                         break;
                 }
             }
+        }
+
+        if (stack.length > 1) {
+            // More than one value left over: parts of the line were never
+            // joined by an operator.
+            this._set_error(report, 'missing-operator', 'Missing operator between the parts of this line');
         }
 
         return stack[0];
@@ -443,6 +747,68 @@ customElements.define('jo-sheet', JoSheet);
 customElements.define('jo-line', JoLine);
 customElements.define('jo-sum', JoSum);
 
+function classify_line(text) {
+    if (/^-{3,}$/.test(text)) {
+        return { type: 'separator' };
+    }
+
+    const definition_match = text.match(/^:([A-Za-z_][A-Za-z0-9_-]*)\s*=\s*(.*)$/);
+    if (definition_match) {
+        return { type: 'definition', name: definition_match[1], expr: definition_match[2] };
+    }
+
+    return { type: 'value' };
+}
+
+function evaluate_sheet(lines) {
+    const context = { vars: new Map(), block_sum: 0, subtotal_index: 0 };
+    const sums = new Array(lines.length);
+    const types = new Array(lines.length);
+    const errors = new Array(lines.length);
+    let total = 0;
+
+    for (let i = 0; i < lines.length; i++) {
+        const text = (lines[i] || '').trim();
+        const classified = classify_line(text);
+        types[i] = classified.type;
+
+        if (classified.type === 'separator') {
+            // Nothing gets parsed for a separator, so it can never be errorous.
+            errors[i] = null;
+            context.subtotal_index++;
+            context.vars.set('SUBTOTAL-' + context.subtotal_index, context.block_sum);
+            sums[i] = context.block_sum;
+            context.block_sum = 0;
+        } else if (classified.type === 'definition') {
+            const report = {};
+            const wert = JoLine.prototype.calculate.call(JoLine.prototype, classified.expr, context, report);
+            errors[i] = report.error || null;
+            // Same NaN guard as for value lines: a broken definition must not
+            // show NaN, and must not poison every line that uses the variable.
+            const safe = isFinite(wert) ? wert : 0;
+            sums[i] = safe;
+            // A broken definition must not propagate its (possibly bogus)
+            // value to lines that reference it.
+            if (!report.error) {
+                context.vars.set(classified.name, safe);
+            }
+        } else {
+            const report = {};
+            const wert = JoLine.prototype.calculate.call(JoLine.prototype, text, context, report);
+            errors[i] = report.error || null;
+            // Display never shows NaN, even though a dangling operator (e.g.
+            // an unresolved :var used before its definition) can produce one.
+            sums[i] = isFinite(wert) ? wert : 0;
+            if (isFinite(wert) && !report.error) {
+                total += wert;
+                context.block_sum += wert;
+            }
+        }
+    }
+
+    return { sums, total, types, vars: context.vars, errors };
+}
+
 function add_calc_line(starter = '') {
     const jo_sheet = document.getElementById('sheet');
     const jo_line = document.createElement('jo-line');
@@ -455,6 +821,26 @@ function add_calc_line(starter = '') {
     jo_line.focus();
     jo_line.recalculate();
     jo_sheet.update_total();
+    return jo_line;
+}
+
+// The empty sheet shows a greyed out example instead of real text. It is a
+// hint, not content: one click and it is gone, so nobody has to delete it
+// first. The numbers next to it are illustrative, never calculated.
+const EXAMPLE_HINT = '3 apples + 4 pears';
+const EXAMPLE_HINT_SUM = '7';
+
+function add_example_hint_line() {
+    const jo_line = add_calc_line('');
+    if (jo_line && jo_line.setAttribute) {
+        jo_line.setAttribute('data-placeholder', EXAMPLE_HINT);
+        jo_line.setAttribute('data-placeholder-sum', EXAMPLE_HINT_SUM);
+        const sheet = document.getElementById('sheet');
+        if (sheet && sheet.update_total) {
+            sheet.update_total();
+        }
+    }
+    return jo_line;
 }
 
 function handle_url_params() {
@@ -477,8 +863,8 @@ function handle_url_params() {
             document.getElementById('sheet').update_total();
         }
     } else {
-        // No text parameter, add an empty line
-        add_calc_line('3 apples + 4 pears');
+        // No text parameter: show the greyed out example hint
+        add_example_hint_line();
     }
 }
 
@@ -487,7 +873,7 @@ function reset_sheet() {
     while (sheet.firstChild) {
         sheet.removeChild(sheet.firstChild);
     }
-    add_calc_line('3 apples + 4 pears');
+    add_example_hint_line();
     sheet.update_total();
 }
 
@@ -541,7 +927,7 @@ if (typeof window !== 'undefined') {
 }
 
 if (typeof module !== 'undefined' && module.exports) {
-    module.exports = { JoLine, JoSheet };
+    module.exports = { JoLine, JoSheet, classify_line, evaluate_sheet };
 }
 </script>
   </head>
@@ -569,7 +955,7 @@ if (typeof module !== 'undefined' && module.exports) {
     <!-- Footer -->
     <footer>
       Download for offline use • Source and docs on <a href="https://github.com/jerik/jotsum">GitHub</a>
-      <span id="version">2025-09-28T11:06:48Z<br>163-g5ef4225</span>
+      <span id="version">2026-09-13T16:59:07Z<br>173-gf4610d3</span>
     </footer>
   </body>
 </html>

@@ -123,6 +123,18 @@
 	    font-weight: bold;
 	  }
 
+	  /* Beispiel-Hinweis auf dem leeren Blatt: nur Optik, kein Inhalt.
+	     ::after, weil ::before bereits der Akzentstreifen ist. */
+	  jo-line.is-placeholder::after {
+	    content: attr(data-placeholder);
+	    color: #8c959f;
+	  }
+	  jo-sum.is-placeholder,
+	  jo-total.is-placeholder {
+	    color: #8c959f;
+	    font-weight: normal;
+	  }
+
 	  /* Fehlerhafte Zeilen: roter Akzentstreifen links, analog zur aktiven Zeile.
 	     Bewusst KEINE Unterstreichung - die waere von den roten Wellenlinien
 	     der Browser-Rechtschreibpruefung nicht zu unterscheiden. */
@@ -160,6 +172,12 @@
 	    jo-line.is-separator,
 	    jo-line.is-separator + jo-sum {
 	      border-top-color: #30363d;
+	    }
+
+	    jo-line.is-placeholder::after,
+	    jo-sum.is-placeholder,
+	    jo-total.is-placeholder {
+	      color: #6e7781;
 	    }
 
 	    jo-line.is-error::before {

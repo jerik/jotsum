@@ -162,3 +162,23 @@ test('a structurally broken line is marked as an error and excluded from the tot
   await expect(page.locator('#total')).toHaveText('150'); // not 155, the broken line is excluded
 });
 
+test('the example on an empty sheet is a hint, not text you have to delete', async ({ page }) => {
+  const firstLine = page.locator('jo-line').first();
+  const firstSum = page.locator('jo-sum').first();
+
+  // The hint is shown, but the line itself is empty - nothing to delete.
+  await expect(firstLine).toHaveClass(/is-placeholder/);
+  await expect(firstLine).toHaveAttribute('data-placeholder', '3 apples + 4 pears');
+  await expect(firstLine).toHaveText('');
+  await expect(firstSum).toHaveText('7');
+  await expect(firstSum).toHaveClass(/is-placeholder/);
+
+  // Clicking in drops the hint for good, typing starts on a clean line.
+  await firstLine.click();
+  await expect(firstLine).not.toHaveClass(/is-placeholder/);
+  await page.keyboard.type('Tanken -45.50 EUR');
+
+  await expect(firstLine).toHaveText('Tanken -45.50 EUR');
+  await expect(firstSum).toHaveText('-45.50');
+  await expect(page.locator('#total')).toHaveText('-45.50');
+});
