@@ -203,3 +203,17 @@ test('the hint does not come back after typing and clearing the line', async ({ 
   const box = await firstLine.boundingBox();
   expect(box.height).toBeLessThan(45);
 });
+
+test('several spaces in a row still calculate', async ({ page }) => {
+  // contenteditable stores every second space as a non-breaking space, which
+  // used to be swallowed into the number and made the line collapse to 0.
+  const line = page.locator('jo-line').first();
+  await line.click();
+  await page.keyboard.type('18 +    23');
+
+  const raw = await line.evaluate(el => el.textContent);
+  expect(raw).toContain('\u00A0'); // the browser really did insert one
+
+  await expect(page.locator('jo-sum').first()).toHaveText('41');
+  await expect(page.locator('#total')).toHaveText('41');
+});

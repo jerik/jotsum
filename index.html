@@ -448,7 +448,11 @@ class JoLine extends HTMLElement {
         for (let i = 0; i < expression.length; i++) {
             const char = expression[i];
 
-            if (char === ' ') {
+            // Any whitespace separates, not just U+0020. contenteditable turns
+            // every second space into a non-breaking space, and isNaN('\u00A0')
+            // is false - so an untreated nbsp would be collected into the
+            // number and parseFloat would turn the whole line into NaN.
+            if (/\s/.test(char)) {
                 if (current_number !== '') {
                     if (escape_next_number) {
                         escape_next_number = false;
@@ -967,7 +971,7 @@ if (typeof module !== 'undefined' && module.exports) {
     <!-- Footer -->
     <footer>
       Download for offline use • Source and docs on <a href="https://github.com/jerik/jotsum">GitHub</a>
-      <span id="version">2026-09-13T17:00:46Z<br>174-g9a1bc2c</span>
+      <span id="version">2026-09-13T18:44:16Z<br>175-g6b7a535</span>
     </footer>
   </body>
 </html>

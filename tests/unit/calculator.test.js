@@ -72,6 +72,26 @@ function testCalculate() {
         }
     });
 
+    // Whitespace that is not U+0020. contenteditable stores "18 +    23" as
+    // "18 +\u00A0 \u00A0 23", and isNaN('\u00A0') is false, so an untreated
+    // non-breaking space used to be collected into the number and dragged the
+    // whole line down to NaN.
+    const NBSP = '\u00A0';
+    const whitespace_tests = [
+        { expression: '18 +' + NBSP + ' ' + NBSP + ' 23', expected: 41 },
+        { expression: '18 +' + NBSP + NBSP + NBSP + '23', expected: 41 },
+        { expression: '18 +\t23', expected: 41 },
+        { expression: '18' + NBSP + '+' + NBSP + '23', expected: 41 },
+        { expression: '3' + NBSP + 'apples + 4 pears', expected: 7 },
+        { expression: '18 +    23', expected: 41 },
+        { expression: 'Tanken' + NBSP + '-45.50 EUR', expected: -45.5 },
+    ];
+
+    whitespace_tests.forEach(test => {
+        const result = joLine.calculate(test.expression);
+        assert.strictEqual(result, test.expected, `Test failed for expression: ${JSON.stringify(test.expression)}. Expected ${test.expected}, but got ${result}`);
+    });
+
     console.log('All calculator tests passed!');
 }
 
