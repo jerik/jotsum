@@ -11,6 +11,7 @@
 - [x] variablen können dann in anderen zeilen mit 12 * :auto genutzt werden
 - [x] Zwischensumme mit --- erzeugen, die werte der zwischensummen werden in automatisch variablen gespeichert :SUBTOTAL-1 
 - [x] Hinweis auf fehlerhafte Zeilen (fehlender Operator, fehlender Wert, unbalancierte Klammern, unbekannte Variable, Division durch Null) statt stiller Falschergebnisse; Anzeige ? in der Summenspalte, Zeile zählt nicht in die Gesamtsumme
+- [x] implizite Addition entfernt: zwischen zwei Zahlen muss immer ein Operator stehen, sonst Fehlerhinweis (kam aus 1e55f08, war nie beabsichtigt)
 - Währung umrechnung sollte lokal passieren. täglich die wichtigsten umrechnungskurse holen :EUR-USD und bereitstellen? 
 - Längenumrechnungen, was könnte ich da machen?
 - markdown parsing für header. dafür muss am zeilenanfang mit einem oder mehreren # beginnen

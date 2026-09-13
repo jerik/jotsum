@@ -17,6 +17,7 @@ The numbers are extracted, calculated as a subtotal, and all subtotals are summe
 ## How it works
 
 * Each line can contain both text and numbers with operators
+* Numbers always need an operator between them — `18 + 12 note 20 + 10` is two finished sums glued together by a word, so jotsum reports it instead of guessing
 * Subtotals are calculated per line
 * All subtotals are automatically added up
 
@@ -83,7 +84,7 @@ jotsum is intentionally lenient with text — `apples` yields 0 and `3 apples + 
 
 Recognized cases:
 
-- **Missing operator** — `(2+3) (4+5)` (operator missing between parentheses)
+- **Missing operator** — `(2+3) (4+5)` or `18 + 12 note 20 + 10` (two numbers with nothing joining them)
 - **Missing value** — `5 +` (operator lacks a value)
 - **Unbalanced parentheses** — `(2+3` (unclosed bracket)
 - **Unknown variable** — `12 * :rate` (if `:rate` was never defined)

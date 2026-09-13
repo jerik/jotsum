@@ -217,3 +217,19 @@ test('several spaces in a row still calculate', async ({ page }) => {
   await expect(page.locator('jo-sum').first()).toHaveText('41');
   await expect(page.locator('#total')).toHaveText('41');
 });
+
+test('two numbers without an operator between them are an error', async ({ page }) => {
+  const text = '18 + 12 mirakel 20 + 10\n18 + 12 mirakel + 20 + 10';
+  await page.goto('/jotsum.html?text=' + encodeURIComponent(text));
+
+  const lines = page.locator('jo-line');
+  const sums = page.locator('jo-sum');
+
+  // Glued together by a word: ambiguous, so it is reported instead of summing to 60.
+  await expect(lines.nth(0)).toHaveClass(/is-error/);
+  await expect(sums.nth(0)).toHaveText('?');
+
+  // The same line with an operator in place calculates normally.
+  await expect(sums.nth(1)).toHaveText('60');
+  await expect(page.locator('#total')).toHaveText('60');
+});

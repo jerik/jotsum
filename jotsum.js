@@ -347,16 +347,11 @@ class JoLine extends HTMLElement {
             }
         }
 
-        // Implicit addition
-        const final_tokens = [];
-        for (let i = 0; i < tokens.length; i++) {
-            final_tokens.push(tokens[i]);
-            if (i < tokens.length - 1 && typeof tokens[i] === 'number' && typeof tokens[i+1] === 'number') {
-                final_tokens.push('+');
-            }
-        }
-
-        return final_tokens;
+        // Two numbers next to each other are NOT joined with an implicit plus.
+        // "18 + 12 mirakel 20 + 10" are two finished sums glued together by a
+        // word - what the line is supposed to mean is anyone's guess, so it is
+        // reported as missing-operator instead of silently adding up to 60.
+        return tokens;
     }
 
     shuntingYard(tokens, report = null) {

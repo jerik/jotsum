@@ -40,7 +40,9 @@ function testCalculate() {
         { expression: '- (-5 + 5) * 2', expected: 0 },
         { expression: '10 * 8 höhner asdf ', expected: 80 }, // online kommt NaN raus, wegen dem letzten leerzeichen
         { expression: 'das letzte leerzeichen   ', expected: 0 }, // online kommt NaN raus
-        { expression: '10 . 87', expected: 'NaN' }, 
+        // A stray dot between two numbers leaves them unconnected, which is
+        // reported as missing-operator; the value is the first number.
+        { expression: '10 . 87', expected: 10 }, 
         { expression: '10.87', expected: 10.87 }, 
         { expression: '3 apples + 4 pears ', expected: 7 }, 
         { expression: 'make-love-not-war', expected: 0 }, 
@@ -59,7 +61,9 @@ function testCalculate() {
         { expression: "Rechnung '2024 500", expected: 500 },
         { expression: "'12", expected: 0 },
         { expression: "don't 5 + 5", expected: 10 },
-        { expression: "70's 5", expected: 75 },
+        // The apostrophe only escapes when a digit follows it, so "70's" keeps
+        // its 70. Needs an explicit operator now to join the two numbers.
+        { expression: "70's + 5", expected: 75 },
         { expression: "L'Oreal 12", expected: 12 },
     ];
 
@@ -102,14 +106,17 @@ function testCalculateWithContext() {
     const resolved = joLine.calculate('12 * :auto', { vars: new Map([['auto', 120]]) });
     assert.strictEqual(resolved, 1440, `Expected 1440, but got ${resolved}`);
 
-    // No context at all -> ':auto' is ignored like an unknown word, implicit
-    // addition still applies around it.
-    const no_context = joLine.calculate('5 :auto 10');
-    assert.strictEqual(no_context, 15, `Expected 15, but got ${no_context}`);
+    // No context at all -> ':auto' is ignored like an unknown word. The two
+    // numbers are then unconnected, which is a missing-operator line.
+    const no_context_report = {};
+    joLine.calculate('5 :auto 10', null, no_context_report);
+    assert.strictEqual(no_context_report.error && no_context_report.error.code, 'missing-operator', `Expected missing-operator, but got ${JSON.stringify(no_context_report.error)}`);
 
-    // Context present but the name is missing -> also ignored, no NaN.
-    const unknown_name = joLine.calculate('5 :unknown 3', { vars: new Map([['auto', 120]]) });
-    assert.strictEqual(unknown_name, 8, `Expected 8, but got ${unknown_name}`);
+    // Context present but the name is missing -> the variable itself is the
+    // error that gets reported first.
+    const unknown_report = {};
+    joLine.calculate('5 :unknown 3', { vars: new Map([['auto', 120]]) }, unknown_report);
+    assert.strictEqual(unknown_report.error && unknown_report.error.code, 'unknown-variable', `Expected unknown-variable, but got ${JSON.stringify(unknown_report.error)}`);
 
     // Dash belongs to the variable name (needed for :SUBTOTAL-1 style names).
     const dashed_name = joLine.calculate(':SUBTOTAL-1 + 1', { vars: new Map([['SUBTOTAL-1', 300]]) });
@@ -217,6 +224,34 @@ function testErrorReports() {
     const div_ok = {};
     joLine.calculate('10 / 2', null, div_ok);
     assert.strictEqual(div_ok.error, undefined, `Expected no error, but got ${JSON.stringify(div_ok.error)}`);
+
+    // Two numbers side by side are never joined on their own - an operator
+    // between them is always required.
+    const no_implicit = [
+        { expression: '18 + 12 mirakel 20 + 10', value: 18 },
+        { expression: 'apples 5 pears 10', value: 5 },
+        { expression: '5 10', value: 5 },
+        { expression: '10 . 87', value: 10 },
+    ];
+    no_implicit.forEach(test => {
+        const r = {};
+        const v = joLine.calculate(test.expression, null, r);
+        assert.strictEqual(v, test.value, `Expected ${test.value} for ${JSON.stringify(test.expression)}, but got ${v}`);
+        assert.strictEqual(r.error && r.error.code, 'missing-operator', `Expected missing-operator for ${JSON.stringify(test.expression)}, but got ${JSON.stringify(r.error)}`);
+    });
+
+    // With an operator in place the very same lines are fine again.
+    const with_operator = [
+        { expression: '18 + 12 mirakel + 20 + 10', expected: 60 },
+        { expression: 'apples 5 + pears 10', expected: 15 },
+        { expression: '3 apples + 4 pears', expected: 7 },
+    ];
+    with_operator.forEach(test => {
+        const r = {};
+        const v = joLine.calculate(test.expression, null, r);
+        assert.strictEqual(v, test.expected, `Expected ${test.expected} for ${JSON.stringify(test.expression)}, but got ${v}`);
+        assert.strictEqual(r.error, undefined, `Expected no error for ${JSON.stringify(test.expression)}, but got ${JSON.stringify(r.error)}`);
+    });
 
     console.log('All error report tests passed!');
 }
