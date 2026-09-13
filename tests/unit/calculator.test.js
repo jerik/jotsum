@@ -117,5 +117,90 @@ function testCalculateWithContext() {
     console.log('All calculator context tests passed!');
 }
 
+function testErrorReports() {
+    const joLine = new JoLine();
+
+    // Structurally broken lines must be MARKED via `report.error`, while the
+    // return value of calculate() stays exactly what it was before (the ~60
+    // cases above must not change).
+    const broken_cases = [
+        { expression: '(2+3) (4+5)', context: null, expected_value: 5, code: 'missing-operator' },
+        { expression: '3 * (3+4) : ( 4 + 8 )', context: null, expected_value: 3, code: 'missing-operator' },
+        { expression: '5 +', context: null, expected_value: NaN, code: 'missing-value' },
+        { expression: '* 5', context: null, expected_value: NaN, code: 'missing-value' },
+        { expression: '(2+3', context: null, expected_value: 0, code: 'unbalanced-parens' },
+        { expression: '2+3)', context: null, expected_value: 5, code: 'unbalanced-parens' },
+        { expression: '12 * :auto', context: { vars: new Map() }, expected_value: NaN, code: 'unknown-variable' },
+    ];
+
+    broken_cases.forEach(test => {
+        const report = {};
+        const result = joLine.calculate(test.expression, test.context, report);
+
+        if (Number.isNaN(test.expected_value)) {
+            assert(isNaN(result), `Test failed for expression: "${test.expression}". Expected NaN, but got ${result}`);
+        } else {
+            assert.strictEqual(result === -0 ? 0 : result, test.expected_value, `Test failed for expression: "${test.expression}". Expected ${test.expected_value}, but got ${result}`);
+        }
+
+        assert(report.error, `Expected an error to be reported for "${test.expression}", but none was set`);
+        assert.strictEqual(report.error.code, test.code, `Test failed for expression: "${test.expression}". Expected error code ${test.code}, but got ${report.error && report.error.code}`);
+    });
+
+    // Without context, ':auto' is ignored just like an unknown word (same as
+    // the existing unit tests above) - no error must be reported for it.
+    {
+        const report = {};
+        const result = joLine.calculate('12 * :auto', null, report);
+        assert(isNaN(result), `Expected NaN, but got ${result}`);
+        assert.strictEqual(report.error, undefined, `Expected no error, but got ${JSON.stringify(report.error)}`);
+    }
+
+    // ':auto' resolved via context must still name the unresolved variable.
+    {
+        const report = {};
+        joLine.calculate('12 * :auto', { vars: new Map() }, report);
+        assert(report.error.message.includes(':auto'), `Expected the message to mention ":auto", but got "${report.error.message}"`);
+    }
+
+    // Core jotsum behaviour: text without numbers, and ordinary well-formed
+    // lines, must never be reported as an error - regardless of the result
+    // being 0.
+    const clean_cases = [
+        { expression: 'apples', context: null },
+        { expression: '3 apples + 4 pears', context: null },
+        { expression: '2 + 2', context: null },
+        { expression: '-10 -10 -10', context: null },
+        { expression: 'Tanken -45.50 EUR', context: null },
+        { expression: "Rechnung '2024 500", context: null },
+        { expression: '', context: null },
+    ];
+
+    clean_cases.forEach(test => {
+        const report = {};
+        joLine.calculate(test.expression, test.context, report);
+        assert.strictEqual(report.error, undefined, `Expected no error for "${test.expression}", but got ${JSON.stringify(report.error)}`);
+    });
+
+    // '---' is a separator and never reaches calculate()/tokenize() at all,
+    // so it cannot carry an error either (checked at the evaluate_sheet
+    // level in sheet.test.js).
+
+    // Division by zero is the same silent-wrong pattern: without a report it
+    // would just show 0 in the sum column.
+    const div_report = {};
+    const div_value = joLine.calculate('Aufteilung 10 / 0', null, div_report);
+    assert.strictEqual(div_value, Infinity, `Expected Infinity, but got ${div_value}`);
+    assert.strictEqual(div_report.error && div_report.error.code, 'division-by-zero', `Expected division-by-zero, but got ${JSON.stringify(div_report.error)}`);
+
+    // A normal division must stay clean.
+    const div_ok = {};
+    joLine.calculate('10 / 2', null, div_ok);
+    assert.strictEqual(div_ok.error, undefined, `Expected no error, but got ${JSON.stringify(div_ok.error)}`);
+
+    console.log('All error report tests passed!');
+}
+
 testCalculate();
 testCalculateWithContext();
+testErrorReports();

@@ -145,3 +145,20 @@ test('editing an earlier line live-recalculates a later line through a variable'
   await expect(secondSum).toHaveText('40');
 });
 
+test('a structurally broken line is marked as an error and excluded from the total', async ({ page }) => {
+  const text = 'A 100\n(2+3) (4+5)\nB 50';
+  await page.goto('/jotsum.html?text=' + encodeURIComponent(text));
+
+  const lines = page.locator('jo-line');
+  await expect(lines).toHaveCount(3);
+
+  const brokenLine = lines.nth(1);
+  const brokenSum = brokenLine.locator('xpath=following-sibling::jo-sum[1]');
+
+  await expect(brokenLine).toHaveClass(/is-error/);
+  await expect(brokenSum).toHaveClass(/is-error/);
+  await expect(brokenSum).toHaveText('?');
+
+  await expect(page.locator('#total')).toHaveText('150'); // not 155, the broken line is excluded
+});
+

@@ -123,6 +123,15 @@
 	    font-weight: bold;
 	  }
 
+	  /* Fehlerhafte Zeilen: dezent, kein Vollton */
+	  jo-line.is-error {
+	    text-decoration: underline dotted #cf222e;
+	  }
+	  jo-sum.is-error {
+	    color: #cf222e;
+	    text-align: right;
+	  }
+
 	  /* Dark Mode: noch dezenteres Highlight + etwas dunklere Akzentleiste */
 	  @media (prefers-color-scheme: dark){
 	    jo-line.is-active {
@@ -142,6 +151,13 @@
 	    jo-line.is-separator,
 	    jo-line.is-separator + jo-sum {
 	      border-top-color: #30363d;
+	    }
+
+	    jo-line.is-error {
+	      text-decoration-color: #ff7b72;
+	    }
+	    jo-sum.is-error {
+	      color: #ff7b72;
 	    }
 	  }
 

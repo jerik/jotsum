@@ -77,6 +77,22 @@ VAT :SUBTOTAL-1 * 0.19           → 57
 
 ---
 
+## Error hints
+
+jotsum is intentionally lenient with text — `apples` yields 0 and `3 apples + 4 pears` yields 7, which is by design, not an error. However, when a line has a structural problem, jotsum now shows a hint instead of silently producing a plausible but incorrect result. The sum column displays `?` instead of a number, the line is subtly marked, and the explanation appears in a tooltip. The line does not contribute to the final total; the rest of the sheet calculates normally.
+
+Recognized cases:
+
+- **Missing operator** — `(2+3) (4+5)` (operator missing between parentheses)
+- **Missing value** — `5 +` (operator lacks a value)
+- **Unbalanced parentheses** — `(2+3` (unclosed bracket)
+- **Unknown variable** — `12 * :rate` (if `:rate` was never defined)
+- **Division by zero** — `10 / 0`
+
+Note: While typing in a line, no error is displayed — the hint appears only after you leave the line. Otherwise every line would briefly flash while you type.
+
+---
+
 ## Start with a link
 You don’t even need to type or paste: JotSum can take a text directly from the URL. Just add `?text=...` at the end of the link, and your notes will appear instantly. Multi-line texts are split into rows, ready for calculation. 
 

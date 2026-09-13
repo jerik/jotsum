@@ -9,10 +9,15 @@ class JoSheet extends HTMLElement {
     update_total() {
         const lines = Array.from(this.querySelectorAll('jo-line'));
         const texts = lines.map(line => line.textContent.trim());
-        const { sums, types, total } = evaluate_sheet(texts);
+        const { sums, types, total, errors } = evaluate_sheet(texts);
 
         lines.forEach((line, i) => {
             const type = types[i];
+            const error = errors[i];
+            // While a line is actively being edited it is routinely broken
+            // for a moment (e.g. "5 +"), so no error is shown for it - flicker
+            // would be unbearable.
+            const is_active = line.classList.contains('is-active');
 
             line.classList.remove('is-definition', 'is-separator');
             if (type === 'definition') {
@@ -22,8 +27,25 @@ class JoSheet extends HTMLElement {
             }
 
             const sumElement = line.nextElementSibling;
+            const show_error = !!error && !is_active;
+
+            if (show_error) {
+                line.classList.add('is-error');
+                line.setAttribute('title', error.message);
+            } else {
+                line.classList.remove('is-error');
+                line.removeAttribute('title');
+            }
+
             if (sumElement && sumElement.tagName === 'JO-SUM') {
-                sumElement.textContent = this.round(sums[i]);
+                if (show_error) {
+                    sumElement.classList.add('is-error');
+                    sumElement.textContent = '?';
+                } else {
+                    sumElement.classList.remove('is-error');
+                    sumElement.textContent = this.round(sums[i]);
+                }
+
                 if (type === 'definition' || type === 'separator') {
                     sumElement.classList.add('is-muted');
                 } else {
@@ -56,8 +78,20 @@ class JoLine extends HTMLElement {
 		  // andere aktive Zeile(n) abräumen
 		  document.querySelectorAll('jo-line.is-active').forEach(el => { if (el !== this) el.classList.remove('is-active'); });
 		  this.classList.add('is-active');
+		  // The error display depends on which line is active, so the sheet
+		  // must re-sweep on every focus change too (not just on typing).
+		  const sheet = typeof this.closest === 'function' ? this.closest('jo-sheet') : null;
+		  if (sheet) {
+		    sheet.update_total();
+		  }
 		};
-		this._onBlur = () => { this.classList.remove('is-active'); };
+		this._onBlur = () => {
+		  this.classList.remove('is-active');
+		  const sheet = typeof this.closest === 'function' ? this.closest('jo-sheet') : null;
+		  if (sheet) {
+		    sheet.update_total();
+		  }
+		};
 		this.addEventListener('focus', this._onFocus);
 		this.addEventListener('blur', this._onBlur);
   }
@@ -83,18 +117,28 @@ class JoLine extends HTMLElement {
         }
     }
 
-    calculate(expression, context = null) {
+    calculate(expression, context = null, report = null) {
         if (!expression || typeof expression !== 'string') {
             return 0;
         }
 
         try {
-            const tokens = this.tokenize(expression, context);
-            const RPN = this.shuntingYard(tokens);
-            const result = this.calculateRPN(RPN);
+            const tokens = this.tokenize(expression, context, report);
+            const RPN = this.shuntingYard(tokens, report);
+            const result = this.calculateRPN(RPN, report);
             return result === undefined ? 0 : result;
         } catch (e) {
             return 0;
+        }
+    }
+
+    // Records the first structural problem found for a line, if the caller
+    // asked for diagnostics via `report`. Never overwrites an earlier error
+    // - the first one found wins - and never touches the return value of
+    // calculate()/tokenize()/shuntingYard()/calculateRPN().
+    _set_error(report, code, message) {
+        if (report && !report.error) {
+            report.error = { code, message };
         }
     }
 
@@ -111,7 +155,7 @@ class JoLine extends HTMLElement {
         return !!(prev_is_letter || next_is_letter);
     }
 
-    tokenize(expression, context = null) {
+    tokenize(expression, context = null, report = null) {
         const tokens = [];
         let current_number = '';
         // true only once we actually have an operand available (a number was
@@ -197,6 +241,24 @@ class JoLine extends HTMLElement {
                         // "-50" still works as an operator. Never push NaN.
                         const dash = raw.indexOf('-');
                         taken = dash === -1 ? raw.length : dash;
+
+                        if (raw.length > 0) {
+                            if (vars) {
+                                // A context WITH vars was given, but nothing
+                                // matched - that is a genuine unknown variable.
+                                const attempted_name = raw.slice(0, taken);
+                                this._set_error(report, 'unknown-variable', `Unknown variable :${attempted_name}`);
+                            } else if (report) {
+                                // No context at all: we cannot tell whether the
+                                // name would resolve, so - same as the existing
+                                // unit tests - it is silently ignored like any
+                                // other word. Remember that though, so the
+                                // operator this leaves dangling (e.g. "12 * :auto")
+                                // is not mistaken for a genuine missing-value gap
+                                // (e.g. "5 +") further down in calculateRPN.
+                                report._softIgnoredVariable = true;
+                            }
+                        }
                     }
                     i = i + taken; // ':' plus the consumed name characters
                     variable_end = i + 1; // a dash right here is an operator, not a word dash
@@ -237,7 +299,7 @@ class JoLine extends HTMLElement {
         return final_tokens;
     }
 
-    shuntingYard(tokens) {
+    shuntingYard(tokens, report = null) {
         const output = [];
         const operators = [];
         const precedence = {
@@ -268,6 +330,9 @@ class JoLine extends HTMLElement {
                 }
                 if (operators[operators.length - 1] === '(') {
                     operators.pop();
+                } else {
+                    // Closing paren with nothing open to match it.
+                    this._set_error(report, 'unbalanced-parens', 'Unbalanced parentheses');
                 }
             }
         }
@@ -276,11 +341,22 @@ class JoLine extends HTMLElement {
             output.push(operators.pop());
         }
 
+        if (output.includes('(')) {
+            // An open paren that never got closed ends up stranded in the
+            // output (see the loop above) instead of being consumed by a ')'.
+            this._set_error(report, 'unbalanced-parens', 'Unbalanced parentheses');
+        }
+
         return output;
     }
 
-    calculateRPN(rpn) {
+    calculateRPN(rpn, report = null) {
         const stack = [];
+        // A ':variable' that was silently ignored because no context was
+        // given (see tokenize) can leave an operator without a real second
+        // operand. That is not a genuine structural error, so it must not
+        // surface as missing-value.
+        const suppress_missing_value = !!(report && report._softIgnoredVariable);
 
         for (const token of rpn) {
             if (typeof token === 'number') {
@@ -290,6 +366,9 @@ class JoLine extends HTMLElement {
             } else {
                 const b = stack.pop();
                 const a = stack.pop();
+                if ((a === undefined || b === undefined) && !suppress_missing_value) {
+                    this._set_error(report, 'missing-value', 'Missing a value for the operator');
+                }
                 switch (token) {
                     case '+':
                         stack.push(a + b);
@@ -301,10 +380,19 @@ class JoLine extends HTMLElement {
                         stack.push(a * b);
                         break;
                     case '/':
+                        if (b === 0) {
+                            this._set_error(report, 'division-by-zero', 'Division by zero');
+                        }
                         stack.push(a / b);
                         break;
                 }
             }
+        }
+
+        if (stack.length > 1) {
+            // More than one value left over: parts of the line were never
+            // joined by an operator.
+            this._set_error(report, 'missing-operator', 'Missing operator between the parts of this line');
         }
 
         return stack[0];
@@ -408,6 +496,7 @@ function evaluate_sheet(lines) {
     const context = { vars: new Map(), block_sum: 0, subtotal_index: 0 };
     const sums = new Array(lines.length);
     const types = new Array(lines.length);
+    const errors = new Array(lines.length);
     let total = 0;
 
     for (let i = 0; i < lines.length; i++) {
@@ -416,30 +505,40 @@ function evaluate_sheet(lines) {
         types[i] = classified.type;
 
         if (classified.type === 'separator') {
+            // Nothing gets parsed for a separator, so it can never be errorous.
+            errors[i] = null;
             context.subtotal_index++;
             context.vars.set('SUBTOTAL-' + context.subtotal_index, context.block_sum);
             sums[i] = context.block_sum;
             context.block_sum = 0;
         } else if (classified.type === 'definition') {
-            const wert = JoLine.prototype.calculate.call(JoLine.prototype, classified.expr, context);
+            const report = {};
+            const wert = JoLine.prototype.calculate.call(JoLine.prototype, classified.expr, context, report);
+            errors[i] = report.error || null;
             // Same NaN guard as for value lines: a broken definition must not
             // show NaN, and must not poison every line that uses the variable.
             const safe = isFinite(wert) ? wert : 0;
-            context.vars.set(classified.name, safe);
             sums[i] = safe;
+            // A broken definition must not propagate its (possibly bogus)
+            // value to lines that reference it.
+            if (!report.error) {
+                context.vars.set(classified.name, safe);
+            }
         } else {
-            const wert = JoLine.prototype.calculate.call(JoLine.prototype, text, context);
+            const report = {};
+            const wert = JoLine.prototype.calculate.call(JoLine.prototype, text, context, report);
+            errors[i] = report.error || null;
             // Display never shows NaN, even though a dangling operator (e.g.
             // an unresolved :var used before its definition) can produce one.
             sums[i] = isFinite(wert) ? wert : 0;
-            if (isFinite(wert)) {
+            if (isFinite(wert) && !report.error) {
                 total += wert;
                 context.block_sum += wert;
             }
         }
     }
 
-    return { sums, total, types, vars: context.vars };
+    return { sums, total, types, vars: context.vars, errors };
 }
 
 function add_calc_line(starter = '') {

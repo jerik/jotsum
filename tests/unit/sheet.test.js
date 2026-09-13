@@ -92,5 +92,44 @@ function testEvaluateSheet() {
     console.log('All evaluate_sheet tests passed!');
 }
 
+function testEvaluateSheetErrors() {
+    // A structurally broken line is marked in `errors` and does not count
+    // towards the total - even though sums[i] still holds the (unchanged)
+    // computed value.
+    {
+        const result = evaluate_sheet(['A 100', '(2+3) (4+5)', 'B 50']);
+        assert.strictEqual(result.errors[0], null);
+        assert(result.errors[1], 'Expected an error for "(2+3) (4+5)"');
+        assert.strictEqual(result.errors[1].code, 'missing-operator');
+        assert.strictEqual(result.sums[1], 5);
+        assert.strictEqual(result.errors[2], null);
+        assert.strictEqual(result.total, 150);
+    }
+
+    // A broken definition must not set the variable - a broken definition
+    // must not spread its value to lines that reference it.
+    {
+        const result = evaluate_sheet([':rate = (2+3) (4+5)', 'x :rate']);
+        assert(result.errors[0], 'Expected the definition to be reported as broken');
+        assert.strictEqual(result.errors[0].code, 'missing-operator');
+        assert.strictEqual(result.vars.has('rate'), false);
+        assert(result.errors[1], 'Expected the reference to :rate to be reported as broken');
+        assert.strictEqual(result.errors[1].code, 'unknown-variable');
+    }
+
+    // A broken line inside a block must not skew the subtotal that was
+    // already carried by an earlier separator.
+    {
+        const result = evaluate_sheet(['A 100', '---', 'B (2+3) (4+5)']);
+        assert.strictEqual(result.sums[1], 100);
+        assert.strictEqual(result.errors[1], null);
+        assert(result.errors[2], 'Expected an error for "B (2+3) (4+5)"');
+        assert.strictEqual(result.total, 100);
+    }
+
+    console.log('All evaluate_sheet error tests passed!');
+}
+
 testClassifyLine();
 testEvaluateSheet();
+testEvaluateSheetErrors();

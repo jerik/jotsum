@@ -10,8 +10,12 @@
 - [x] variablen ermöglichen. variablen definition :auto = 120 EUR. :xxx muss immer zu beginn stehen, gefolgt von einem =-zeichen
 - [x] variablen können dann in anderen zeilen mit 12 * :auto genutzt werden
 - [x] Zwischensumme mit --- erzeugen, die werte der zwischensummen werden in automatisch variablen gespeichert :SUBTOTAL-1 
+- [x] Hinweis auf fehlerhafte Zeilen (fehlender Operator, fehlender Wert, unbalancierte Klammern, unbekannte Variable, Division durch Null) statt stiller Falschergebnisse; Anzeige ? in der Summenspalte, Zeile zählt nicht in die Gesamtsumme
 - Währung umrechnung sollte lokal passieren. täglich die wichtigsten umrechnungskurse holen :EUR-USD und bereitstellen? 
 - Längenumrechnungen, was könnte ich da machen?
+- markdown parsing für header. dafür muss am zeilenanfang mit einem oder mehreren # beginnen
+- vorbelegung der ersten Zeile mit dem beispiel. aktuell ist das ein echter test, wenn man reinklickt, soll sich die zeile leeren.
+  muss nicht echt sein, kann auch nur zum schein sein, damit die nutezr wissen was zu tun ist. 
 
 ## helper
 ### finding elements for playwright 
