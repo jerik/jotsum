@@ -104,12 +104,10 @@ class JoLine extends HTMLElement {
 		this.addEventListener('beforeinput', this.recalculate);
 		this.addEventListener('keyup', this.recalculate);
 		this.addEventListener('keydown', this.handle_keys);
-		// The hint line is already focused on load, so a click on it fires no
-		// focus event - catch the press itself as well.
-		this.addEventListener('pointerdown', () => this._drop_hint());
-		this.addEventListener('mousedown', () => this._drop_hint());
-		// Typing counts as touching it too - otherwise the hint would come
-		// back the moment someone clears the line again.
+		// The hint goes away when you type, and only then. Hanging it on focus
+		// or on a click breaks the page in a background tab: there the focus
+		// event arrives after the hint was set up and wipes it out, while in a
+		// foreground tab it arrives before and does nothing.
 		this.addEventListener('beforeinput', () => this._drop_hint());
 		this.addEventListener('input', () => this._drop_hint());
 
@@ -118,7 +116,6 @@ class JoLine extends HTMLElement {
 		  // andere aktive Zeile(n) abräumen
 		  document.querySelectorAll('jo-line.is-active').forEach(el => { if (el !== this) el.classList.remove('is-active'); });
 		  this.classList.add('is-active');
-		  this._drop_hint();
 		  // The error display depends on which line is active, so the sheet
 		  // must re-sweep on every focus change too (not just on typing).
 		  const sheet = typeof this.closest === 'function' ? this.closest('jo-sheet') : null;

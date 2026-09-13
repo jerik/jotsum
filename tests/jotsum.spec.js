@@ -173,10 +173,13 @@ test('the example on an empty sheet is a hint, not text you have to delete', asy
   await expect(firstSum).toHaveText('7');
   await expect(firstSum).toHaveClass(/is-placeholder/);
 
-  // Clicking in drops the hint for good, typing starts on a clean line.
+  // The hint stays while the line merely has focus - you are meant to read it.
   await firstLine.click();
-  await expect(firstLine).not.toHaveClass(/is-placeholder/);
+  await expect(firstLine).toHaveClass(/is-placeholder/);
+
+  // It goes away as soon as you type, and the line is clean underneath.
   await page.keyboard.type('Tanken -45.50 EUR');
+  await expect(firstLine).not.toHaveClass(/is-placeholder/);
 
   await expect(firstLine).toHaveText('Tanken -45.50 EUR');
   await expect(firstSum).toHaveText('-45.50');
@@ -248,4 +251,19 @@ test('the error explanation sits on the ? as well as on the line', async ({ page
 
   // A healthy line carries no leftover tooltip.
   await expect(page.locator('jo-sum').nth(1)).not.toHaveAttribute('title', /.*/);
+});
+
+test('the hint survives a focus that arrives after the page was built', async ({ page }) => {
+  // Opening the link in a background tab delivers the focus event only when
+  // the tab is activated, which is after the hint was set up. Hanging the
+  // hint on focus used to wipe it out in exactly that case, leaving an empty
+  // sheet with no clue how to use it.
+  const firstLine = page.locator('jo-line').first();
+
+  await firstLine.blur();
+  await firstLine.focus();
+
+  await expect(firstLine).toHaveClass(/is-placeholder/);
+  await expect(firstLine).toHaveAttribute('data-placeholder', '3 apples + 4 pears');
+  await expect(page.locator('jo-sum').first()).toHaveText('7');
 });
