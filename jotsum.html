@@ -123,9 +123,18 @@
 	    font-weight: bold;
 	  }
 
-	  /* Fehlerhafte Zeilen: dezent, kein Vollton */
+	  /* Fehlerhafte Zeilen: roter Akzentstreifen links, analog zur aktiven Zeile.
+	     Bewusst KEINE Unterstreichung - die waere von den roten Wellenlinien
+	     der Browser-Rechtschreibpruefung nicht zu unterscheiden. */
 	  jo-line.is-error {
-	    text-decoration: underline dotted #cf222e;
+	    position: relative;
+	  }
+	  jo-line.is-error::before {
+	    content: "";
+	    position: absolute;
+	    left: 0; top: 0; bottom: 0;
+	    width: 3px;
+	    background: #cf222e;
 	  }
 	  jo-sum.is-error {
 	    color: #cf222e;
@@ -153,8 +162,8 @@
 	      border-top-color: #30363d;
 	    }
 
-	    jo-line.is-error {
-	      text-decoration-color: #ff7b72;
+	    jo-line.is-error::before {
+	      background: #ff7b72;
 	    }
 	    jo-sum.is-error {
 	      color: #ff7b72;

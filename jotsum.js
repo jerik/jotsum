@@ -100,6 +100,11 @@ class JoLine extends HTMLElement {
         if (!this.hasAttribute('contenteditable')) {
             this.setAttribute('contenteditable', 'true');
         }
+        // A sheet full of amounts and part numbers is not prose - the red
+        // squiggles would only compete with the error marker.
+        if (!this.hasAttribute('spellcheck')) {
+            this.setAttribute('spellcheck', 'false');
+        }
     }
 
     recalculate() {
