@@ -719,5 +719,5 @@ if (typeof window !== 'undefined') {
 }
 
 if (typeof module !== 'undefined' && module.exports) {
-    module.exports = { JoLine, JoSheet, classify_line, evaluate_sheet };
+    module.exports = { JoLine, JoSheet, classify_line, evaluate_sheet, handle_url_params, reset_sheet, SHEET_STORAGE_KEY };
 }

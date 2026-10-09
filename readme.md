@@ -108,6 +108,8 @@ No hint is shown while the caret is in the line, since a half-typed line is brok
 
 **URL.** `?text=...` fills the sheet on load, taking precedence over the saved sheet, with `%0A` as the line break:
 
+URL input preserves blank lines (including an empty `?text=`) and is decoded once, so literal `%` text is kept. Paste drops blank lines.
+
 [`?text=3+apples+%2B+4+pears%0A2+bananas+*+7+melons`](https://jerik.github.io/jotsum/?text=3+apples+%2B+4+pears%0A2+bananas+*+7+melons)
 
 **Offline.** Saving the page stores one self-contained HTML file, including the script, so it runs without a connection.
