@@ -118,6 +118,7 @@ No hint is shown while the caret is in the line, since a half-typed line is brok
 | --- | --- |
 | `Enter` | On the last line: new line. Otherwise: move down |
 | `Ctrl + Enter` | Insert a new line below the current one |
+| `Ctrl + Shift + Enter` | Insert a new line above the current one |
 | `Ctrl + Delete` | Remove the current line |
 | `↑` / `↓` | Move between lines |
 

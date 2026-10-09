@@ -454,7 +454,11 @@ class JoLine extends HTMLElement {
         if (e.which === 13) { // Enter
             e.preventDefault();
             if (e.ctrlKey) {
-                this.add_new_line_after();
+                if (e.shiftKey) {
+                    this.add_new_line_before();
+                } else {
+                    this.add_new_line_after();
+                }
             } else {
                 const next_line = this.nextElementSibling.nextElementSibling;
                 if (next_line) {
@@ -476,6 +480,18 @@ class JoLine extends HTMLElement {
         } else if (e.which === 46 && e.ctrlKey) { // Ctrl+Delete
             this.delete_line();
         }
+    }
+
+    add_new_line_before(content = '') {
+        const new_line = document.createElement('jo-line');
+        new_line.textContent = content;
+        const new_sum = document.createElement('jo-sum');
+        this.parentNode.insertBefore(new_line, this);
+        this.parentNode.insertBefore(new_sum, this);
+        new_line.focus();
+        this.dispatchEvent(new Event('line-added', { bubbles: true }));
+        new_line.recalculate();
+        return new_line;
     }
 
     add_new_line_after(content = '') {
