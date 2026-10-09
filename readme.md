@@ -24,6 +24,7 @@ Try it directly in your browser: **[jerik.github.io/jotsum](https://jerik.github
 | Line result | Each line is evaluated on its own; the result appears on the right, rounded to two decimals |
 | Total | All line results are summed at the bottom |
 | Escaping | `'2024` keeps a number out of the calculation |
+| Headings | `# Rechnung 2024` labels a section without counting its numbers |
 | Variables | `:rate = 85`, used later as `12 * :rate` |
 | Subtotals | A `---` line sums the block above it and stores it as `:SUBTOTAL_n` |
 | Error hints | Structurally broken lines show `?` and stay out of the total |
@@ -50,6 +51,12 @@ Invoice '2024 Material 500     500
 ```
 
 Only `500` is counted. The apostrophe has to sit directly in front of a digit, so words like `don't` are unaffected.
+
+---
+
+## Headings
+
+Start a line with one to six `#` characters followed by a space (for example, `# Rechnung 2024` or `## Materials`). Headings appear larger and bold, with no line result. Their numbers and expressions are excluded from the total and all subtotals. A heading does not start a new subtotal block; use `---` for that.
 
 ---
 

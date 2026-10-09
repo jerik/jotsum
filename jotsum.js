@@ -27,11 +27,13 @@ class JoSheet extends HTMLElement {
                 line.classList.remove('is-placeholder');
             }
 
-            line.classList.remove('is-definition', 'is-separator');
+            line.classList.remove('is-definition', 'is-separator', 'is-heading');
             if (type === 'definition') {
                 line.classList.add('is-definition');
             } else if (type === 'separator') {
                 line.classList.add('is-separator');
+            } else if (type === 'heading') {
+                line.classList.add('is-heading');
             }
 
             const sumElement = line.nextElementSibling;
@@ -522,6 +524,10 @@ customElements.define('jo-line', JoLine);
 customElements.define('jo-sum', JoSum);
 
 function classify_line(text) {
+    if (/^#{1,6}(?:\s|$)/.test(text)) {
+        return { type: 'heading' };
+    }
+
     if (/^-{3,}$/.test(text)) {
         return { type: 'separator' };
     }
@@ -546,7 +552,11 @@ function evaluate_sheet(lines) {
         const classified = classify_line(text);
         types[i] = classified.type;
 
-        if (classified.type === 'separator') {
+        if (classified.type === 'heading') {
+            // Headings are text only and leave the current subtotal block intact.
+            sums[i] = 0;
+            errors[i] = null;
+        } else if (classified.type === 'separator') {
             // Nothing gets parsed for a separator, so it can never be errorous.
             errors[i] = null;
             context.subtotal_index++;

@@ -107,6 +107,14 @@
 	  }
 	  jo-line:focus { outline: none; }
 
+	  jo-line.is-heading {
+	    font-size: 1.2em;
+	    font-weight: bold;
+	  }
+	  jo-line.is-heading + jo-sum {
+	    visibility: hidden;
+	  }
+
 	  /* Variablen & Zwischensummen */
 	  jo-sum.is-muted {
 	    color: #6e7781; /* gedimmt, passend zum Footer */

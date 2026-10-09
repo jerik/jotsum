@@ -6,6 +6,12 @@ const { classify_line, evaluate_sheet, JoSheet } = require('../../jotsum.js');
 
 function testClassifyLine() {
     const tests = [
+        { text: '# Rechnung 2024', expected: { type: 'heading' } },
+        { text: '## Costs 2024', expected: { type: 'heading' } },
+        { text: '######', expected: { type: 'heading' } },
+        { text: '#2024', expected: { type: 'value' } },
+        { text: '####### Costs 2024', expected: { type: 'value' } },
+        { text: 'Item # 2024', expected: { type: 'value' } },
         { text: '---', expected: { type: 'separator' } },
         { text: '-----', expected: { type: 'separator' } },
         { text: ':auto = 120 EUR', expected: { type: 'definition', name: 'auto', expr: '120 EUR' } },
@@ -87,6 +93,26 @@ function testEvaluateSheet() {
         const result = evaluate_sheet(['', '   ', 'just words here']);
         assert.deepStrictEqual(result.sums, [0, 0, 0]);
         assert.strictEqual(result.total, 0);
+    }
+
+    // Headings never enter totals or subtotals, parse expressions, or reset blocks.
+    {
+        const headingOnly = evaluate_sheet(['# Rechnung 2024']);
+        assert.deepStrictEqual(headingOnly.sums, [0]);
+        assert.strictEqual(headingOnly.total, 0);
+
+        const result = evaluate_sheet([
+            'A 100', '  # Rechnung 2024  ', '## (2+3) (4+5) :unknown', 'B 50', '---',
+            'VAT :SUBTOTAL_1 * 0.2', '###### Year 2025', '---',
+        ]);
+        assert.deepStrictEqual(result.types, [
+            'value', 'heading', 'heading', 'value', 'separator', 'value', 'heading', 'separator',
+        ]);
+        assert.deepStrictEqual(result.sums, [100, 0, 0, 50, 150, 30, 0, 30]);
+        assert.deepStrictEqual(result.errors, Array(8).fill(null));
+        assert.strictEqual(result.total, 180);
+        assert.strictEqual(result.vars.get('SUBTOTAL_1'), 150);
+        assert.strictEqual(result.vars.get('SUBTOTAL_2'), 30);
     }
 
     console.log('All evaluate_sheet tests passed!');
