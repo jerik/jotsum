@@ -104,7 +104,9 @@ No hint is shown while the caret is in the line, since a half-typed line is brok
 
 **Paste.** Pasting multi-line text creates one line per row and evaluates all of them.
 
-**URL.** `?text=...` fills the sheet on load, with `%0A` as the line break:
+**Saved sheet.** The current sheet is saved automatically in localStorage in this browser and restored after a reload or reopening the page. Only one sheet is kept. **New page** empties the sheet and clears its saved state (and any `?text=` in the current URL).
+
+**URL.** `?text=...` fills the sheet on load, taking precedence over the saved sheet, with `%0A` as the line break:
 
 [`?text=3+apples+%2B+4+pears%0A2+bananas+*+7+melons`](https://jerik.github.io/jotsum/?text=3+apples+%2B+4+pears%0A2+bananas+*+7+melons)
 

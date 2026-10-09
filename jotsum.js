@@ -1,3 +1,5 @@
+const SHEET_STORAGE_KEY = 'jotsum.sheet';
+
 class JoSheet extends HTMLElement {
     constructor() {
         super();
@@ -86,6 +88,17 @@ class JoSheet extends HTMLElement {
         } else {
             total_element.textContent = this.round(total);
             total_element.classList.remove('is-placeholder');
+        }
+        // Store content only, never the placeholder or calculated results.
+        try {
+            const saved_texts = lines.map(line => line.textContent);
+            if (saved_texts.some(text => text !== '')) {
+                window.localStorage.setItem(SHEET_STORAGE_KEY, JSON.stringify(saved_texts));
+            } else {
+                window.localStorage.removeItem(SHEET_STORAGE_KEY);
+            }
+        } catch (error) {
+            // Storage can be unavailable or full; calculations still work.
         }
     }
 
@@ -621,28 +634,33 @@ function handle_url_params() {
     const url_params = new URLSearchParams(window.location.search);
     const text_param = url_params.get('text');
 
-    if (text_param) {
-        const decoded_text = decodeURIComponent(text_param);
-        const lines = decoded_text.split('\n').filter(line => line.trim() !== '');
-        if (lines.length > 0) {
-            // Clear existing lines
-            const sheet = document.getElementById('sheet');
-            while (sheet.firstChild) {
-                sheet.removeChild(sheet.firstChild);
-            }
-
-            lines.forEach(line_content => {
-                add_calc_line(line_content);
-            });
-            document.getElementById('sheet').update_total();
-        }
+    let lines = null;
+    if (url_params.has('text')) {
+        // URLSearchParams already decodes the value, including literal % signs.
+        lines = text_param.split('\n');
     } else {
-        // No text parameter: show the greyed out example hint
+        try {
+            const saved = JSON.parse(window.localStorage.getItem(SHEET_STORAGE_KEY));
+            if (Array.isArray(saved) && saved.every(line => typeof line === 'string')) {
+                lines = saved;
+            }
+        } catch (error) {
+            // Ignore unavailable storage and malformed saved data.
+        }
+    }
+
+    if (lines && lines.length > 0) {
+        lines.forEach(line => add_calc_line(line));
+    } else {
         add_example_hint_line();
     }
 }
 
 function reset_sheet() {
+    // A shared URL should not refill the new page on its next reload.
+    const url = new URL(window.location.href);
+    url.searchParams.delete('text');
+    window.history.replaceState(null, '', url);
     const sheet = document.getElementById('sheet');
     while (sheet.firstChild) {
         sheet.removeChild(sheet.firstChild);
