@@ -107,6 +107,14 @@
 	  }
 	  jo-line:focus { outline: none; }
 
+	  jo-line.is-heading {
+	    font-size: 1.2em;
+	    font-weight: bold;
+	  }
+	  jo-line.is-heading + jo-sum {
+	    visibility: hidden;
+	  }
+
 	  /* Variablen & Zwischensummen */
 	  jo-sum.is-muted {
 	    color: #6e7781; /* gedimmt, passend zum Footer */
@@ -219,6 +227,8 @@
       }
     </style>
 <script type="text/javascript" charset="utf-8">
+const SHEET_STORAGE_KEY = 'jotsum.sheet';
+
 class JoSheet extends HTMLElement {
     constructor() {
         super();
@@ -248,11 +258,13 @@ class JoSheet extends HTMLElement {
                 line.classList.remove('is-placeholder');
             }
 
-            line.classList.remove('is-definition', 'is-separator');
+            line.classList.remove('is-definition', 'is-separator', 'is-heading');
             if (type === 'definition') {
                 line.classList.add('is-definition');
             } else if (type === 'separator') {
                 line.classList.add('is-separator');
+            } else if (type === 'heading') {
+                line.classList.add('is-heading');
             }
 
             const sumElement = line.nextElementSibling;
@@ -307,6 +319,17 @@ class JoSheet extends HTMLElement {
         } else {
             total_element.textContent = this.round(total);
             total_element.classList.remove('is-placeholder');
+        }
+        // Store content only, never the placeholder or calculated results.
+        try {
+            const saved_texts = lines.map(line => line.textContent);
+            if (saved_texts.some(text => text !== '')) {
+                window.localStorage.setItem(SHEET_STORAGE_KEY, JSON.stringify(saved_texts));
+            } else {
+                window.localStorage.removeItem(SHEET_STORAGE_KEY);
+            }
+        } catch (error) {
+            // Storage can be unavailable or full; calculations still work.
         }
     }
 
@@ -675,7 +698,11 @@ class JoLine extends HTMLElement {
         if (e.which === 13) { // Enter
             e.preventDefault();
             if (e.ctrlKey) {
-                this.add_new_line_after();
+                if (e.shiftKey) {
+                    this.add_new_line_before();
+                } else {
+                    this.add_new_line_after();
+                }
             } else {
                 const next_line = this.nextElementSibling.nextElementSibling;
                 if (next_line) {
@@ -697,6 +724,18 @@ class JoLine extends HTMLElement {
         } else if (e.which === 46 && e.ctrlKey) { // Ctrl+Delete
             this.delete_line();
         }
+    }
+
+    add_new_line_before(content = '') {
+        const new_line = document.createElement('jo-line');
+        new_line.textContent = content;
+        const new_sum = document.createElement('jo-sum');
+        this.parentNode.insertBefore(new_line, this);
+        this.parentNode.insertBefore(new_sum, this);
+        new_line.focus();
+        this.dispatchEvent(new Event('line-added', { bubbles: true }));
+        new_line.recalculate();
+        return new_line;
     }
 
     add_new_line_after(content = '') {
@@ -743,6 +782,10 @@ customElements.define('jo-line', JoLine);
 customElements.define('jo-sum', JoSum);
 
 function classify_line(text) {
+    if (/^#{1,6}(?:\s|$)/.test(text)) {
+        return { type: 'heading' };
+    }
+
     if (/^-{3,}$/.test(text)) {
         return { type: 'separator' };
     }
@@ -767,7 +810,11 @@ function evaluate_sheet(lines) {
         const classified = classify_line(text);
         types[i] = classified.type;
 
-        if (classified.type === 'separator') {
+        if (classified.type === 'heading') {
+            // Headings are text only and leave the current subtotal block intact.
+            sums[i] = 0;
+            errors[i] = null;
+        } else if (classified.type === 'separator') {
             // Nothing gets parsed for a separator, so it can never be errorous.
             errors[i] = null;
             context.subtotal_index++;
@@ -842,28 +889,33 @@ function handle_url_params() {
     const url_params = new URLSearchParams(window.location.search);
     const text_param = url_params.get('text');
 
-    if (text_param) {
-        const decoded_text = decodeURIComponent(text_param);
-        const lines = decoded_text.split('\n').filter(line => line.trim() !== '');
-        if (lines.length > 0) {
-            // Clear existing lines
-            const sheet = document.getElementById('sheet');
-            while (sheet.firstChild) {
-                sheet.removeChild(sheet.firstChild);
-            }
-
-            lines.forEach(line_content => {
-                add_calc_line(line_content);
-            });
-            document.getElementById('sheet').update_total();
-        }
+    let lines = null;
+    if (url_params.has('text')) {
+        // URLSearchParams already decodes the value, including literal % signs.
+        lines = text_param.split('\n');
     } else {
-        // No text parameter: show the greyed out example hint
+        try {
+            const saved = JSON.parse(window.localStorage.getItem(SHEET_STORAGE_KEY));
+            if (Array.isArray(saved) && saved.every(line => typeof line === 'string')) {
+                lines = saved;
+            }
+        } catch (error) {
+            // Ignore unavailable storage and malformed saved data.
+        }
+    }
+
+    if (lines && lines.length > 0) {
+        lines.forEach(line => add_calc_line(line));
+    } else {
         add_example_hint_line();
     }
 }
 
 function reset_sheet() {
+    // A shared URL should not refill the new page on its next reload.
+    const url = new URL(window.location.href);
+    url.searchParams.delete('text');
+    window.history.replaceState(null, '', url);
     const sheet = document.getElementById('sheet');
     while (sheet.firstChild) {
         sheet.removeChild(sheet.firstChild);
@@ -922,7 +974,7 @@ if (typeof window !== 'undefined') {
 }
 
 if (typeof module !== 'undefined' && module.exports) {
-    module.exports = { JoLine, JoSheet, classify_line, evaluate_sheet };
+    module.exports = { JoLine, JoSheet, classify_line, evaluate_sheet, handle_url_params, reset_sheet, SHEET_STORAGE_KEY };
 }
 </script>
   </head>
@@ -934,7 +986,7 @@ if (typeof module !== 'undefined' && module.exports) {
         <nav class="actions">
           <!--a class="btn" href="https://github.com/jerik/jotsum" target="_blank">Repository</a-->
           <button class="btn btn-primary" onclick="add_calc_line()">Add line</button>
-          <button class="btn" onclick="reset_sheet()">Reset</button>
+          <button class="btn" onclick="reset_sheet()">New page</button>
         </nav>
       </div>
     </header>
@@ -950,7 +1002,7 @@ if (typeof module !== 'undefined' && module.exports) {
     <!-- Footer -->
     <footer>
 		Use the operators + - * / ( ) <br/> Download for offline use • Source and docs on <a href="https://github.com/jerik/jotsum">GitHub</a>
-      <span id="version">2026-10-10T17:13:38Z<br>192-gc8b5e92</span>
+      <span id="version">2026-10-10T17:14:57Z<br>204-g27a390c</span>
     </footer>
   </body>
 </html>
