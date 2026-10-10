@@ -10,6 +10,7 @@ function testClassifyLine() {
         { text: '-----', expected: { type: 'separator' } },
         { text: ':auto = 120 EUR', expected: { type: 'definition', name: 'auto', expr: '120 EUR' } },
         { text: ':a-b = 5', expected: { type: 'value' } },
+        { text: ':1Test = 5', expected: { type: 'value' } },
         { text: '3 apples + 4', expected: { type: 'value' } },
         { text: 'a - b', expected: { type: 'value' } },
     ];
@@ -94,6 +95,17 @@ function testEvaluateSheet() {
 }
 
 function testEvaluateSheetErrors() {
+    // Variable names are case-sensitive: defining :Auto does not define :auto.
+    {
+        const result = evaluate_sheet([':Auto = 5', ':auto']);
+        assert.strictEqual(result.errors[0], null);
+        assert.strictEqual(result.vars.get('Auto'), 5);
+        assert.strictEqual(result.vars.has('auto'), false);
+        assert(result.errors[1], 'Expected an error for the reference to :auto');
+        assert.strictEqual(result.errors[1].code, 'unknown-variable');
+        assert.strictEqual(result.errors[1].message, 'Unknown variable :auto');
+    }
+
     // A structurally broken line is marked in `errors` and does not count
     // towards the total - even though sums[i] still holds the (unchanged)
     // computed value.
