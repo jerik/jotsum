@@ -21,6 +21,21 @@ global.document = {
     }
 };
 global.window = {
-    onload: () => {}
+    onload: () => {},
+    localStorage: {
+        data: {},
+        getItem(key) {
+            return Object.prototype.hasOwnProperty.call(this.data, key) ? this.data[key] : null;
+        },
+        setItem(key, value) {
+            this.data[key] = String(value);
+        },
+        removeItem(key) {
+            delete this.data[key];
+        },
+        reset() {
+            this.data = {};
+        }
+    }
 };
 global.add_calc_line = () => {};
