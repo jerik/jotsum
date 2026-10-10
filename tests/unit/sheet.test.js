@@ -9,6 +9,7 @@ function testClassifyLine() {
         { text: '---', expected: { type: 'separator' } },
         { text: '-----', expected: { type: 'separator' } },
         { text: ':auto = 120 EUR', expected: { type: 'definition', name: 'auto', expr: '120 EUR' } },
+        { text: ':a-b = 5', expected: { type: 'value' } },
         { text: ':1Test = 5', expected: { type: 'value' } },
         { text: '3 apples + 4', expected: { type: 'value' } },
         { text: 'a - b', expected: { type: 'value' } },
