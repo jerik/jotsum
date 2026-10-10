@@ -64,7 +64,7 @@ Workshop 4 * :rate       340
                         1360
 ```
 
-Variables are resolved in document order, so a definition has to come before its use. A name is made of letters, digits and underscores — a dash is always the operator, so `:SUBTOTAL_1-50` is a subtraction.
+Variables are resolved in document order, so a definition has to come before its use. A name is made of letters, digits and underscores and cannot start with a digit, so `:1Test = 5` is not a definition. Names are case-sensitive: `:Auto = 5` does not define `:auto`, which produces "Unknown variable :auto" when used. A dash is always the operator, so `:SUBTOTAL_1-50` is a subtraction.
 
 ---
 

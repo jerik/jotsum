@@ -526,7 +526,7 @@ function classify_line(text) {
         return { type: 'separator' };
     }
 
-    const definition_match = text.match(/^:([A-Za-z_][A-Za-z0-9_-]*)\s*=\s*(.*)$/);
+    const definition_match = text.match(/^:([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)$/);
     if (definition_match) {
         return { type: 'definition', name: definition_match[1], expr: definition_match[2] };
     }
