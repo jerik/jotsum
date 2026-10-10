@@ -1,5 +1,5 @@
 const assert = require('assert');
-const { classify_line, evaluate_sheet, JoSheet } = require('../../jotsum.js');
+const { classify_line, evaluate_sheet, JoSheet, JoLine } = require('../../jotsum.js');
 
 
 
@@ -187,7 +187,76 @@ function testRoundingIsDisplayOnly() {
     console.log('All rounding tests passed!');
 }
 
+function testInsertLine() {
+    const originalCreateElement = document.createElement;
+    try {
+        // Exercise both shortcuts against the same ordered line/sum pairs.
+        for (const currentIndex of [0, 1]) {
+            for (const insertAbove of [true, false]) {
+                let focused = null;
+                let recalculated = null;
+                const events = [];
+                const sheet = {
+                    children: [],
+                    insertBefore(element, reference) {
+                        const index = reference === null ? this.children.length : this.children.indexOf(reference);
+                        assert(index >= 0, 'insertion reference must belong to the sheet');
+                        this.children.splice(index, 0, element);
+                        element.parentNode = this;
+                    }
+                };
+                document.createElement = tagName => {
+                    const element = tagName === 'jo-line' ? new JoLine() : new HTMLElement();
+                    element.tagName = tagName.toUpperCase();
+                    Object.defineProperty(element, 'nextElementSibling', {
+                        get() {
+                            return sheet.children[sheet.children.indexOf(this) + 1] || null;
+                        }
+                    });
+                    element.focus = () => { focused = element; };
+                    element.recalculate = () => { recalculated = element; };
+                    element.dispatchEvent = event => { events.push(event); };
+                    return element;
+                };
+                for (const content of ['First 10', 'Second 20']) {
+                    const line = document.createElement('jo-line');
+                    line.textContent = content;
+                    sheet.insertBefore(line, null);
+                    sheet.insertBefore(document.createElement('jo-sum'), null);
+                }
+                const originalChildren = [...sheet.children];
+                const current = originalChildren[currentIndex * 2];
+                let prevented = false;
+                current.handle_keys({
+                    which: 13,
+                    ctrlKey: true,
+                    shiftKey: insertAbove,
+                    preventDefault() { prevented = true; }
+                });
+
+                const insertionIndex = currentIndex * 2 + (insertAbove ? 0 : 2);
+                const inserted = sheet.children[insertionIndex];
+                assert.strictEqual(inserted.tagName, 'JO-LINE');
+                assert.strictEqual(inserted.textContent, '');
+                assert.strictEqual(sheet.children[insertionIndex + 1].tagName, 'JO-SUM');
+                assert.deepStrictEqual(sheet.children.filter(child => ![inserted, inserted.nextElementSibling].includes(child)), originalChildren);
+                assert.strictEqual(focused, inserted);
+                assert.strictEqual(recalculated, inserted);
+                assert.strictEqual(prevented, true);
+                assert.strictEqual(events.length, 1);
+                assert.strictEqual(events[0].type, 'line-added');
+                assert.strictEqual(events[0].bubbles, true);
+                assert.deepStrictEqual(originalChildren.filter(child => child.tagName === 'JO-LINE').map(line => line.textContent), ['First 10', 'Second 20']);
+            }
+        }
+    } finally {
+        document.createElement = originalCreateElement;
+    }
+    console.log('All line insertion tests passed!');
+}
+
 testClassifyLine();
 testEvaluateSheet();
 testEvaluateSheetErrors();
 testRoundingIsDisplayOnly();
+testInsertLine();
