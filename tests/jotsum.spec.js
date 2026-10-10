@@ -267,3 +267,58 @@ test('the hint survives a focus that arrives after the page was built', async ({
   await expect(firstLine).toHaveAttribute('data-placeholder', 'Start typing, e.g. 3 apples + 4 pears');
   await expect(page.locator('jo-sum').first()).toHaveText('7');
 });
+
+test('the edited sheet survives a reload with blank lines and recalculated totals', async ({ page }) => {
+  const lines = page.locator('jo-line');
+  await lines.first().fill(':rate = 10');
+  await page.getByRole('button', { name: 'Add line' }).click();
+  await page.getByRole('button', { name: 'Add line' }).click();
+  await lines.nth(2).fill('Work 2 * :rate');
+  await lines.first().fill(':rate = 25');
+
+  await page.reload();
+
+  await expect(lines).toHaveText([':rate = 25', '', 'Work 2 * :rate']);
+  await expect(page.locator('#total')).toHaveText('50');
+});
+
+test('URL text overrides the saved sheet and new page clears both', async ({ page }) => {
+  await page.locator('jo-line').first().fill('Saved 100');
+  await page.goto('/jotsum.html?text=' + encodeURIComponent('Discount 10%\nCost 20'));
+  await expect(page.locator('jo-line')).toHaveText(['Discount 10%', 'Cost 20']);
+  await page.goto('/jotsum.html');
+  await expect(page.locator('jo-line')).toHaveText(['Discount 10%', 'Cost 20']);
+
+  await page.goto('/jotsum.html?text=Shared%2050');
+  await page.getByRole('button', { name: 'New page' }).click();
+  await expect(page.locator('jo-line')).toHaveText(['']);
+  expect(await page.evaluate(() => localStorage.getItem('jotsum.sheet'))).toBeNull();
+  expect(new URL(page.url()).searchParams.has('text')).toBe(false);
+  await page.reload();
+  await expect(page.locator('jo-line')).toHaveText(['']);
+  expect(await page.evaluate(() => localStorage.getItem('jotsum.sheet'))).toBeNull();
+});
+
+test('an empty URL text overrides a saved sheet', async ({ page }) => {
+  await page.locator('jo-line').first().fill('Saved 100');
+  await page.goto('/jotsum.html?text=');
+  await expect(page.locator('jo-line')).toHaveText(['']);
+  await expect(page.locator('#total')).toHaveText('0');
+});
+
+test('malformed or unavailable storage leaves the sheet usable', async ({ page }) => {
+  await page.evaluate(() => localStorage.setItem('jotsum.sheet', '{broken'));
+  await page.reload();
+  await expect(page.locator('jo-line')).toHaveText(['']);
+
+  await page.addInitScript(() => {
+    Object.defineProperty(window, 'localStorage', {
+      get() { throw new Error('Storage unavailable'); }
+    });
+  });
+  await page.reload();
+  await page.locator('jo-line').first().fill('Cost 42');
+  await expect(page.locator('#total')).toHaveText('42');
+  await page.getByRole('button', { name: 'New page' }).click();
+  await expect(page.locator('jo-line')).toHaveText(['']);
+});
