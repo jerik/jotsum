@@ -1,4 +1,49 @@
 const SHEET_STORAGE_KEY = 'jotsum.sheet';
+const STORE_STORAGE_KEY = 'jotsum.sheets';
+let sheet_id_sequence = 0;
+
+function sheet_name(lines) {
+    const first = lines.find(line => line.trim() !== '');
+    if (first === undefined) return 'Untitled';
+    const text = first.trim();
+    return classify_line(text).type === 'heading' ? text.replace(/^#+\s*/, '').trim() || 'Untitled' : text;
+}
+
+function new_sheet_id() {
+    if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+        return crypto.randomUUID();
+    }
+    // The counter also distinguishes calls within the same millisecond.
+    return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}-${++sheet_id_sequence}`;
+}
+
+// jotsum.sheets stores a JSON array of { id: string, lines: string[] }.
+// Additional entry fields (e.g. total) are preserved without a migration.
+// An existing list, even [], marks the legacy sheet as already migrated.
+// Keep jotsum.sheet while the current single-sheet UI still reads/writes it.
+function load_store() {
+    try {
+        const stored = window.localStorage.getItem(STORE_STORAGE_KEY);
+        if (stored !== null) {
+            const store = JSON.parse(stored);
+            return Array.isArray(store) && store.every(entry =>
+                entry && typeof entry.id === 'string' && Array.isArray(entry.lines) &&
+                entry.lines.every(line => typeof line === 'string')) ? store : [];
+        }
+        const legacy = JSON.parse(window.localStorage.getItem(SHEET_STORAGE_KEY));
+        if (!Array.isArray(legacy) || !legacy.every(line => typeof line === 'string')) return [];
+        const store = [{ id: new_sheet_id(), lines: legacy }];
+        save_store(store);
+        return store;
+    } catch (error) {
+        // Invalid JSON or unavailable storage must not prevent page loading.
+        return [];
+    }
+}
+
+function save_store(store) {
+    window.localStorage.setItem(STORE_STORAGE_KEY, JSON.stringify(store));
+}
 
 class JoSheet extends HTMLElement {
     constructor() {
@@ -745,5 +790,5 @@ if (typeof window !== 'undefined') {
 }
 
 if (typeof module !== 'undefined' && module.exports) {
-    module.exports = { JoLine, JoSheet, classify_line, evaluate_sheet, handle_url_params, reset_sheet, SHEET_STORAGE_KEY };
+    module.exports = { JoLine, JoSheet, classify_line, evaluate_sheet, handle_url_params, reset_sheet, SHEET_STORAGE_KEY, sheet_name, new_sheet_id, load_store, save_store };
 }
