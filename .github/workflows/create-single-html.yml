@@ -1,6 +1,6 @@
 name: Create single html file
 
-# Workflow startet bei Push in den Hauptbranch
+# Run when source files are pushed to the main branch.
 on:
   push:
     branches:
@@ -8,6 +8,10 @@ on:
     paths: 
       - 'jotsum.html'
       - 'jotsum.js'
+
+concurrency:
+  group: create-single-html-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
   run-script:
@@ -23,7 +27,7 @@ jobs:
       - name: Execute custom script
         run: ./generate-single-html.sh
 
-      # Änderungen committen und pushen
+      # Commit and push the generated file.
       - name: Commit and push changes
         env: 
           GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN }}
@@ -31,5 +35,30 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add index.html
+          if git diff --cached --quiet; then
+            echo "No generated changes to commit."
+            exit 0
+          fi
           git commit -m "Automated file merge"
-          git push
+
+          # Retry if another push lands between the rebase and our push.
+          for attempt in {1..5}; do
+            if ! git pull --rebase origin master; then
+              mapfile -t conflicts < <(git diff --name-only --diff-filter=U)
+              if [[ ${#conflicts[@]} -ne 1 || ${conflicts[0]} != index.html ]]; then
+                echo "Rebase failed outside the generated index.html conflict."
+                git rebase --abort || true
+                exit 1
+              fi
+              # During rebase, theirs is our replayed generated-file commit.
+              git checkout --theirs -- index.html
+              git add index.html
+              GIT_EDITOR=true git rebase --continue
+            fi
+            if git push origin HEAD:master; then
+              exit 0
+            fi
+            echo "Push attempt ${attempt} failed; fetching again before retrying."
+          done
+          echo "Failed to push after five attempts."
+          exit 1
