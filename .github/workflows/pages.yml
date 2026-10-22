@@ -1,0 +1,78 @@
+name: Deploy Pages with objective previews
+
+on:
+  push:
+    branches:
+      - master
+      - 'objective/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout master and branch history
+        uses: actions/checkout@v4
+        with:
+          ref: master
+          fetch-depth: 0
+
+      - name: Build master and all objective branches
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --prune origin '+refs/heads/*:refs/remotes/origin/*'
+          site="$GITHUB_WORKSPACE/.pages-site"
+          checkouts="$GITHUB_WORKSPACE/.pages-checkouts"
+          mkdir -p "$site" "$checkouts"
+
+          # Every step checks its own status: errexit does not apply inside a
+          # function called as an if condition, which is how previews run.
+          build_branch() {
+            local ref="$1" checkout="$2" destination="$3" status=0
+            git worktree add --detach "$checkout" "$ref" || return 1
+            (cd "$checkout" && ./generate-single-html.sh) &&
+              mkdir -p "$destination" &&
+              cp "$checkout/index.html" "$checkout/jotsum.js" "$destination/" ||
+              status=1
+            git worktree remove --force "$checkout"
+            return "$status"
+          }
+
+          build_branch refs/remotes/origin/master "$checkouts/master" "$site"
+          index=0
+          while IFS= read -r ref; do
+            objective="${ref#refs/remotes/origin/objective/}"
+            # A broken objective branch must not stop the master deployment.
+            if ! build_branch "$ref" "$checkouts/objective-$index" "$site/preview/$objective"; then
+              echo "::warning::Preview for objective/$objective failed to build and is skipped."
+              rm -rf "$site/preview/$objective"
+            fi
+            index=$((index + 1))
+          done < <(git for-each-ref --format='%(refname)' refs/remotes/origin/objective/)
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: .pages-site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
