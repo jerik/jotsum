@@ -33,20 +33,28 @@ jobs:
           checkouts="$GITHUB_WORKSPACE/.pages-checkouts"
           mkdir -p "$site" "$checkouts"
 
+          # Every step checks its own status: errexit does not apply inside a
+          # function called as an if condition, which is how previews run.
           build_branch() {
-            local ref="$1" checkout="$2" destination="$3"
-            git worktree add --detach "$checkout" "$ref"
-            (cd "$checkout" && ./generate-single-html.sh)
-            mkdir -p "$destination"
-            cp "$checkout/index.html" "$checkout/jotsum.js" "$destination/"
+            local ref="$1" checkout="$2" destination="$3" status=0
+            git worktree add --detach "$checkout" "$ref" || return 1
+            (cd "$checkout" && ./generate-single-html.sh) &&
+              mkdir -p "$destination" &&
+              cp "$checkout/index.html" "$checkout/jotsum.js" "$destination/" ||
+              status=1
             git worktree remove --force "$checkout"
+            return "$status"
           }
 
           build_branch refs/remotes/origin/master "$checkouts/master" "$site"
           index=0
           while IFS= read -r ref; do
             objective="${ref#refs/remotes/origin/objective/}"
-            build_branch "$ref" "$checkouts/objective-$index" "$site/preview/$objective"
+            # A broken objective branch must not stop the master deployment.
+            if ! build_branch "$ref" "$checkouts/objective-$index" "$site/preview/$objective"; then
+              echo "::warning::Preview for objective/$objective failed to build and is skipped."
+              rm -rf "$site/preview/$objective"
+            fi
             index=$((index + 1))
           done < <(git for-each-ref --format='%(refname)' refs/remotes/origin/objective/)
 
