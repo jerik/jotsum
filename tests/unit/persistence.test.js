@@ -1,5 +1,6 @@
 const assert = require('assert');
-const { JoLine, JoSheet, handle_url_params, reset_sheet, SHEET_STORAGE_KEY } = require('../../jotsum.js');
+const { JoLine, JoSheet, handle_url_params, reset_sheet, SHEET_STORAGE_KEY,
+    sheet_name, new_sheet_id, load_store, save_store } = require('../../jotsum.js');
 
 // Supply only the DOM operations used by the real sheet and loading methods.
 // Calculations, adding lines, saving and restoring all run production code.
@@ -53,6 +54,71 @@ function test(name, run) {
         window.localStorage.reset();
     }
 }
+
+test('sheet_name uses the first nonblank line and removes heading markers only', () => {
+    assert.strictEqual(sheet_name(['', '  ', '  Notes  ', '# Later']), 'Notes');
+    assert.strictEqual(sheet_name(['', '  ### Project budget  ', 'Cost 10']), 'Project budget');
+    assert.strictEqual(sheet_name(['#hashtag']), '#hashtag');
+    assert.strictEqual(sheet_name([]), 'Untitled');
+    assert.strictEqual(sheet_name(['', ' \t ']), 'Untitled');
+});
+
+test('new_sheet_id returns different nonempty strings', () => {
+    const first = new_sheet_id();
+    const second = new_sheet_id();
+    assert.strictEqual(typeof first, 'string');
+    assert.ok(first.length > 0);
+    assert.notStrictEqual(first, second);
+});
+
+test('load_store migrates the legacy sheet exactly once and preserves page loading', () => {
+    // Legacy shape is the raw-text array asserted in update_total's test below.
+    const lines = ['  Cost 2 * 5  ', '', 'Notes'];
+    window.localStorage.setItem(SHEET_STORAGE_KEY, JSON.stringify(lines));
+    const store = load_store();
+    assert.strictEqual(store.length, 1);
+    assert.strictEqual(typeof store[0].id, 'string');
+    assert.deepStrictEqual(store[0].lines, lines);
+    assert.deepStrictEqual(load_store(), store);
+    const { texts } = fixture();
+    window.onload();
+    assert.deepStrictEqual(texts(), lines);
+    assert.deepStrictEqual(load_store(), store);
+    save_store([]);
+    assert.deepStrictEqual(load_store(), []);
+});
+
+test('load_store returns an empty list for malformed JSON and invalid data', () => {
+    for (const key of [SHEET_STORAGE_KEY, 'jotsum.sheets']) {
+        for (const value of ['{broken', '{}', 'null', '[42]']) {
+            window.localStorage.reset();
+            window.localStorage.setItem(key, value);
+            assert.deepStrictEqual(load_store(), []);
+        }
+    }
+    window.localStorage.setItem(SHEET_STORAGE_KEY, JSON.stringify(['Legacy 10']));
+    window.localStorage.setItem('jotsum.sheets', '{broken');
+    assert.deepStrictEqual(load_store(), []);
+});
+
+test('load_store tolerates unavailable storage', () => {
+    const getItem = window.localStorage.getItem;
+    try {
+        window.localStorage.getItem = () => { throw new Error('Storage unavailable'); };
+        assert.deepStrictEqual(load_store(), []);
+    } finally {
+        window.localStorage.getItem = getItem;
+    }
+});
+
+test('save_store and load_store preserve entries and future fields', () => {
+    const store = [
+        { id: new_sheet_id(), lines: ['# Budget', '', 'Cost 10'], total: 10 },
+        { id: new_sheet_id(), lines: [] }
+    ];
+    save_store(store);
+    assert.deepStrictEqual(load_store(), store);
+});
 
 test('update_total saves raw line texts, including blank lines, and removes an empty sheet', () => {
     const { sheet, total } = fixture();
