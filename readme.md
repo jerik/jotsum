@@ -15,6 +15,16 @@ The numbers are extracted, calculated as a line result, and all line results are
 
 Try it directly in your browser: **[jerik.github.io/jotsum](https://jerik.github.io/jotsum/)** — no account, no installation. The page can be saved for offline use.
 
+## Vorschau
+
+Jeder Branch `objective/OBJ-<n>` wird unter
+`https://jerik.github.io/jotsum/preview/OBJ-<n>/` als Vorschau veröffentlicht.
+Die Hauptseite unter `/jotsum/` wird weiterhin aus `master` gebaut. Jeder
+Workflow-Lauf baut alle vorhandenen `objective/*`-Branches neu; gelöschte
+Branches verschwinden beim nächsten Lauf aus der Vorschau.
+Nach dem Merge muss der Owner unter **Settings → Pages → Source** auf
+**GitHub Actions** umstellen. Erst dann veröffentlicht dieser Workflow die Seite.
+
 ---
 
 ## At a glance
