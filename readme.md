@@ -139,7 +139,7 @@ Every sheet is a shortsave. It is saved automatically on every change; there is 
 
 **New page.** The **New page** icon in the header opens an empty sheet. All existing shortsaves are kept.
 
-**Saved sheets.** The **Saved sheets** list shows every shortsave, named after its first line (a heading without its `#`, an empty sheet as `Untitled`). The sheet that is open is highlighted. From 900 px width the list stands next to the sheet. On narrower screens it opens as a drawer via the menu icon in the header and closes again with the same icon, a tap on the backdrop, `Escape`, or by opening an entry.
+**Saved sheets.** The **Saved sheets** list shows every shortsave, named after its first line (a heading without its `#`, an empty sheet as `Untitled`). Right of the name, each entry shows the sheet's total, rounded as under the sheet; a sheet without a number shows no total, and long names are shortened. The sheet that is open is highlighted. From 900 px width the list stands next to the sheet. On narrower screens it opens as a drawer via the menu icon in the header and closes again with the same icon, a tap on the backdrop, `Escape`, or by opening an entry.
 
 **Open and edit.** Tap or click an entry to open it. You keep editing it in place, and every change lands in the same shortsave.
 
