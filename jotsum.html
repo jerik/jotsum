@@ -2,9 +2,25 @@
 <html>
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <title>jotsum</title>
     <style>
+      /* Colours of sidebar, drawer and icons; the dark set is in the
+         prefers-color-scheme block below. */
+      :root {
+        --header-h: 65px;   /* 10px + 44px touch target + 10px + 1px border */
+        --side-bg: #ffffff;
+        --side-fg: #1f2328;
+        --side-muted: #59636e;
+        --side-border: #d0d7de;
+        --side-hover: #f6f8fa;
+        --side-active-bg: #fffbe6;   /* same as the active line */
+        --side-accent: #1f883d;      /* same as the primary button */
+        --side-danger: #cf222e;
+        --focus-ring: #0969da;
+        --backdrop: rgba(31, 35, 40, 0.45);
+      }
+
       body {
         margin: 0;
         font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
@@ -14,6 +30,7 @@
       .site-header {
         position: sticky; top: 0; z-index: 10;
         background: #fff; border-bottom: 1px solid #d0d7de;
+        padding: env(safe-area-inset-top) env(safe-area-inset-right) 0 env(safe-area-inset-left);
       }
       .wrap {
         max-width: 1040px; margin: 0 auto;
@@ -26,6 +43,7 @@
         border: 1px solid #d0d7de; background: transparent;
         padding: 6px 10px; border-radius: 6px; font: 500 14px inherit;
         cursor: pointer;
+        min-height: 44px; min-width: 44px;   /* touch target */
       }
       .btn:hover { background: #f6f8fa; }
       .btn-primary { background: #1f883d; border-color: #1f883d; color:#fff; }
@@ -199,6 +217,20 @@
 	    jo-sum.is-error {
 	      color: #ff7b72;
 	    }
+
+	    /* Sidebar, drawer and icons in the same GitHub dark palette */
+	    :root {
+	      --side-bg: #161b22;
+	      --side-fg: #e6edf3;
+	      --side-muted: #9198a1;
+	      --side-border: #30363d;
+	      --side-hover: #21262d;
+	      --side-active-bg: rgba(255, 251, 230, 0.10);  /* as the active line */
+	      --side-accent: #3fb950;
+	      --side-danger: #ff7b72;
+	      --focus-ring: #4493f8;
+	      --backdrop: rgba(1, 4, 9, 0.65);
+	    }
 	  }
 
 
@@ -213,6 +245,120 @@
           grid-template-columns: 1fr minmax(6ch, fit-content(12ch));
           column-gap: 8px;
         }
+      }
+
+      /* Icon buttons (drawer toggle, new page, close, delete) */
+      .icon-btn {
+        display: inline-flex; align-items: center; justify-content: center;
+        width: 44px; height: 44px; flex: none;
+        padding: 0; border: 1px solid transparent; border-radius: 6px;
+        background: transparent; color: inherit; cursor: pointer;
+      }
+      .icon-btn:hover { background: var(--side-hover); }
+      .site-header .icon-btn:hover { background: #f6f8fa; }   /* header stays light */
+      .icon-btn svg {
+        fill: none; stroke: currentColor; stroke-width: 2;
+        stroke-linecap: round; stroke-linejoin: round;
+      }
+      .btn:focus-visible, .icon-btn:focus-visible,
+      .shortsave-open:focus-visible, .sidebar-title:focus-visible {
+        outline: 2px solid var(--focus-ring); outline-offset: 2px;
+      }
+      .sidebar-title:focus:not(:focus-visible) { outline: none; }
+
+      /* The sticky header must not cover the line being edited */
+      jo-line { scroll-margin-top: calc(var(--header-h) + 8px); scroll-margin-bottom: 16px; }
+
+      /* Layout: sheet content keeps clear of notch and home indicator */
+      .content {
+        min-width: 0;
+        padding: 0 env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+      }
+
+      /* Sidebar with the shortsaves. Below 900px it is a drawer. */
+      .sidebar {
+        box-sizing: border-box;
+        background: var(--side-bg); color: var(--side-fg);
+        position: fixed; z-index: 30; top: 0; bottom: 0; left: 0;
+        width: min(85vw, 320px);
+        overflow-y: auto; overscroll-behavior: contain;
+        -webkit-overflow-scrolling: touch;
+        padding: env(safe-area-inset-top) 0 env(safe-area-inset-bottom) env(safe-area-inset-left);
+        border-right: 1px solid var(--side-border);
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+        transform: translateX(-100%);
+        visibility: hidden;   /* closed drawer is out of tab order */
+        transition: transform 0.2s ease, visibility 0s linear 0.2s;
+      }
+      body.drawer-open .sidebar {
+        transform: none; visibility: visible;
+        transition: transform 0.2s ease, visibility 0s;
+      }
+      body.drawer-open { overflow: hidden; }
+      .drawer-backdrop {
+        display: none;
+        position: fixed; inset: 0; z-index: 20;
+        background: var(--backdrop);
+      }
+      body.drawer-open .drawer-backdrop { display: block; }
+
+      .sidebar-head {
+        display: flex; align-items: center; gap: 8px;
+        padding: 10px 8px 6px 16px;
+      }
+      .sidebar-title {
+        margin: 0; flex: 1;
+        font-size: 13px; font-weight: 600; letter-spacing: 0.02em;
+        text-transform: uppercase; color: var(--side-muted);
+        border-radius: 4px;
+      }
+      .shortsave-list { list-style: none; margin: 0; padding: 0 8px 16px; }
+      .shortsave-item { display: flex; align-items: center; gap: 2px; }
+      .shortsave-open {
+        flex: 1; min-width: 0; min-height: 44px;
+        display: block; text-align: left;
+        padding: 8px 10px 8px 13px;
+        border: 0; border-radius: 6px; background: transparent;
+        color: inherit; font: inherit; font-size: 15px; cursor: pointer;
+        white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+        position: relative;
+      }
+      .shortsave-open:hover { background: var(--side-hover); }
+      /* Active sheet: tint like the active line, accent bar, bold -
+         never colour alone. */
+      .shortsave-open[aria-current] {
+        background: var(--side-active-bg); font-weight: 600;
+      }
+      .shortsave-open[aria-current]::before {
+        content: ""; position: absolute; left: 0; top: 6px; bottom: 6px;
+        width: 3px; border-radius: 2px; background: var(--side-accent);
+      }
+      .shortsave-delete { color: var(--side-muted); }
+      .shortsave-delete:hover { color: var(--side-danger); }
+      .shortsave-empty { margin: 4px 16px 16px; font-size: 14px; color: var(--side-muted); }
+      .shortsave-empty[hidden] { display: none; }
+
+      @media (prefers-reduced-motion: reduce) {
+        .sidebar, body.drawer-open .sidebar { transition: none; }
+      }
+
+      /* From 900px the sidebar stands permanently next to the sheet */
+      @media (min-width: 900px) {
+        .layout {
+          display: grid;
+          grid-template-columns: 280px minmax(0, 1fr);
+          align-items: start;
+        }
+        .sidebar {
+          position: sticky; top: var(--header-h); z-index: auto;
+          width: auto; max-height: calc(100vh - var(--header-h));
+          box-shadow: none; transform: none; visibility: visible; transition: none;
+          padding-top: 0;
+        }
+        .content { padding-left: 0; }
+        .drawer-toggle, .drawer-close { display: none; }
+        body.drawer-open { overflow: visible; }
+        body.drawer-open .drawer-backdrop { display: none; }
       }
 
       /* Footer */
@@ -232,28 +378,52 @@
     <!-- Header -->
     <header class="site-header">
       <div class="wrap">
+        <button id="drawer-toggle" class="icon-btn drawer-toggle" type="button"
+                aria-label="Saved sheets" title="Saved sheets"
+                aria-expanded="false" aria-controls="sidebar">
+          <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" focusable="false"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
+        </button>
         <h1 class="brand">JotSum</h1>
         <nav class="actions">
           <!--a class="btn" href="https://github.com/jerik/jotsum" target="_blank">Repository</a-->
           <button class="btn btn-primary" onclick="add_calc_line()">Add line</button>
-          <button class="btn" onclick="reset_sheet()">New page</button>
+          <button id="new-sheet" class="icon-btn" type="button" aria-label="New page" title="New page">
+            <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" focusable="false"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M12 11v6M9 14h6"/></svg>
+          </button>
         </nav>
       </div>
     </header>
 
-    <!-- Sheet -->
-    <jo-sheet id="sheet">
-    </jo-sheet>
-    <jo-lastline>
-      <jo-spacer></jo-spacer>
-      <jo-total id="total"></jo-total>
-    </jo-lastline>
+    <div class="layout">
+      <!-- Shortsaves: permanent sidebar from 900px, drawer below -->
+      <aside id="sidebar" class="sidebar" aria-labelledby="sidebar-title">
+        <div class="sidebar-head">
+          <h2 id="sidebar-title" class="sidebar-title" tabindex="-1">Saved sheets</h2>
+          <button id="drawer-close" class="icon-btn drawer-close" type="button"
+                  aria-label="Close saved sheets" title="Close saved sheets">
+            <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" focusable="false"><path d="M6 6l12 12M18 6L6 18"/></svg>
+          </button>
+        </div>
+        <ul id="shortsave-list" class="shortsave-list"></ul>
+        <p id="shortsave-empty" class="shortsave-empty">No saved sheets yet. Start typing &ndash; every sheet is saved automatically.</p>
+      </aside>
+      <div id="drawer-backdrop" class="drawer-backdrop"></div>
 
-    <!-- Footer -->
-    <footer>
+      <main id="content" class="content">
+        <!-- Sheet -->
+        <jo-sheet id="sheet">
+        </jo-sheet>
+        <jo-lastline>
+          <jo-spacer></jo-spacer>
+          <jo-total id="total"></jo-total>
+        </jo-lastline>
+
+        <!-- Footer -->
+        <footer>
 		Use the operators + - * / ( ) <br/> Download for offline use • Source and docs on <a href="https://github.com/jerik/jotsum">GitHub</a>
-      <span id="version"></span>
-    </footer>
+          <span id="version"></span>
+        </footer>
+      </main>
+    </div>
   </body>
 </html>
-
