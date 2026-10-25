@@ -161,9 +161,22 @@ function persist_shortsave(lines) {
     save_store(store);
 }
 
+// The total shown under a sheet, as text, or null if no line contributes a
+// number. Text, headings and error lines evaluate to 0 too, so a 0 alone
+// cannot tell an empty sheet from numbers that cancel out.
+function sheet_total(lines) {
+    const { total, types, errors, vars } = evaluate_sheet(lines);
+    const has_number = lines.some((line, i) => types[i] === 'value' && !errors[i] &&
+        JoLine.prototype.tokenize.call(JoLine.prototype, (line || '').trim(), { vars })
+            .some(token => typeof token === 'number'));
+    return has_number ? String(JoSheet.prototype.round.call(JoSheet.prototype, total)) : null;
+}
+
 function list_shortsaves() {
+    // The total is derived for display only and never written to the store.
     return load_store().map(entry => ({
-        ...entry, name: sheet_name(entry.lines), active: entry.id === active_shortsave_id
+        ...entry, name: sheet_name(entry.lines), active: entry.id === active_shortsave_id,
+        total: sheet_total(entry.lines)
     }));
 }
 
@@ -1131,5 +1144,5 @@ if (typeof window !== 'undefined') {
 }
 
 if (typeof module !== 'undefined' && module.exports) {
-    module.exports = { new_sheet, open_shortsave, delete_shortsave, list_shortsaves, ACTIVE_STORAGE_KEY, STORE_STORAGE_KEY, JoLine, JoSheet, classify_line, evaluate_sheet, handle_url_params, reset_sheet, SHEET_STORAGE_KEY, sheet_name, new_sheet_id, load_store, save_store };
+    module.exports = { new_sheet, open_shortsave, delete_shortsave, list_shortsaves, sheet_total, ACTIVE_STORAGE_KEY, STORE_STORAGE_KEY, JoLine, JoSheet, classify_line, evaluate_sheet, handle_url_params, reset_sheet, SHEET_STORAGE_KEY, sheet_name, new_sheet_id, load_store, save_store };
 }
