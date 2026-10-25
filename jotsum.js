@@ -161,9 +161,22 @@ function persist_shortsave(lines) {
     save_store(store);
 }
 
+// The total shown under a sheet, as text, or null if no line contributes a
+// number. Text, headings and error lines evaluate to 0 too, so a 0 alone
+// cannot tell an empty sheet from numbers that cancel out.
+function sheet_total(lines) {
+    const { total, types, errors, vars } = evaluate_sheet(lines);
+    const has_number = lines.some((line, i) => types[i] === 'value' && !errors[i] &&
+        JoLine.prototype.tokenize.call(JoLine.prototype, (line || '').trim(), { vars })
+            .some(token => typeof token === 'number'));
+    return has_number ? String(JoSheet.prototype.round.call(JoSheet.prototype, total)) : null;
+}
+
 function list_shortsaves() {
+    // The total is derived for display only and never written to the store.
     return load_store().map(entry => ({
-        ...entry, name: sheet_name(entry.lines), active: entry.id === active_shortsave_id
+        ...entry, name: sheet_name(entry.lines), active: entry.id === active_shortsave_id,
+        total: sheet_total(entry.lines)
     }));
 }
 
@@ -941,8 +954,9 @@ function render_shortsave_list() {
     const entries = list_shortsaves();
     // Every keystroke writes the store; only redraw when the list really
     // changed, otherwise a focus move into the list (which blurs and saves
-    // the edited line) would remove the button it just focused.
-    const signature = JSON.stringify(entries.map(entry => [entry.id, entry.name, entry.active]));
+    // the edited line) would remove the button it just focused. The total is
+    // part of it so the open sheet's total follows the typing.
+    const signature = JSON.stringify(entries.map(entry => [entry.id, entry.name, entry.active, entry.total]));
     if (signature === rendered_shortsaves) return;
     rendered_shortsaves = signature;
     // Redrawing replaces the buttons, so keep the focus on the same entry.
@@ -960,7 +974,18 @@ function render_shortsave_list() {
         open.className = 'shortsave-open';
         open.setAttribute('data-action', 'open');
         open.setAttribute('data-id', entry.id);
-        open.textContent = entry.name;
+        const name = document.createElement('span');
+        name.className = 'shortsave-name';
+        name.textContent = entry.name;
+        open.appendChild(name);
+        if (entry.total !== null) {
+            const total = document.createElement('span');
+            total.className = 'shortsave-total';
+            total.textContent = entry.total;
+            open.appendChild(total);
+            // Two adjacent spans would be read as one word, e.g. "Rent1545".
+            open.setAttribute('aria-label', `${entry.name}, total ${entry.total}`);
+        }
         open.title = entry.name;
         if (entry.active) open.setAttribute('aria-current', 'true');
 
@@ -1131,5 +1156,5 @@ if (typeof window !== 'undefined') {
 }
 
 if (typeof module !== 'undefined' && module.exports) {
-    module.exports = { new_sheet, open_shortsave, delete_shortsave, list_shortsaves, ACTIVE_STORAGE_KEY, STORE_STORAGE_KEY, JoLine, JoSheet, classify_line, evaluate_sheet, handle_url_params, reset_sheet, SHEET_STORAGE_KEY, sheet_name, new_sheet_id, load_store, save_store };
+    module.exports = { render_shortsave_list, new_sheet, open_shortsave, delete_shortsave, list_shortsaves, sheet_total, ACTIVE_STORAGE_KEY, STORE_STORAGE_KEY, JoLine, JoSheet, classify_line, evaluate_sheet, handle_url_params, reset_sheet, SHEET_STORAGE_KEY, sheet_name, new_sheet_id, load_store, save_store };
 }

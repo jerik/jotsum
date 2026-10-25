@@ -167,3 +167,124 @@ test('invalid store JSON does not interrupt calculations', () => {
     edit(page, 'Cost 15');
     assert.strictEqual(page.total.textContent, 15);
 });
+
+const { sheet_total } = require('../../jotsum.js');
+
+// Seeds the store with several sheets, then opens each one so the real
+// render/update_total writes #total, the reference for the sidebar total.
+function shown_totals(sheets) {
+    const page = fixture();
+    window.onload();
+    save_store(sheets.map((lines, i) => ({ id: 'sheet-' + i, lines })));
+    return sheets.map((_lines, i) => {
+        open_shortsave('sheet-' + i);
+        return String(page.total.textContent);
+    });
+}
+
+test('list totals match the total under each sheet', () => {
+    const sheets = [
+        ['Rent 1200', 'Food 300', 'Bus 45'],
+        ['Coffee 3.5', 'Cake 2.25', '1/3'],
+        [':rate = 2.5', 'Hours 4 * :rate', 'Extra :rate'],
+        ['A 10', 'B 20', '---', 'C 5', '---', 'Both :SUBTOTAL_1 + :SUBTOTAL_2'],
+        ['Valid 7', 'Broken 5 +', 'Unknown :nope', 'Glued 10 20', 'Valid 1.5'],
+        ['# Budget', 'Notes without numbers', 'Item 40']
+    ];
+    const expected = shown_totals(sheets);
+    assert.deepStrictEqual(expected, ['1545', '6.08', '12.50', '70', '8.50', '40']);
+    const listed = list_shortsaves();
+    assert.deepStrictEqual(listed.map(entry => entry.total), expected);
+    sheets.forEach((lines, i) => assert.strictEqual(sheet_total(lines), expected[i]));
+});
+
+test('sheets without a valid number have no total, numbers cancelling out total 0', () => {
+    const sheets = [
+        [],
+        [''],
+        ['Just some notes', 'nothing to add'],
+        ['# Heading', '## Subheading'],
+        ['Broken 5 +', 'Unknown :nope', '10 20'],
+        ['Plus 5', 'Minus -5']
+    ];
+    const listed = (() => {
+        fixture();
+        window.onload();
+        save_store(sheets.map((lines, i) => ({ id: 'sheet-' + i, lines })));
+        return list_shortsaves();
+    })();
+    assert.deepStrictEqual(listed.map(entry => entry.total), [null, null, null, null, null, '0']);
+    // The sheet itself still shows 0 for these, so 0 alone cannot be the signal.
+    assert.deepStrictEqual(shown_totals(sheets.slice(1)), ['0', '0', '0', '0', '0']);
+});
+
+test('list totals are never written to the store', () => {
+    fixture();
+    window.onload();
+    save_store([{ id: 'a', lines: ['A 10'] }, { id: 'b', lines: ['B 2.5'] }]);
+    const before = window.localStorage.getItem('jotsum.sheets');
+    assert.deepStrictEqual(list_shortsaves().map(entry => entry.total), ['10', '2.50']);
+    const after = window.localStorage.getItem('jotsum.sheets');
+    assert.strictEqual(after, before);
+    assert.ok(JSON.parse(after).every(entry => !('total' in entry)));
+    assert.ok(load_store().every(entry => !('total' in entry)));
+});
+
+const { render_shortsave_list } = require('../../jotsum.js');
+
+// Adds just enough DOM for the sidebar list: a #shortsave-list that holds
+// children, and created elements that can hold children too. The store
+// event is wired to the list exactly as init_sidebar does in the browser.
+function with_list(page) {
+    const container = node => {
+        node.children = [];
+        node.appendChild = child => { node.children.push(child); return child; };
+        node.removeChild = child => node.children.splice(node.children.indexOf(child), 1);
+        node.contains = () => false;
+        node.querySelector = () => null;
+        Object.defineProperty(node, 'firstChild', { get: () => node.children[0] });
+        return node;
+    };
+    const list = container(element(new HTMLElement(), 'UL'));
+    const { getElementById, createElement } = global.document;
+    global.document.getElementById = id => id === 'shortsave-list' ? list : getElementById(id);
+    global.document.createElement = tag => container(createElement(tag));
+    window.dispatchEvent = event => {
+        if (event.type === 'shortsaves-changed') render_shortsave_list();
+    };
+    return { ...page, list };
+}
+
+function shown_entry(list, id) {
+    const item = list.children.find(item => item.children[0].getAttribute('data-id') === id);
+    const span = name => item.children[0].children.find(child => child.className === name);
+    return {
+        name: span('shortsave-name')?.textContent,
+        total: span('shortsave-total')?.textContent ?? null,
+        label: item.children[0].getAttribute('aria-label')
+    };
+}
+
+test('the open sheet\'s list total follows a changed line while its name stays', () => {
+    const page = with_list(fixture());
+    try {
+        window.onload();
+        save_store([{ id: 'notes', lines: ['Just notes'] }, { id: 'budget', lines: ['Budget', 'Rent 1200'] }]);
+        assert.deepStrictEqual(shown_entry(page.list, 'notes'), { name: 'Just notes', total: null, label: null });
+        open_shortsave('budget');
+        assert.deepStrictEqual(page.texts(), ['Budget', 'Rent 1200']);
+        assert.deepStrictEqual(shown_entry(page.list, 'budget'),
+            { name: 'Budget', total: '1200', label: 'Budget, total 1200' });
+
+        // Type into the second line only: name and active entry stay the same,
+        // the save on update_total() fires the store event that redraws the list.
+        page.sheet.querySelectorAll()[1].textContent = 'Rent 1200.5';
+        page.sheet.update_total();
+        assert.deepStrictEqual(load_store().find(entry => entry.id === 'budget').lines, ['Budget', 'Rent 1200.5']);
+        assert.strictEqual(String(page.total.textContent), '1200.50');
+        assert.deepStrictEqual(shown_entry(page.list, 'budget'),
+            { name: 'Budget', total: '1200.50', label: 'Budget, total 1200.50' });
+    } finally {
+        delete window.dispatchEvent;
+    }
+});

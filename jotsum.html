@@ -284,11 +284,23 @@
       .shortsave:hover { background: var(--side-hover); }
       .shortsave-open {
         flex: 1; min-width: 0; min-height: 44px;
+        display: flex; align-items: center; gap: 8px;
         padding: 8px 8px 8px 12px; margin: 0;
         border: 0; background: transparent; color: inherit;
         font: inherit; font-size: 15px; text-align: left;
-        white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+        white-space: nowrap; overflow: hidden;
         cursor: pointer;
+      }
+      /* Name wird gekürzt, die Summe bleibt immer ganz sichtbar (Seitenleiste und Schublade) */
+      .shortsave-name {
+        flex: 1 1 auto; min-width: 0;
+        overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+      }
+      .shortsave-total {
+        flex-shrink: 0; margin-left: auto;
+        white-space: nowrap; text-align: right;
+        font-variant-numeric: tabular-nums;
+        color: var(--side-text);
       }
       .shortsave-delete {
         flex: none; width: 44px; min-height: 44px;
