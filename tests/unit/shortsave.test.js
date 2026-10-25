@@ -1,6 +1,6 @@
 const assert = require('assert');
 const { JoLine, JoSheet, handle_url_params, reset_sheet, SHEET_STORAGE_KEY,
-    sheet_name, new_sheet_id, load_store, save_store, new_sheet, open_shortsave, delete_shortsave, list_shortsaves, sheet_total } = require('../../jotsum.js');
+    sheet_name, new_sheet_id, load_store, save_store, new_sheet, open_shortsave, delete_shortsave, list_shortsaves } = require('../../jotsum.js');
 
 // Supply only the DOM operations used by the real sheet and loading methods.
 // Calculations, adding lines, saving and restoring all run production code.
@@ -167,6 +167,8 @@ test('invalid store JSON does not interrupt calculations', () => {
     edit(page, 'Cost 15');
     assert.strictEqual(page.total.textContent, 15);
 });
+
+const { sheet_total } = require('../../jotsum.js');
 
 // Seeds the store with several sheets, then opens each one so the real
 // render/update_total writes #total, the reference for the sidebar total.
