@@ -229,3 +229,62 @@ test('list totals are never written to the store', () => {
     assert.ok(JSON.parse(after).every(entry => !('total' in entry)));
     assert.ok(load_store().every(entry => !('total' in entry)));
 });
+
+const { render_shortsave_list } = require('../../jotsum.js');
+
+// Adds just enough DOM for the sidebar list: a #shortsave-list that holds
+// children, and created elements that can hold children too. The store
+// event is wired to the list exactly as init_sidebar does in the browser.
+function with_list(page) {
+    const container = node => {
+        node.children = [];
+        node.appendChild = child => { node.children.push(child); return child; };
+        node.removeChild = child => node.children.splice(node.children.indexOf(child), 1);
+        node.contains = () => false;
+        node.querySelector = () => null;
+        Object.defineProperty(node, 'firstChild', { get: () => node.children[0] });
+        return node;
+    };
+    const list = container(element(new HTMLElement(), 'UL'));
+    const { getElementById, createElement } = global.document;
+    global.document.getElementById = id => id === 'shortsave-list' ? list : getElementById(id);
+    global.document.createElement = tag => container(createElement(tag));
+    window.dispatchEvent = event => {
+        if (event.type === 'shortsaves-changed') render_shortsave_list();
+    };
+    return { ...page, list };
+}
+
+function shown_entry(list, id) {
+    const item = list.children.find(item => item.children[0].getAttribute('data-id') === id);
+    const span = name => item.children[0].children.find(child => child.className === name);
+    return {
+        name: span('shortsave-name')?.textContent,
+        total: span('shortsave-total')?.textContent ?? null,
+        label: item.children[0].getAttribute('aria-label')
+    };
+}
+
+test('the open sheet\'s list total follows a changed line while its name stays', () => {
+    const page = with_list(fixture());
+    try {
+        window.onload();
+        save_store([{ id: 'notes', lines: ['Just notes'] }, { id: 'budget', lines: ['Budget', 'Rent 1200'] }]);
+        assert.deepStrictEqual(shown_entry(page.list, 'notes'), { name: 'Just notes', total: null, label: null });
+        open_shortsave('budget');
+        assert.deepStrictEqual(page.texts(), ['Budget', 'Rent 1200']);
+        assert.deepStrictEqual(shown_entry(page.list, 'budget'),
+            { name: 'Budget', total: '1200', label: 'Budget, total 1200' });
+
+        // Type into the second line only: name and active entry stay the same,
+        // the save on update_total() fires the store event that redraws the list.
+        page.sheet.querySelectorAll()[1].textContent = 'Rent 1200.5';
+        page.sheet.update_total();
+        assert.deepStrictEqual(load_store().find(entry => entry.id === 'budget').lines, ['Budget', 'Rent 1200.5']);
+        assert.strictEqual(String(page.total.textContent), '1200.50');
+        assert.deepStrictEqual(shown_entry(page.list, 'budget'),
+            { name: 'Budget', total: '1200.50', label: 'Budget, total 1200.50' });
+    } finally {
+        delete window.dispatchEvent;
+    }
+});
