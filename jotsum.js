@@ -1,5 +1,8 @@
 const SHEET_STORAGE_KEY = 'jotsum.sheet';
 const STORE_STORAGE_KEY = 'jotsum.sheets';
+const ACTIVE_STORAGE_KEY = 'jotsum.active';
+let restoring_sheet = false;
+const shortsave_listeners = new Set();
 let sheet_id_sequence = 0;
 
 function sheet_name(lines) {
@@ -31,7 +34,8 @@ function load_store() {
                 entry.lines.every(line => typeof line === 'string')) ? store : [];
         }
         const legacy = JSON.parse(window.localStorage.getItem(SHEET_STORAGE_KEY));
-        if (!Array.isArray(legacy) || !legacy.every(line => typeof line === 'string')) return [];
+        if (!Array.isArray(legacy) || !legacy.every(line => typeof line === 'string') ||
+            !legacy.some(line => line.trim() !== '')) return [];
         const store = [{ id: new_sheet_id(), lines: legacy }];
         save_store(store);
         return store;
@@ -42,7 +46,97 @@ function load_store() {
 }
 
 function save_store(store) {
-    window.localStorage.setItem(STORE_STORAGE_KEY, JSON.stringify(store));
+    try {
+        window.localStorage.setItem(STORE_STORAGE_KEY, JSON.stringify(store));
+    } catch (error) {
+        // Storage failures must not interrupt editing.
+    }
+    notify_shortsaves();
+}
+
+function active_shortsave_id() {
+    try {
+        return window.localStorage.getItem(ACTIVE_STORAGE_KEY);
+    } catch (error) {
+        return null;
+    }
+}
+
+function set_active_shortsave(id) {
+    try {
+        if (id) window.localStorage.setItem(ACTIVE_STORAGE_KEY, id);
+        else window.localStorage.removeItem(ACTIVE_STORAGE_KEY);
+    } catch (error) {
+        // The sheet remains usable without storage.
+    }
+}
+
+function list_shortsaves() {
+    const active = active_shortsave_id();
+    return load_store().map(entry => ({ ...entry, name: sheet_name(entry.lines), active: entry.id === active }));
+}
+
+// Subscribe to store or active-selection changes; the returned function unsubscribes.
+function on_shortsaves_changed(listener) {
+    shortsave_listeners.add(listener);
+    return () => shortsave_listeners.delete(listener);
+}
+
+function notify_shortsaves() {
+    shortsave_listeners.forEach(listener => {
+        try { listener(); } catch (error) { /* Observers must not interrupt editing. */ }
+    });
+}
+
+function persist_shortsave(lines) {
+    if (restoring_sheet) return;
+    const store = load_store();
+    const id = active_shortsave_id();
+    const entry = store.find(entry => entry.id === id);
+    if (entry) {
+        entry.lines = lines;
+    } else {
+        if (!lines.some(line => line.trim() !== '')) return;
+        const new_id = new_sheet_id();
+        store.push({ id: new_id, lines });
+        set_active_shortsave(new_id);
+    }
+    save_store(store);
+}
+
+function restore_sheet_lines(lines) {
+    const sheet = document.getElementById('sheet');
+    restoring_sheet = true;
+    try {
+        while (sheet.firstChild) sheet.removeChild(sheet.firstChild);
+        if (lines.length) lines.forEach(line => add_calc_line(line));
+        else add_example_hint_line();
+    } finally {
+        restoring_sheet = false;
+    }
+    sheet.update_total();
+}
+
+function new_sheet() {
+    reset_sheet();
+}
+
+function open_shortsave(id) {
+    const entry = load_store().find(entry => entry.id === id);
+    if (!entry) return false;
+    clear_text_url();
+    set_active_shortsave(id);
+    restore_sheet_lines(entry.lines);
+    return true;
+}
+
+function delete_shortsave(id) {
+    const store = load_store();
+    if (!store.some(entry => entry.id === id) || !window.confirm('Delete this shortsave?')) return false;
+    const active = active_shortsave_id() === id;
+    save_store(store.filter(entry => entry.id !== id));
+    if (active) reset_sheet();
+    return true;
 }
 
 class JoSheet extends HTMLElement {
@@ -137,8 +231,10 @@ class JoSheet extends HTMLElement {
             total_element.classList.remove('is-placeholder');
         }
         // Store content only, never the placeholder or calculated results.
+        const saved_texts = lines.map(line => line.textContent);
+        persist_shortsave(saved_texts);
+        if (restoring_sheet) return;
         try {
-            const saved_texts = lines.map(line => line.textContent);
             if (saved_texts.some(text => text !== '')) {
                 window.localStorage.setItem(SHEET_STORAGE_KEY, JSON.stringify(saved_texts));
             } else {
@@ -706,7 +802,9 @@ function handle_url_params() {
     const text_param = url_params.get('text');
 
     let lines = null;
+    const store = load_store();
     if (url_params.has('text')) {
+        set_active_shortsave(null);
         // URLSearchParams already decodes the value, including literal % signs.
         lines = text_param.split('\n');
     } else {
@@ -720,24 +818,35 @@ function handle_url_params() {
         }
     }
 
-    if (lines && lines.length > 0) {
-        lines.forEach(line => add_calc_line(line));
-    } else {
-        add_example_hint_line();
+    if (!url_params.has('text')) {
+        const active = store.find(entry => entry.id === active_shortsave_id());
+        const migrated = !active && lines && store.find(entry => JSON.stringify(entry.lines) === JSON.stringify(lines));
+        set_active_shortsave(active ? active.id : migrated ? migrated.id : null);
+        if (active) lines = active.lines;
     }
+    restore_sheet_lines(lines && lines.length ? lines : []);
+    notify_shortsaves();
 }
 
-function reset_sheet() {
-    // A shared URL should not refill the new page on its next reload.
+function clear_text_url() {
     const url = new URL(window.location.href);
     url.searchParams.delete('text');
     window.history.replaceState(null, '', url);
+}
+
+function reset_sheet() {
+    // Mark migration complete before removing the legacy current sheet.
+    const store = load_store();
+    save_store(store);
+    set_active_shortsave(null);
+    clear_text_url();
     const sheet = document.getElementById('sheet');
     while (sheet.firstChild) {
         sheet.removeChild(sheet.firstChild);
     }
     add_example_hint_line();
     sheet.update_total();
+    notify_shortsaves();
 }
 
 if (typeof window !== 'undefined') {
@@ -790,5 +899,5 @@ if (typeof window !== 'undefined') {
 }
 
 if (typeof module !== 'undefined' && module.exports) {
-    module.exports = { JoLine, JoSheet, classify_line, evaluate_sheet, handle_url_params, reset_sheet, SHEET_STORAGE_KEY, sheet_name, new_sheet_id, load_store, save_store };
+    module.exports = { JoLine, JoSheet, classify_line, evaluate_sheet, handle_url_params, reset_sheet, SHEET_STORAGE_KEY, sheet_name, new_sheet_id, load_store, save_store, STORE_STORAGE_KEY, ACTIVE_STORAGE_KEY, active_shortsave_id, set_active_shortsave, list_shortsaves, on_shortsaves_changed, notify_shortsaves, persist_shortsave, restore_sheet_lines, new_sheet, open_shortsave, delete_shortsave, clear_text_url };
 }
