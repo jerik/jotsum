@@ -24,35 +24,102 @@ function new_sheet_id() {
 // Additional entry fields (e.g. total) are preserved without a migration.
 // An existing list, even [], marks the legacy sheet as already migrated.
 // Keep jotsum.sheet while the current single-sheet UI still reads/writes it.
+let store_entries = [];
+let store_pending = false;
+let initial_store_read = true;
+let pending_store_backup = null;
+
+function readable_entry(entry) {
+    return entry && typeof entry.id === 'string' && Array.isArray(entry.lines) &&
+        entry.lines.every(line => typeof line === 'string');
+}
+
 function load_store() {
+    const initialize = initial_store_read;
+    initial_store_read = false;
+    if (store_pending) return store_entries.filter(readable_entry);
     try {
-        const stored = window.localStorage.getItem(STORE_STORAGE_KEY);
-        if (stored !== null) {
-            const store = JSON.parse(stored);
-            return Array.isArray(store) && store.every(entry =>
-                entry && typeof entry.id === 'string' && Array.isArray(entry.lines) &&
-                entry.lines.every(line => typeof line === 'string')) ? store : [];
+        const raw = window.localStorage.getItem(STORE_STORAGE_KEY);
+        if (raw === null) {
+            store_entries = [];
+            // Support initialization before the onload callback as well.
+            if (initialize) {
+                try {
+                    const legacy = JSON.parse(window.localStorage.getItem(SHEET_STORAGE_KEY));
+                    if (Array.isArray(legacy) && legacy.every(line => typeof line === 'string') && legacy.some(line => line.trim())) {
+                        store_entries = [{ id: new_sheet_id(), lines: legacy }];
+                        save_store(store_entries);
+                        set_active_shortsave(store_entries[0].id);
+                    }
+                } catch (error) {
+                    // Invalid legacy data is ignored.
+                }
+            }
         }
-        const legacy = JSON.parse(window.localStorage.getItem(SHEET_STORAGE_KEY));
-        if (!Array.isArray(legacy) || !legacy.every(line => typeof line === 'string') || !legacy.some(line => line.trim())) return [];
-        const store = [{ id: new_sheet_id(), lines: legacy }];
-        save_store(store);
-        return store;
+        else {
+            let parsed;
+            try {
+                parsed = JSON.parse(raw);
+                if (!Array.isArray(parsed)) throw new Error('Expected an array');
+            } catch (error) {
+                console.warn('Unreadable shortsave store; preserving a backup.', error);
+                // If the backup fails, retain the raw store and retry next time.
+                pending_store_backup = raw;
+                if (window.localStorage.getItem(STORE_STORAGE_KEY + '.broken') === null) {
+                    window.localStorage.setItem(STORE_STORAGE_KEY + '.broken', raw);
+                }
+                pending_store_backup = null;
+                parsed = [];
+            }
+            store_entries = parsed;
+        }
     } catch (error) {
-        // Invalid JSON or unavailable storage must not prevent page loading.
-        return [];
+        // Keep the last known entries when storage cannot be read.
     }
+    return store_entries.filter(readable_entry);
 }
 
 function save_store(store) {
+    const unreadable = store_entries.filter(entry => !readable_entry(entry));
+    store_entries = [...store, ...unreadable];
+    store_pending = true;
     try {
-        window.localStorage.setItem(STORE_STORAGE_KEY, JSON.stringify(store));
+        if (pending_store_backup !== null) {
+            if (window.localStorage.getItem(STORE_STORAGE_KEY + '.broken') === null) {
+                window.localStorage.setItem(STORE_STORAGE_KEY + '.broken', pending_store_backup);
+            }
+            pending_store_backup = null;
+        }
+        window.localStorage.setItem(STORE_STORAGE_KEY, JSON.stringify(store_entries));
+        store_pending = false;
     } catch (error) {
-        // Storage failure must not interrupt editing.
+        // Retry on the next save while keeping IDs and edits in memory.
     }
     if (typeof window.dispatchEvent === 'function') {
         window.dispatchEvent(new Event('shortsaves-changed'));
     }
+}
+
+function handle_store_change(event) {
+    if (event.key !== STORE_STORAGE_KEY && event.key !== null) return;
+    if (event.storageArea && event.storageArea !== window.localStorage) return;
+    // Use the event snapshot: malformed data is not evidence of deletion.
+    let entries;
+    try {
+        entries = event.newValue === null ? [] : JSON.parse(event.newValue);
+    } catch (error) {
+        return;
+    }
+    if (!Array.isArray(entries)) return;
+    store_entries = entries;
+    store_pending = false;
+    if (active_shortsave_id && !entries.some(entry => readable_entry(entry) && entry.id === active_shortsave_id)) {
+        new_sheet();
+    }
+}
+
+if (typeof window.addEventListener === 'function') {
+    window.addEventListener('storage', handle_store_change);
 }
 
 function set_active_shortsave(id) {
@@ -786,15 +853,31 @@ function handle_url_params() {
     const url_params = new URLSearchParams(window.location.search);
     const text_param = url_params.get('text');
 
-    const store = load_store();
+    // Initialization is the only place that may migrate legacy content.
+    store_entries = [];
+    store_pending = false;
+    let missing_store = false;
     let stored_active = null;
     try {
-        // Only jotsum.sheet from before this page load counts as legacy content.
-        // Rendering below rewrites it, so mark the store as migrated right away.
-        if (window.localStorage.getItem(STORE_STORAGE_KEY) === null) save_store(store);
+        missing_store = window.localStorage.getItem(STORE_STORAGE_KEY) === null;
         stored_active = window.localStorage.getItem(ACTIVE_STORAGE_KEY);
     } catch (error) {
         // Loading still works without persistent storage.
+    }
+    initial_store_read = false;
+    const store = load_store();
+    let migrated_id = null;
+    if (missing_store) {
+        try {
+            const legacy = JSON.parse(window.localStorage.getItem(SHEET_STORAGE_KEY));
+            if (Array.isArray(legacy) && legacy.every(line => typeof line === 'string') && legacy.some(line => line.trim())) {
+                migrated_id = new_sheet_id();
+                store.push({ id: migrated_id, lines: legacy });
+            }
+        } catch (error) {
+            // Broken legacy data must not prevent new shortsaves.
+        }
+        save_store(store);
     }
     set_active_shortsave(store.some(entry => entry.id === stored_active) ? stored_active : null);
     let lines = null;
@@ -813,10 +896,7 @@ function handle_url_params() {
         }
     }
 
-    if (!url_params.has('text') && !active_shortsave_id && lines) {
-        const migrated = store.find(entry => JSON.stringify(entry.lines) === JSON.stringify(lines));
-        if (migrated) set_active_shortsave(migrated.id);
-    }
+    if (!url_params.has('text') && migrated_id) set_active_shortsave(migrated_id);
     render_sheet(lines || []);
     // Once imported, reload the saved association rather than importing again.
     if (url_params.has('text')) clear_text_url();
