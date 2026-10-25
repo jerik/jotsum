@@ -1,6 +1,6 @@
 const assert = require('assert');
 const { JoLine, JoSheet, handle_url_params, reset_sheet, SHEET_STORAGE_KEY,
-    sheet_name, new_sheet_id, load_store, save_store, new_sheet, open_shortsave, delete_shortsave, list_shortsaves } = require('../../jotsum.js');
+    sheet_name, new_sheet_id, load_store, save_store, new_sheet, open_shortsave, delete_shortsave, list_shortsaves, sheet_total } = require('../../jotsum.js');
 
 // Supply only the DOM operations used by the real sheet and loading methods.
 // Calculations, adding lines, saving and restoring all run production code.
@@ -166,4 +166,64 @@ test('invalid store JSON does not interrupt calculations', () => {
     window.onload();
     edit(page, 'Cost 15');
     assert.strictEqual(page.total.textContent, 15);
+});
+
+// Seeds the store with several sheets, then opens each one so the real
+// render/update_total writes #total, the reference for the sidebar total.
+function shown_totals(sheets) {
+    const page = fixture();
+    window.onload();
+    save_store(sheets.map((lines, i) => ({ id: 'sheet-' + i, lines })));
+    return sheets.map((_lines, i) => {
+        open_shortsave('sheet-' + i);
+        return String(page.total.textContent);
+    });
+}
+
+test('list totals match the total under each sheet', () => {
+    const sheets = [
+        ['Rent 1200', 'Food 300', 'Bus 45'],
+        ['Coffee 3.5', 'Cake 2.25', '1/3'],
+        [':rate = 2.5', 'Hours 4 * :rate', 'Extra :rate'],
+        ['A 10', 'B 20', '---', 'C 5', '---', 'Both :SUBTOTAL_1 + :SUBTOTAL_2'],
+        ['Valid 7', 'Broken 5 +', 'Unknown :nope', 'Glued 10 20', 'Valid 1.5'],
+        ['# Budget', 'Notes without numbers', 'Item 40']
+    ];
+    const expected = shown_totals(sheets);
+    assert.deepStrictEqual(expected, ['1545', '6.08', '12.50', '70', '8.50', '40']);
+    const listed = list_shortsaves();
+    assert.deepStrictEqual(listed.map(entry => entry.total), expected);
+    sheets.forEach((lines, i) => assert.strictEqual(sheet_total(lines), expected[i]));
+});
+
+test('sheets without a valid number have no total, numbers cancelling out total 0', () => {
+    const sheets = [
+        [],
+        [''],
+        ['Just some notes', 'nothing to add'],
+        ['# Heading', '## Subheading'],
+        ['Broken 5 +', 'Unknown :nope', '10 20'],
+        ['Plus 5', 'Minus -5']
+    ];
+    const listed = (() => {
+        fixture();
+        window.onload();
+        save_store(sheets.map((lines, i) => ({ id: 'sheet-' + i, lines })));
+        return list_shortsaves();
+    })();
+    assert.deepStrictEqual(listed.map(entry => entry.total), [null, null, null, null, null, '0']);
+    // The sheet itself still shows 0 for these, so 0 alone cannot be the signal.
+    assert.deepStrictEqual(shown_totals(sheets.slice(1)), ['0', '0', '0', '0', '0']);
+});
+
+test('list totals are never written to the store', () => {
+    fixture();
+    window.onload();
+    save_store([{ id: 'a', lines: ['A 10'] }, { id: 'b', lines: ['B 2.5'] }]);
+    const before = window.localStorage.getItem('jotsum.sheets');
+    assert.deepStrictEqual(list_shortsaves().map(entry => entry.total), ['10', '2.50']);
+    const after = window.localStorage.getItem('jotsum.sheets');
+    assert.strictEqual(after, before);
+    assert.ok(JSON.parse(after).every(entry => !('total' in entry)));
+    assert.ok(load_store().every(entry => !('total' in entry)));
 });
