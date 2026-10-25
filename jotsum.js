@@ -789,6 +789,9 @@ function handle_url_params() {
     const store = load_store();
     let stored_active = null;
     try {
+        // Only jotsum.sheet from before this page load counts as legacy content.
+        // Rendering below rewrites it, so mark the store as migrated right away.
+        if (window.localStorage.getItem(STORE_STORAGE_KEY) === null) save_store(store);
         stored_active = window.localStorage.getItem(ACTIVE_STORAGE_KEY);
     } catch (error) {
         // Loading still works without persistent storage.
