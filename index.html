@@ -405,38 +405,119 @@ function new_sheet_id() {
     return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}-${++sheet_id_sequence}`;
 }
 
-// jotsum.sheets stores a JSON array of { id: string, lines: string[] }.
-// Additional entry fields (e.g. total) are preserved without a migration.
-// An existing list, even [], marks the legacy sheet as already migrated.
-// Keep jotsum.sheet while the current single-sheet UI still reads/writes it.
+// Keep unreadable entries verbatim and retain failed writes in memory.
+let store_memory = [];
+let store_pending = false;
+let store_initialized = false;
+let store_invalid = [];
+let store_backups = new Map();
+let migrated_shortsave_id = null;
+
+function readable_entry(entry) {
+    return entry && typeof entry.id === 'string' && Array.isArray(entry.lines) &&
+        entry.lines.every(line => typeof line === 'string');
+}
+
+function read_store() {
+    const raw = window.localStorage.getItem(STORE_STORAGE_KEY);
+    if (raw === null) return null;
+    try {
+        const entries = JSON.parse(raw);
+        if (Array.isArray(entries)) return entries;
+    } catch (error) {
+        // Preserve the original text before replacing an unreadable store.
+    }
+    if (!store_backups.has(raw)) {
+        store_backups.set(raw, STORE_STORAGE_KEY + '.broken.' + new Date().toISOString() + '.' + new_sheet_id());
+        console.warn('Unreadable shortsave store; preserving a backup.');
+    }
+    return [];
+}
+
+function merge_pending(entries) {
+    const merged = entries.filter(readable_entry);
+    if (store_pending) {
+        for (const entry of store_memory) {
+            const index = merged.findIndex(other => other.id === entry.id);
+            if (index < 0) merged.push(entry);
+            else merged[index] = entry;
+        }
+    }
+    return merged;
+}
+
 function load_store() {
     try {
-        const stored = window.localStorage.getItem(STORE_STORAGE_KEY);
-        if (stored !== null) {
-            const store = JSON.parse(stored);
-            return Array.isArray(store) && store.every(entry =>
-                entry && typeof entry.id === 'string' && Array.isArray(entry.lines) &&
-                entry.lines.every(line => typeof line === 'string')) ? store : [];
+        const entries = read_store();
+        store_invalid = (entries || []).filter(entry => !readable_entry(entry));
+        store_memory = merge_pending(entries || []);
+        if (!store_initialized) {
+            store_initialized = true;
+            if (entries === null) {
+                let legacy = null;
+                try { legacy = JSON.parse(window.localStorage.getItem(SHEET_STORAGE_KEY)); } catch (error) {}
+                if (Array.isArray(legacy) && legacy.every(line => typeof line === 'string') &&
+                    legacy.some(line => line.trim())) {
+                    const entry = { id: new_sheet_id(), lines: legacy };
+                    migrated_shortsave_id = entry.id;
+                    store_memory.push(entry);
+                }
+                save_store(store_memory);
+            }
         }
-        const legacy = JSON.parse(window.localStorage.getItem(SHEET_STORAGE_KEY));
-        if (!Array.isArray(legacy) || !legacy.every(line => typeof line === 'string') || !legacy.some(line => line.trim())) return [];
-        const store = [{ id: new_sheet_id(), lines: legacy }];
-        save_store(store);
-        return store;
     } catch (error) {
-        // Invalid JSON or unavailable storage must not prevent page loading.
-        return [];
+        // Reads can fail independently of writes. Keep the current sheet usable.
+    }
+    return store_memory.map(entry => ({ ...entry, lines: [...entry.lines] }));
+}
+
+function notify_shortsaves() {
+    if (typeof window.dispatchEvent === 'function') {
+        window.dispatchEvent(new Event('shortsaves-changed'));
     }
 }
 
 function save_store(store) {
+    store_memory = store.map(entry => ({ ...entry, lines: [...entry.lines] }));
+    store_pending = true;
     try {
-        window.localStorage.setItem(STORE_STORAGE_KEY, JSON.stringify(store));
+        // Check again: another tab may have replaced the value since our read.
+        const entries = read_store();
+        if (entries !== null) store_invalid = entries.filter(entry => !readable_entry(entry));
+        for (const [raw, key] of store_backups) {
+            window.localStorage.setItem(key, raw);
+            store_backups.delete(raw);
+        }
+        window.localStorage.setItem(STORE_STORAGE_KEY, JSON.stringify([...store_memory, ...store_invalid]));
+        store_pending = false;
     } catch (error) {
-        // Storage failure must not interrupt editing.
+        // Retry on the next save, including any backup that still needs writing.
     }
-    if (typeof window.dispatchEvent === 'function') {
-        window.dispatchEvent(new Event('shortsaves-changed'));
+    notify_shortsaves();
+}
+
+function handle_store_change(event) {
+    if (event.key !== STORE_STORAGE_KEY && event.key !== null) return;
+    if (event.storageArea && event.storageArea !== window.localStorage) return;
+    try {
+        const entries = read_store() || [];
+        const active = store_memory.find(entry => entry.id === active_shortsave_id);
+        const previously_saved = event.oldValue ? JSON.parse(event.oldValue) : [];
+        const deleted = Array.isArray(previously_saved) &&
+            previously_saved.some(entry => readable_entry(entry) && entry.id === active_shortsave_id) &&
+            !entries.some(entry => readable_entry(entry) && entry.id === active_shortsave_id);
+        store_invalid = entries.filter(entry => !readable_entry(entry));
+        store_memory = entries.filter(readable_entry);
+        if (deleted) {
+            store_pending = false;
+            new_sheet();
+        } else if (active && store_pending) {
+            store_memory = store_memory.filter(entry => entry.id !== active.id);
+            store_memory.push(active);
+        }
+        notify_shortsaves();
+    } catch (error) {
+        // An unavailable store must not discard edits in this tab.
     }
 }
 
@@ -1171,12 +1252,15 @@ function handle_url_params() {
     const url_params = new URLSearchParams(window.location.search);
     const text_param = url_params.get('text');
 
+    store_memory = [];
+    store_pending = false;
+    store_initialized = false;
+    store_invalid = [];
+    store_backups = new Map();
+    migrated_shortsave_id = null;
     const store = load_store();
     let stored_active = null;
     try {
-        // Only jotsum.sheet from before this page load counts as legacy content.
-        // Rendering below rewrites it, so mark the store as migrated right away.
-        if (window.localStorage.getItem(STORE_STORAGE_KEY) === null) save_store(store);
         stored_active = window.localStorage.getItem(ACTIVE_STORAGE_KEY);
     } catch (error) {
         // Loading still works without persistent storage.
@@ -1199,7 +1283,8 @@ function handle_url_params() {
     }
 
     if (!url_params.has('text') && !active_shortsave_id && lines) {
-        const migrated = store.find(entry => JSON.stringify(entry.lines) === JSON.stringify(lines));
+        const migrated = store.find(entry => entry.id === migrated_shortsave_id) ||
+            store.find(entry => JSON.stringify(entry.lines) === JSON.stringify(lines));
         if (migrated) set_active_shortsave(migrated.id);
     }
     render_sheet(lines || []);
@@ -1374,6 +1459,9 @@ function init_sidebar() {
 }
 
 if (typeof window !== 'undefined') {
+    if (typeof window.addEventListener === 'function') {
+        window.addEventListener('storage', handle_store_change);
+    }
     window.onload = function () {
         handle_url_params();
         try {
@@ -1473,7 +1561,7 @@ if (typeof module !== 'undefined' && module.exports) {
         <!-- Footer -->
         <footer>
 		Use the operators + - * / ( ) <br/> Download for offline use • Source and docs on <a href="https://github.com/jerik/jotsum">GitHub</a>
-          <span id="version">2026-10-25T12:17:14Z<br>224-g4439ca5</span>
+          <span id="version">2026-10-25T13:06:15Z<br>229-g9d535c2</span>
         </footer>
       </main>
     </div>
