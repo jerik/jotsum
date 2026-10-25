@@ -825,9 +825,144 @@ function reset_sheet() {
     render_sheet([]);
 }
 
+// Sidebar / drawer with the shortsaves. Every DOM access is guarded: the unit
+// tests run against a minimal mock where getElementById returns {}.
+const WIDE_QUERY = '(min-width: 900px)';
+const DELETE_ICON = '<svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false">' +
+    '<path d="M4 7h16M10 11v6M14 11v6M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12M9 7V4h6v3"/></svg>';
+
+function ui_element(id) {
+    const element = document.getElementById(id);
+    return element && typeof element.addEventListener === 'function' ? element : null;
+}
+
+function is_wide_screen() {
+    return typeof window.matchMedia === 'function' && window.matchMedia(WIDE_QUERY).matches;
+}
+
+function is_drawer_open() {
+    return !!(document.body && document.body.classList && document.body.classList.contains('drawer-open'));
+}
+
+function render_shortsave_list() {
+    const list = ui_element('shortsave-list');
+    if (!list || typeof list.appendChild !== 'function' || typeof list.removeChild !== 'function' ||
+        typeof list.querySelectorAll !== 'function') return;
+    let entries = [];
+    try {
+        entries = list_shortsaves();
+    } catch (error) {
+        // An unreadable store shows an empty list; the sheet keeps working.
+    }
+    while (list.firstChild) list.removeChild(list.firstChild);
+    entries.forEach((entry, index) => {
+        const item = document.createElement('li');
+        item.className = 'shortsave-item';
+
+        const open = document.createElement('button');
+        open.type = 'button';
+        open.className = 'shortsave-open';
+        open.textContent = entry.name;
+        open.title = entry.name;
+        if (entry.active) open.setAttribute('aria-current', 'true');
+        open.addEventListener('click', () => open_from_list(entry.id));
+
+        const remove = document.createElement('button');
+        remove.type = 'button';
+        remove.className = 'icon-btn shortsave-delete';
+        remove.setAttribute('aria-label', `Delete ${entry.name}`);
+        remove.title = `Delete ${entry.name}`;
+        remove.innerHTML = DELETE_ICON;
+        remove.addEventListener('click', () => delete_from_list(entry.id, index));
+
+        item.appendChild(open);
+        item.appendChild(remove);
+        list.appendChild(item);
+    });
+    const empty = document.getElementById('shortsave-empty');
+    if (empty) empty.hidden = entries.length > 0;
+}
+
+function set_drawer_open(open, restore_focus = false) {
+    const body = document.body;
+    if (!body || !body.classList) return;
+    if (open && is_wide_screen()) return;
+    body.classList.toggle('drawer-open', open);
+    const toggle = ui_element('drawer-toggle');
+    if (toggle) toggle.setAttribute('aria-expanded', String(open));
+    // The sheet behind an open drawer is neither focusable nor read out.
+    const content = ui_element('content');
+    if (content) content.inert = open;
+    if (open) {
+        const list = ui_element('shortsave-list');
+        const target = (list && typeof list.querySelector === 'function' &&
+            (list.querySelector('[aria-current]') || list.querySelector('button'))) ||
+            ui_element('drawer-close');
+        if (target) target.focus();
+    } else if (restore_focus && toggle) {
+        toggle.focus();
+    }
+}
+
+function open_from_list(id) {
+    // Close first: focus cannot move into the sheet while it is inert.
+    if (is_drawer_open()) set_drawer_open(false);
+    open_shortsave(id);
+    render_shortsave_list();
+    // render_sheet leaves the focus on the sheet, ready to edit.
+}
+
+function delete_from_list(id, index) {
+    delete_shortsave(id);
+    // Cancelled: the entry and its focused button are untouched.
+    if (list_shortsaves().some(entry => entry.id === id)) return;
+    render_shortsave_list();
+    const list = ui_element('shortsave-list');
+    const buttons = list && typeof list.querySelectorAll === 'function' ? list.querySelectorAll('.shortsave-open') : [];
+    const next = buttons[Math.min(index, buttons.length - 1)] || ui_element('sidebar-title');
+    if (next) next.focus();
+}
+
+function start_new_sheet() {
+    if (is_drawer_open()) set_drawer_open(false);
+    new_sheet();
+    // new_sheet() writes nothing and fires no shortsaves-changed event.
+    render_shortsave_list();
+}
+
+function init_sidebar() {
+    if (typeof window.addEventListener === 'function') {
+        window.addEventListener('shortsaves-changed', render_shortsave_list);
+    }
+    const new_button = ui_element('new-sheet');
+    if (new_button) new_button.addEventListener('click', start_new_sheet);
+    const toggle = ui_element('drawer-toggle');
+    if (toggle) toggle.addEventListener('click', () => set_drawer_open(!is_drawer_open(), true));
+    const close = ui_element('drawer-close');
+    if (close) close.addEventListener('click', () => set_drawer_open(false, true));
+    const backdrop = ui_element('drawer-backdrop');
+    if (backdrop) backdrop.addEventListener('click', () => set_drawer_open(false, true));
+    if (typeof document.addEventListener === 'function') {
+        document.addEventListener('keydown', (event) => {
+            if (event.key === 'Escape' && is_drawer_open()) {
+                event.preventDefault();
+                set_drawer_open(false, true);
+            }
+        });
+    }
+    if (typeof window.matchMedia === 'function') {
+        const query = window.matchMedia(WIDE_QUERY);
+        const on_change = () => { if (query.matches && is_drawer_open()) set_drawer_open(false); };
+        if (typeof query.addEventListener === 'function') query.addEventListener('change', on_change);
+        else if (typeof query.addListener === 'function') query.addListener(on_change);  // Safari < 14
+    }
+    render_shortsave_list();
+}
+
 if (typeof window !== 'undefined') {
     window.onload = function () {
         handle_url_params();
+        init_sidebar();
 		/** Not used anymore ? removed buttons from the bottom, the upper once do the stuff now
         document.getElementById("add_line").addEventListener('click', () => {
             add_calc_line();
