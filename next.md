@@ -20,6 +20,11 @@
 - Zur Doku hinzufügen: Variablen können nicht mit einer Zahl starten. :1Test geht nicht. Variablen sind case-sensitive. 
 - , als dezimal delimiter. wie kann man das am besten einbringen?  
 - firfox und webkit wieder in tests mitreinnehmen (installation notwendig)
+- idee: in der Seitenleiste bei dem Sheet das Endergebnis anzeigen
+- jedes sheet braucht ein clear oder reset button
+- idee: in der Seitenleste ein + machen, damit ein neues sheet angelegt werden kann. gleiche funktion wie ob im hauptmenü
+- idee: generell alle buttons durch icons ersetzten. der Button kann auch das Icon enthalten. es geht darum so wenig wie möglich übersetzten
+  zu müssen. "add line" bräuchte ein passendes icon. Wir sollten bei einer icon library bleiben, damit es gleich aussieht
 
 ## build
 `index.html` wird von `generate-single-html.sh` aus `jotsum.html` + `jotsum.js` erzeugt und von der
