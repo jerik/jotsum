@@ -1,5 +1,8 @@
 const SHEET_STORAGE_KEY = 'jotsum.sheet';
 const STORE_STORAGE_KEY = 'jotsum.sheets';
+const ACTIVE_STORAGE_KEY = 'jotsum.active';
+let active_shortsave_id = null;
+let restoring_sheet = false;
 let sheet_id_sequence = 0;
 
 function sheet_name(lines) {
@@ -31,7 +34,7 @@ function load_store() {
                 entry.lines.every(line => typeof line === 'string')) ? store : [];
         }
         const legacy = JSON.parse(window.localStorage.getItem(SHEET_STORAGE_KEY));
-        if (!Array.isArray(legacy) || !legacy.every(line => typeof line === 'string')) return [];
+        if (!Array.isArray(legacy) || !legacy.every(line => typeof line === 'string') || !legacy.some(line => line.trim())) return [];
         const store = [{ id: new_sheet_id(), lines: legacy }];
         save_store(store);
         return store;
@@ -42,7 +45,84 @@ function load_store() {
 }
 
 function save_store(store) {
-    window.localStorage.setItem(STORE_STORAGE_KEY, JSON.stringify(store));
+    try {
+        window.localStorage.setItem(STORE_STORAGE_KEY, JSON.stringify(store));
+    } catch (error) {
+        // Storage failure must not interrupt editing.
+    }
+    if (typeof window.dispatchEvent === 'function') {
+        window.dispatchEvent(new Event('shortsaves-changed'));
+    }
+}
+
+function set_active_shortsave(id) {
+    active_shortsave_id = id;
+    try {
+        if (id) window.localStorage.setItem(ACTIVE_STORAGE_KEY, id);
+        else window.localStorage.removeItem(ACTIVE_STORAGE_KEY);
+    } catch (error) {
+        // Keep the in-memory association when storage is unavailable.
+    }
+}
+
+function persist_shortsave(lines) {
+    if (restoring_sheet) return;
+    const store = load_store();
+    if (!active_shortsave_id && !lines.some(line => line.trim())) return;
+    let entry = store.find(entry => entry.id === active_shortsave_id);
+    if (!entry) {
+        entry = { id: new_sheet_id(), lines };
+        store.push(entry);
+        set_active_shortsave(entry.id);
+    } else {
+        entry.lines = lines;
+    }
+    save_store(store);
+}
+
+function list_shortsaves() {
+    return load_store().map(entry => ({
+        ...entry, name: sheet_name(entry.lines), active: entry.id === active_shortsave_id
+    }));
+}
+
+function render_sheet(lines) {
+    const sheet = document.getElementById('sheet');
+    restoring_sheet = true;
+    try {
+        while (sheet.firstChild) sheet.removeChild(sheet.firstChild);
+        if (lines.length) lines.forEach(line => add_calc_line(line));
+        else add_example_hint_line();
+    } finally {
+        restoring_sheet = false;
+    }
+    sheet.update_total();
+}
+
+function new_sheet() {
+    set_active_shortsave(null);
+    reset_sheet();
+}
+
+function open_shortsave(id) {
+    const entry = load_store().find(entry => entry.id === id);
+    if (!entry) return;
+    clear_text_url();
+    set_active_shortsave(id);
+    render_sheet(entry.lines);
+}
+
+function delete_shortsave(id) {
+    const store = load_store();
+    if (!store.some(entry => entry.id === id) || !window.confirm('Delete this sheet?')) return;
+    if (active_shortsave_id === id) new_sheet();
+    save_store(store.filter(entry => entry.id !== id));
+}
+
+function clear_text_url() {
+    const url = new URL(window.location.href);
+    url.searchParams.delete('text');
+    window.history.replaceState(null, '', url);
 }
 
 class JoSheet extends HTMLElement {
@@ -136,6 +216,7 @@ class JoSheet extends HTMLElement {
             total_element.textContent = this.round(total);
             total_element.classList.remove('is-placeholder');
         }
+        persist_shortsave(lines.map(line => line.textContent));
         // Store content only, never the placeholder or calculated results.
         try {
             const saved_texts = lines.map(line => line.textContent);
@@ -705,8 +786,20 @@ function handle_url_params() {
     const url_params = new URLSearchParams(window.location.search);
     const text_param = url_params.get('text');
 
+    const store = load_store();
+    let stored_active = null;
+    try {
+        // Only jotsum.sheet from before this page load counts as legacy content.
+        // Rendering below rewrites it, so mark the store as migrated right away.
+        if (window.localStorage.getItem(STORE_STORAGE_KEY) === null) save_store(store);
+        stored_active = window.localStorage.getItem(ACTIVE_STORAGE_KEY);
+    } catch (error) {
+        // Loading still works without persistent storage.
+    }
+    set_active_shortsave(store.some(entry => entry.id === stored_active) ? stored_active : null);
     let lines = null;
     if (url_params.has('text')) {
+        set_active_shortsave(null);
         // URLSearchParams already decodes the value, including literal % signs.
         lines = text_param.split('\n');
     } else {
@@ -720,29 +813,189 @@ function handle_url_params() {
         }
     }
 
-    if (lines && lines.length > 0) {
-        lines.forEach(line => add_calc_line(line));
-    } else {
-        add_example_hint_line();
+    if (!url_params.has('text') && !active_shortsave_id && lines) {
+        const migrated = store.find(entry => JSON.stringify(entry.lines) === JSON.stringify(lines));
+        if (migrated) set_active_shortsave(migrated.id);
     }
+    render_sheet(lines || []);
+    // Once imported, reload the saved association rather than importing again.
+    if (url_params.has('text')) clear_text_url();
 }
 
 function reset_sheet() {
-    // A shared URL should not refill the new page on its next reload.
-    const url = new URL(window.location.href);
-    url.searchParams.delete('text');
-    window.history.replaceState(null, '', url);
-    const sheet = document.getElementById('sheet');
-    while (sheet.firstChild) {
-        sheet.removeChild(sheet.firstChild);
+    clear_text_url();
+    set_active_shortsave(null);
+    render_sheet([]);
+}
+
+// Sidebar (from 900px) and drawer (below) listing the shortsaves.
+// Everything here tolerates a missing or mocked DOM: without the sidebar
+// markup the sheet keeps working and nothing is drawn.
+const WIDE_LAYOUT_QUERY = '(min-width: 900px)';
+const DELETE_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg>';
+
+function ui_element(id) {
+    if (typeof document === 'undefined' || typeof document.getElementById !== 'function') return null;
+    const element = document.getElementById(id);
+    return element && typeof element.appendChild === 'function' && typeof element.contains === 'function' ? element : null;
+}
+
+function is_wide_layout() {
+    return typeof window.matchMedia === 'function' && window.matchMedia(WIDE_LAYOUT_QUERY).matches;
+}
+
+function is_drawer_open() {
+    return !!(document.body && document.body.classList && document.body.classList.contains('drawer-open'));
+}
+
+let rendered_shortsaves = null;
+
+function render_shortsave_list() {
+    const list = ui_element('shortsave-list');
+    if (!list) return;
+    const entries = list_shortsaves();
+    // Every keystroke writes the store; only redraw when the list really
+    // changed, otherwise a focus move into the list (which blurs and saves
+    // the edited line) would remove the button it just focused.
+    const signature = JSON.stringify(entries.map(entry => [entry.id, entry.name, entry.active]));
+    if (signature === rendered_shortsaves) return;
+    rendered_shortsaves = signature;
+    // Redrawing replaces the buttons, so keep the focus on the same entry.
+    const focused = document.activeElement;
+    const focus_id = focused && list.contains(focused) ? focused.getAttribute('data-id') : null;
+    const focus_action = focus_id ? focused.getAttribute('data-action') : null;
+
+    while (list.firstChild) list.removeChild(list.firstChild);
+    entries.forEach(entry => {
+        const item = document.createElement('li');
+        item.className = entry.active ? 'shortsave is-active' : 'shortsave';
+
+        const open = document.createElement('button');
+        open.type = 'button';
+        open.className = 'shortsave-open';
+        open.setAttribute('data-action', 'open');
+        open.setAttribute('data-id', entry.id);
+        open.textContent = entry.name;
+        open.title = entry.name;
+        if (entry.active) open.setAttribute('aria-current', 'true');
+
+        const remove = document.createElement('button');
+        remove.type = 'button';
+        remove.className = 'shortsave-delete';
+        remove.setAttribute('data-action', 'delete');
+        remove.setAttribute('data-id', entry.id);
+        remove.setAttribute('aria-label', `Delete “${entry.name}”`);
+        remove.title = `Delete “${entry.name}”`;
+        remove.innerHTML = DELETE_ICON;
+
+        item.appendChild(open);
+        item.appendChild(remove);
+        list.appendChild(item);
+    });
+
+    const empty = ui_element('shortsave-empty');
+    if (empty) empty.hidden = entries.length > 0;
+
+    if (focus_id) {
+        const target = list.querySelector(`button[data-action="${focus_action}"][data-id="${CSS.escape(focus_id)}"]`);
+        if (target) target.focus();
     }
-    add_example_hint_line();
-    sheet.update_total();
+}
+
+function set_drawer_open(open) {
+    const sidebar = ui_element('sidebar');
+    const toggle = ui_element('drawer-toggle');
+    if (!sidebar || !toggle || !document.body) return;
+    // From 900px the sidebar is always visible, so there is nothing to open.
+    const drawer = open && !is_wide_layout();
+    const was_open = is_drawer_open();
+    const had_focus = sidebar.contains(document.activeElement);
+    document.body.classList.toggle('drawer-open', drawer);
+    toggle.setAttribute('aria-expanded', String(drawer));
+    // Behind the open drawer the page must not be reachable by keyboard.
+    ['content', 'header-actions'].forEach(id => {
+        const element = ui_element(id);
+        if (element) element.inert = drawer;
+    });
+    if (drawer && !was_open) {
+        const target = sidebar.querySelector('.shortsave-open[aria-current]') ||
+            sidebar.querySelector('.shortsave-open') || ui_element('sidebar-title');
+        if (target) target.focus();
+    } else if (!drawer && was_open && had_focus) {
+        toggle.focus();
+    }
+}
+
+function open_from_sidebar(id) {
+    // Close first: focus cannot move into the sheet while it is inert.
+    set_drawer_open(false);
+    open_shortsave(id);
+    render_shortsave_list();
+}
+
+function delete_from_sidebar(id) {
+    const list = ui_element('shortsave-list');
+    const ids = list_shortsaves().map(entry => entry.id);
+    const index = ids.indexOf(id);
+    delete_shortsave(id);
+    render_shortsave_list();
+    if (!list || list_shortsaves().some(entry => entry.id === id)) return;
+    // The focused button is gone: move on to the neighbouring entry.
+    const remaining = list.querySelectorAll('.shortsave-open');
+    const target = remaining[Math.min(index, remaining.length - 1)] || ui_element('sidebar-title');
+    if (target) target.focus();
+}
+
+function new_sheet_from_header() {
+    set_drawer_open(false);
+    new_sheet();
+    // new_sheet() writes nothing to the store, so no change event follows.
+    render_shortsave_list();
+}
+
+function init_sidebar() {
+    const list = ui_element('shortsave-list');
+    if (!list) return;
+    list.addEventListener('click', event => {
+        const button = event.target.closest('button[data-action]');
+        if (!button) return;
+        const id = button.getAttribute('data-id');
+        if (button.getAttribute('data-action') === 'open') open_from_sidebar(id);
+        else delete_from_sidebar(id);
+    });
+
+    const toggle = ui_element('drawer-toggle');
+    if (toggle) toggle.addEventListener('click', () => set_drawer_open(!is_drawer_open()));
+    const new_button = ui_element('new-sheet');
+    if (new_button) new_button.addEventListener('click', new_sheet_from_header);
+    const backdrop = ui_element('drawer-backdrop');
+    if (backdrop) backdrop.addEventListener('click', () => set_drawer_open(false));
+
+    document.addEventListener('keydown', event => {
+        if (event.key === 'Escape' && is_drawer_open()) {
+            set_drawer_open(false);
+            if (toggle) toggle.focus();
+        }
+    });
+    if (typeof window.matchMedia === 'function') {
+        const wide = window.matchMedia(WIDE_LAYOUT_QUERY);
+        const on_change = () => { if (wide.matches) set_drawer_open(false); };
+        if (typeof wide.addEventListener === 'function') wide.addEventListener('change', on_change);
+    }
+    if (typeof window.addEventListener === 'function') {
+        window.addEventListener('shortsaves-changed', render_shortsave_list);
+    }
+    render_shortsave_list();
 }
 
 if (typeof window !== 'undefined') {
     window.onload = function () {
         handle_url_params();
+        try {
+            init_sidebar();
+        } catch (error) {
+            // The sidebar is optional; the sheet must keep calculating.
+        }
 		/** Not used anymore ? removed buttons from the bottom, the upper once do the stuff now
         document.getElementById("add_line").addEventListener('click', () => {
             add_calc_line();
@@ -790,5 +1043,5 @@ if (typeof window !== 'undefined') {
 }
 
 if (typeof module !== 'undefined' && module.exports) {
-    module.exports = { JoLine, JoSheet, classify_line, evaluate_sheet, handle_url_params, reset_sheet, SHEET_STORAGE_KEY, sheet_name, new_sheet_id, load_store, save_store };
+    module.exports = { new_sheet, open_shortsave, delete_shortsave, list_shortsaves, ACTIVE_STORAGE_KEY, STORE_STORAGE_KEY, JoLine, JoSheet, classify_line, evaluate_sheet, handle_url_params, reset_sheet, SHEET_STORAGE_KEY, sheet_name, new_sheet_id, load_store, save_store };
 }

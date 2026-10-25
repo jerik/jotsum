@@ -121,15 +121,31 @@ No hint is shown while the caret is in the line, since a half-typed line is brok
 
 **Paste.** Pasting multi-line text creates one line per row and evaluates all of them.
 
-**Saved sheet.** The current sheet is saved automatically in localStorage in this browser and restored after a reload or reopening the page. Only one sheet is kept. **New page** empties the sheet and clears its saved state (and any `?text=` in the current URL).
+**Saved sheets.** Every sheet is saved automatically in this browser and restored after a reload or reopening the page. Several sheets are kept side by side; see [Shortsaves](#shortsaves).
 
-**URL.** `?text=...` fills the sheet on load, taking precedence over the saved sheet, with `%0A` as the line break:
+**URL.** `?text=...` opens the given text as a sheet of its own on load, with `%0A` as the line break. It becomes a new shortsave and does not overwrite any existing one; after a reload it is not imported again:
 
 URL input preserves blank lines (including an empty `?text=`) and is decoded once, so literal `%` text is kept. Paste drops blank lines.
 
 [`?text=3+apples+%2B+4+pears%0A2+bananas+*+7+melons`](https://jerik.github.io/jotsum/?text=3+apples+%2B+4+pears%0A2+bananas+*+7+melons)
 
 **Offline.** Saving the page stores one self-contained HTML file, including the script, so it runs without a connection.
+
+---
+
+## Shortsaves
+
+Every sheet is a shortsave. It is saved automatically on every change; there is no save button.
+
+**New page.** The **New page** icon in the header opens an empty sheet. All existing shortsaves are kept.
+
+**Saved sheets.** The **Saved sheets** list shows every shortsave, named after its first line (a heading without its `#`, an empty sheet as `Untitled`). The sheet that is open is highlighted. From 900 px width the list stands next to the sheet. On narrower screens it opens as a drawer via the menu icon in the header and closes again with the same icon, a tap on the backdrop, `Escape`, or by opening an entry.
+
+**Open and edit.** Tap or click an entry to open it. You keep editing it in place, and every change lands in the same shortsave.
+
+**Delete.** The delete icon next to an entry asks for confirmation (“Delete this sheet?”) and then removes it for good; there is no undo. Deleting the sheet that is open leaves an empty sheet.
+
+**Only this browser.** Shortsaves live in the localStorage of this browser on this device. Nothing is synced, another browser or device does not see them, and clearing the site data deletes them. There is no export or import yet ([#7](https://github.com/jerik/jotsum/issues/7)).
 
 ---
 
