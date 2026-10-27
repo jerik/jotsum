@@ -477,7 +477,9 @@ class JoLine extends HTMLElement {
                 if (current_number !== '') {
                     if (escape_next_number) {
                         escape_next_number = false;
-                    } else {
+                    } else if (/[0-9]/.test(current_number)) {
+                        // A lone '.' is no number ("12 + ."), so it must not
+                        // become a NaN operand that hides the gap.
                         tokens.push(parseFloat(current_number));
                         has_operand = true;
                     }
@@ -490,7 +492,7 @@ class JoLine extends HTMLElement {
                 if (char === '.' && current_number.includes('.')) {
                     if (escape_next_number) {
                         escape_next_number = false;
-                    } else {
+                    } else if (/[0-9]/.test(current_number)) {
                         tokens.push(parseFloat(current_number));
                         has_operand = false;
                     }
@@ -583,7 +585,7 @@ class JoLine extends HTMLElement {
         if (current_number !== '') {
             if (escape_next_number) {
                 escape_next_number = false;
-            } else {
+            } else if (/[0-9]/.test(current_number)) {
                 tokens.push(parseFloat(current_number));
             }
         }
@@ -658,6 +660,10 @@ class JoLine extends HTMLElement {
             if (typeof token === 'number') {
                 stack.push(token);
             } else if (token === 'u') {
+                if (stack.length === 0 && !suppress_missing_value) {
+                    // A sign with nothing to apply it to ("-", ":rate = -").
+                    this._set_error(report, 'missing-value', 'Missing a value for the operator');
+                }
                 stack.push(-stack.pop());
             } else {
                 const b = stack.pop();
@@ -835,8 +841,12 @@ function evaluate_sheet(lines) {
             sums[i] = safe;
             // A broken definition must not propagate its (possibly bogus)
             // value to lines that reference it.
+            // An earlier value is dropped too, so every later use of the
+            // name is an error instead of silently using the old value.
             if (!report.error) {
                 context.vars.set(classified.name, safe);
+            } else {
+                context.vars.delete(classified.name);
             }
         } else {
             const report = {};
