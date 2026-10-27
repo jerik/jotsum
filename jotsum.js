@@ -161,6 +161,17 @@ function persist_shortsave(lines) {
     save_store(store);
 }
 
+// Two decimals for display. Anything that rounds to zero is shown as 0:
+// 0.3 - 0.1 - 0.2 is a tiny negative float, and "-0.00" would look like a
+// debt that is not there.
+function round_for_display(num) {
+    if (num % 1 !== 0) {
+        const text = num.toFixed(2);
+        return Number(text) === 0 ? 0 : text;
+    }
+    return num === 0 ? 0 : num;
+}
+
 // The total shown under a sheet, as text, or null if no line contributes a
 // number. Text, headings and error lines evaluate to 0 too, so a 0 alone
 // cannot tell an empty sheet from numbers that cancel out.
@@ -325,10 +336,7 @@ class JoSheet extends HTMLElement {
     }
 
     round(num) {
-        if (num % 1 !== 0) {
-            return num.toFixed(2);
-        }
-        return num;
+        return round_for_display(num);
     }
 }
 
@@ -676,13 +684,7 @@ class JoLine extends HTMLElement {
     }
 
     round(num) {
-        if (num === -0) {
-            return 0;
-        }
-        if (num % 1 !== 0) {
-            return num.toFixed(2);
-        }
-        return num;
+        return round_for_display(num);
     }
 
     handle_keys(e) {
