@@ -611,6 +611,11 @@ class JoLine extends HTMLElement {
         for (const token of tokens) {
             if (typeof token === 'number') {
                 output.push(token);
+            } else if (token === 'u') {
+                // A sign belongs to the operand that follows, so it pops
+                // nothing - otherwise "--5" would apply the first sign to
+                // an empty stack.
+                operators.push(token);
             } else if (token in precedence) {
                 while (
                     operators.length > 0 &&
