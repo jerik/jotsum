@@ -161,15 +161,23 @@ function persist_shortsave(lines) {
     save_store(store);
 }
 
+// Two decimals for display. Anything that rounds to zero is shown as 0:
+// 0.3 - 0.1 - 0.2 is a tiny negative float, and "-0.00" would look like a
+// debt that is not there.
+function round_for_display(num) {
+    if (num % 1 !== 0) {
+        const text = num.toFixed(2);
+        return Number(text) === 0 ? 0 : text;
+    }
+    return num === 0 ? 0 : num;
+}
+
 // The total shown under a sheet, as text, or null if no line contributes a
 // number. Text, headings and error lines evaluate to 0 too, so a 0 alone
 // cannot tell an empty sheet from numbers that cancel out.
 function sheet_total(lines) {
-    const { total, types, errors, vars } = evaluate_sheet(lines);
-    const has_number = lines.some((line, i) => types[i] === 'value' && !errors[i] &&
-        JoLine.prototype.tokenize.call(JoLine.prototype, (line || '').trim(), { vars })
-            .some(token => typeof token === 'number'));
-    return has_number ? String(JoSheet.prototype.round.call(JoSheet.prototype, total)) : null;
+    const { total, counted } = evaluate_sheet(lines);
+    return counted.some(Boolean) ? String(JoSheet.prototype.round.call(JoSheet.prototype, total)) : null;
 }
 
 function list_shortsaves() {
@@ -325,10 +333,7 @@ class JoSheet extends HTMLElement {
     }
 
     round(num) {
-        if (num % 1 !== 0) {
-            return num.toFixed(2);
-        }
-        return num;
+        return round_for_display(num);
     }
 }
 
@@ -469,7 +474,9 @@ class JoLine extends HTMLElement {
                 if (current_number !== '') {
                     if (escape_next_number) {
                         escape_next_number = false;
-                    } else {
+                    } else if (/[0-9]/.test(current_number)) {
+                        // A lone '.' is no number ("12 + ."), so it must not
+                        // become a NaN operand that hides the gap.
                         tokens.push(parseFloat(current_number));
                         has_operand = true;
                     }
@@ -482,7 +489,7 @@ class JoLine extends HTMLElement {
                 if (char === '.' && current_number.includes('.')) {
                     if (escape_next_number) {
                         escape_next_number = false;
-                    } else {
+                    } else if (/[0-9]/.test(current_number)) {
                         tokens.push(parseFloat(current_number));
                         has_operand = false;
                     }
@@ -492,6 +499,16 @@ class JoLine extends HTMLElement {
                     current_number += char;
                 }
             } else {
+                if (char === ':' && /[0-9]/.test(expression[i-1] || '') && /[0-9]/.test(expression[i+1] || '')) {
+                    // A time like "10:30" is text: neither part is a number.
+                    current_number = '';
+                    escape_next_number = false;
+                    while (/[0-9]/.test(expression[i+1] || '')) {
+                        i++;
+                    }
+                    continue;
+                }
+
                 if (current_number !== '') {
                     if (escape_next_number) {
                         escape_next_number = false;
@@ -505,11 +522,12 @@ class JoLine extends HTMLElement {
                 if (char === "'" && expression[i+1] && /[0-9]/.test(expression[i+1])) {
                     // apostrophe directly before a digit escapes the following number
                     escape_next_number = true;
-                } else if (char === ':') {
+                } else if (char === ':' && !/[0-9]/.test(expression[i+1] || '')) {
                     // Variable reference. Names are letters, digits and
                     // underscores - deliberately no dash, because a dash is an
                     // operator and ":SUBTOTAL_1-50" has to be a subtraction
-                    // with nothing left to guess.
+                    // with nothing left to guess. A name never starts with a
+                    // digit, so in "Price:100" the ':' is just punctuation.
                     let j = i + 1;
                     let name = '';
                     while (j < expression.length && /[A-Za-z0-9_]/.test(expression[j])) {
@@ -564,7 +582,7 @@ class JoLine extends HTMLElement {
         if (current_number !== '') {
             if (escape_next_number) {
                 escape_next_number = false;
-            } else {
+            } else if (/[0-9]/.test(current_number)) {
                 tokens.push(parseFloat(current_number));
             }
         }
@@ -590,6 +608,11 @@ class JoLine extends HTMLElement {
         for (const token of tokens) {
             if (typeof token === 'number') {
                 output.push(token);
+            } else if (token === 'u') {
+                // A sign belongs to the operand that follows, so it pops
+                // nothing - otherwise "--5" would apply the first sign to
+                // an empty stack.
+                operators.push(token);
             } else if (token in precedence) {
                 while (
                     operators.length > 0 &&
@@ -639,6 +662,10 @@ class JoLine extends HTMLElement {
             if (typeof token === 'number') {
                 stack.push(token);
             } else if (token === 'u') {
+                if (stack.length === 0 && !suppress_missing_value) {
+                    // A sign with nothing to apply it to ("-", ":rate = -").
+                    this._set_error(report, 'missing-value', 'Missing a value for the operator');
+                }
                 stack.push(-stack.pop());
             } else {
                 const b = stack.pop();
@@ -676,13 +703,7 @@ class JoLine extends HTMLElement {
     }
 
     round(num) {
-        if (num === -0) {
-            return 0;
-        }
-        if (num % 1 !== 0) {
-            return num.toFixed(2);
-        }
-        return num;
+        return round_for_display(num);
     }
 
     handle_keys(e) {
@@ -777,7 +798,9 @@ function classify_line(text) {
         return { type: 'heading' };
     }
 
-    if (/^-{3,}$/.test(text)) {
+    // Whatever follows the dashes is a label only ("--- Rent", "--- 5").
+    // "---5" has no space, so it stays a value line.
+    if (/^-{3,}(\s|$)/.test(text)) {
         return { type: 'separator' };
     }
 
@@ -794,6 +817,10 @@ function evaluate_sheet(lines) {
     const sums = new Array(lines.length);
     const types = new Array(lines.length);
     const errors = new Array(lines.length);
+    // Whether a value line added a number to the total. Decided here, with
+    // the variables as they are at this line: a later broken definition
+    // deletes the name, so looking it up after the loop would miss it.
+    const counted = new Array(lines.length).fill(false);
     let total = 0;
 
     for (let i = 0; i < lines.length; i++) {
@@ -822,8 +849,12 @@ function evaluate_sheet(lines) {
             sums[i] = safe;
             // A broken definition must not propagate its (possibly bogus)
             // value to lines that reference it.
+            // An earlier value is dropped too, so every later use of the
+            // name is an error instead of silently using the old value.
             if (!report.error) {
                 context.vars.set(classified.name, safe);
+            } else {
+                context.vars.delete(classified.name);
             }
         } else {
             const report = {};
@@ -835,11 +866,13 @@ function evaluate_sheet(lines) {
             if (isFinite(wert) && !report.error) {
                 total += wert;
                 context.block_sum += wert;
+                counted[i] = JoLine.prototype.tokenize.call(JoLine.prototype, text, context)
+                    .some(token => typeof token === 'number');
             }
         }
     }
 
-    return { sums, total, types, vars: context.vars, errors };
+    return { sums, total, types, vars: context.vars, errors, counted };
 }
 
 function add_calc_line(starter = '') {
