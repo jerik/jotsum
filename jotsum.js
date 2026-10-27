@@ -500,6 +500,16 @@ class JoLine extends HTMLElement {
                     current_number += char;
                 }
             } else {
+                if (char === ':' && /[0-9]/.test(expression[i-1] || '') && /[0-9]/.test(expression[i+1] || '')) {
+                    // A time like "10:30" is text: neither part is a number.
+                    current_number = '';
+                    escape_next_number = false;
+                    while (/[0-9]/.test(expression[i+1] || '')) {
+                        i++;
+                    }
+                    continue;
+                }
+
                 if (current_number !== '') {
                     if (escape_next_number) {
                         escape_next_number = false;
@@ -513,11 +523,12 @@ class JoLine extends HTMLElement {
                 if (char === "'" && expression[i+1] && /[0-9]/.test(expression[i+1])) {
                     // apostrophe directly before a digit escapes the following number
                     escape_next_number = true;
-                } else if (char === ':') {
+                } else if (char === ':' && !/[0-9]/.test(expression[i+1] || '')) {
                     // Variable reference. Names are letters, digits and
                     // underscores - deliberately no dash, because a dash is an
                     // operator and ":SUBTOTAL_1-50" has to be a subtraction
-                    // with nothing left to guess.
+                    // with nothing left to guess. A name never starts with a
+                    // digit, so in "Price:100" the ':' is just punctuation.
                     let j = i + 1;
                     let name = '';
                     while (j < expression.length && /[A-Za-z0-9_]/.test(expression[j])) {
