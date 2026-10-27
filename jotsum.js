@@ -801,7 +801,9 @@ function classify_line(text) {
         return { type: 'heading' };
     }
 
-    if (/^-{3,}$/.test(text)) {
+    // Whatever follows the dashes is a label only ("--- Rent", "--- 5").
+    // "---5" has no space, so it stays a value line.
+    if (/^-{3,}(\s|$)/.test(text)) {
         return { type: 'separator' };
     }
 
