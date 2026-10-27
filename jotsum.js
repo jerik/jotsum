@@ -500,12 +500,15 @@ class JoLine extends HTMLElement {
                 }
             } else {
                 if (char === ':' && /[0-9]/.test(expression[i-1] || '') && /[0-9]/.test(expression[i+1] || '')) {
-                    // A time like "10:30" is text: neither part is a number.
+                    // A time like "10:30" is text: no part of it is a number.
+                    // The whole time is consumed - seconds and their fraction
+                    // ("10:30:45.500") and a range glued on with a dash
+                    // ("10:30-11:30") - so no leftover '.500' or '-' turns
+                    // into an operand or a sign for the next number.
                     current_number = '';
                     escape_next_number = false;
-                    while (/[0-9]/.test(expression[i+1] || '')) {
-                        i++;
-                    }
+                    const time = /^\d+(?::\d+)*(?:\.\d+)?(?:-\d+(?::\d+)+(?:\.\d+)?)*/.exec(expression.slice(i + 1));
+                    i += time[0].length;
                     continue;
                 }
 

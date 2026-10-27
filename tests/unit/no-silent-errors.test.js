@@ -31,6 +31,20 @@ function testColon() {
         assert.strictEqual(sheet_total(lines), null, 'a time alone contributes no number');
     }
 
+    // The whole time is text, including seconds, their fraction and a range
+    // glued on with a dash - nothing of it may leak into the sum as a sign
+    // or an operand (cross-review of PR #35).
+    check_line('Termin 10:30-11:30 Kosten 50', 50);
+    check_line('10:30:45.500', 0);
+    check_line('Time 10:30:45 50', 50);
+    {
+        const lines = ['Termin 10:30-11:30 Kosten 50', 'Start 10:30:45.500'];
+        const result = evaluate_sheet(lines);
+        assert.deepStrictEqual(result.errors, [null, null]);
+        assert.strictEqual(result.total, 50);
+        assert.strictEqual(sheet_total(lines), '50');
+    }
+
     console.log('All colon tests passed!');
 }
 
