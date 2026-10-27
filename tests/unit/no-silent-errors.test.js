@@ -95,6 +95,16 @@ function testIncompleteExpressions() {
         assert(result.errors[3], 'Expected the use of :rate to be an error after the broken definition');
         assert.strictEqual(result.total, 170);
     }
+    {
+        // Lines from the cross-review of PR #35: the sidebar lost the valid 85
+        // because the deleted :rate was looked up after the whole sheet ran.
+        const lines = [':rate = 85', ':rate', ':rate = -'];
+        const result = evaluate_sheet(lines);
+        assert.strictEqual(result.errors[1], null);
+        assert(result.errors[2], 'Expected ":rate = -" to be an error');
+        assert.strictEqual(result.total, 85);
+        assert.strictEqual(sheet_total(lines), '85');
+    }
 
     // Text without numbers stays clean and 0.
     check_line('make-love-not-war', 0);

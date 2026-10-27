@@ -176,11 +176,8 @@ function round_for_display(num) {
 // number. Text, headings and error lines evaluate to 0 too, so a 0 alone
 // cannot tell an empty sheet from numbers that cancel out.
 function sheet_total(lines) {
-    const { total, types, errors, vars } = evaluate_sheet(lines);
-    const has_number = lines.some((line, i) => types[i] === 'value' && !errors[i] &&
-        JoLine.prototype.tokenize.call(JoLine.prototype, (line || '').trim(), { vars })
-            .some(token => typeof token === 'number'));
-    return has_number ? String(JoSheet.prototype.round.call(JoSheet.prototype, total)) : null;
+    const { total, counted } = evaluate_sheet(lines);
+    return counted.some(Boolean) ? String(JoSheet.prototype.round.call(JoSheet.prototype, total)) : null;
 }
 
 function list_shortsaves() {
@@ -820,6 +817,10 @@ function evaluate_sheet(lines) {
     const sums = new Array(lines.length);
     const types = new Array(lines.length);
     const errors = new Array(lines.length);
+    // Whether a value line added a number to the total. Decided here, with
+    // the variables as they are at this line: a later broken definition
+    // deletes the name, so looking it up after the loop would miss it.
+    const counted = new Array(lines.length).fill(false);
     let total = 0;
 
     for (let i = 0; i < lines.length; i++) {
@@ -865,11 +866,13 @@ function evaluate_sheet(lines) {
             if (isFinite(wert) && !report.error) {
                 total += wert;
                 context.block_sum += wert;
+                counted[i] = JoLine.prototype.tokenize.call(JoLine.prototype, text, context)
+                    .some(token => typeof token === 'number');
             }
         }
     }
 
-    return { sums, total, types, vars: context.vars, errors };
+    return { sums, total, types, vars: context.vars, errors, counted };
 }
 
 function add_calc_line(starter = '') {
