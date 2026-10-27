@@ -81,13 +81,23 @@ Workshop 4 * :rate       340
                         1360
 ```
 
-Variables are resolved in document order, so a definition has to come before its use. A name is made of letters, digits and underscores and cannot start with a digit, so `:1Test = 5` is not a definition. Names are case-sensitive: `:Auto = 5` does not define `:auto`, which produces "Unknown variable :auto" when used. A dash is always the operator, so `:SUBTOTAL_1-50` is a subtraction.
+Variables are resolved in document order, so a definition has to come before its use. A name starts with a letter or `_` and continues with letters, digits and `_`; it never contains a `-`. So `:1Test = 5` is not a definition. Names are case-sensitive: `:Auto = 5` does not define `:auto`, which produces "Unknown variable :auto" when used. A dash is always the operator, so in `:SUBTOTAL_1-50` the `-` is a subtraction.
+
+A `:` in front of a digit never starts a variable. With a digit directly before and directly after it, the `:` is part of a time, and a time is text:
+
+```
+Price:100                100
+Time 10:30                 0
+                         100
+```
+
+`Price:100` counts as 100. `Time 10:30` yields no number and no error; like any text it shows 0.
 
 ---
 
 ## Subtotals
 
-A line containing only `---` sums the line results since the previous `---` and stores that value as `:SUBTOTAL_1`, `:SUBTOTAL_2`, and so on.
+A separator line sums the line results since the previous separator, shows that subtotal, and stores it as `:SUBTOTAL_1`, `:SUBTOTAL_2`, and so on. A line is a separator when it starts with three or more `-` followed by a space or the end of the line.
 
 ```
 Design 12 * 85           1020
@@ -98,6 +108,18 @@ VAT :SUBTOTAL_1 * 0.19  678.30
 ```
 
 A subtotal only reads lines that are already part of the total, so it is not added a second time.
+
+Everything after the dashes is only a label:
+
+```
+Rent 800                  800
+--- Miete                 800
+Fee 20                     20
+--- 5                      20
+                          820
+```
+
+Both `--- Miete` and `--- 5` show the subtotal; the `5` counts nowhere. Without the space, `---5` is no separator but an ordinary line with a number.
 
 ---
 
@@ -112,6 +134,18 @@ Text alone is not an error: `apples` evaluates to 0 by design. A line is only fl
 | Unbalanced parentheses | `(2+3` |
 | Undefined variable | `12 * :rate` |
 | Division by zero | `10 / 0` |
+
+A line with an operator but no complete expression is an error too, for example `-`, `Lunch 12 + .` or `:rate = -`. It shows `?` and does not count towards the total. Text without numbers, like `make-love-not-war`, stays free of errors.
+
+A broken definition leaves no valid value behind, even if the variable had one before. Every line that uses the variable then shows `?` as well:
+
+```
+:rate = 85                85
+Before 2 * :rate         170
+:rate = -                  ?
+12 * :rate                 ?
+                         170
+```
 
 No hint is shown while the caret is in the line, since a half-typed line is broken more often than not. It appears once the line loses focus.
 
