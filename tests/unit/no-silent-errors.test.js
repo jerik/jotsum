@@ -216,9 +216,34 @@ function testSeparators() {
     console.log('All separator tests passed!');
 }
 
+function testOwnerDecisions() {
+    // Decided by the owner on the cross-review of PR #35 - the existing
+    // behaviour is correct. A time is text, but a minus before it or between
+    // two times stays an operator. A dot between spaces, at the start or
+    // right after a letter (end of sentence) is not counted; a dot with a
+    // digit before, after or both belongs to the number.
+    check_line('-10:30 kosten 50', -50);
+    check_line('fahrt 8:00 - 9:30 kosten 50', -50);
+    check_line('12 + . + 3', 15);
+    check_line('. + 3', 3);
+    check_line('12 + 3 das ist aber toll.', 15);
+    check_line('das ist 3 + .5', 3.5);
+    check_line('hier sind 6. * .5', 3);
+    {
+        const expression = 'nochmal 15.4 + .3 - 7.';
+        const report = {};
+        const result = new JoLine().calculate(expression, null, report);
+        assert.strictEqual(report.error, undefined, `Expected no error for ${JSON.stringify(expression)}`);
+        assert.strictEqual(Math.round(result * 100) / 100, 8.7, `Test failed for expression: ${JSON.stringify(expression)}. Expected 8.7, but got ${result}`);
+    }
+
+    console.log('All owner decision tests passed!');
+}
+
 testColon();
 testNameRule();
 testIncompleteExpressions();
 testZeroDisplay();
 testSigns();
 testSeparators();
+testOwnerDecisions();
