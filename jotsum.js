@@ -1,7 +1,8 @@
 // Resolve once per page so every storage path, including backups, stays isolated.
 const preview_objective = typeof window !== 'undefined' && window.location &&
-    /^\/jotsum\/preview\/(OBJ-\d+)\//.exec(window.location.pathname);
-const storage_namespace = preview_objective ? `jotsum.preview.${preview_objective[1]}.` : 'jotsum.';
+    /(?:^|\/)preview\/(.+?)\/(?:index\.html)?$/.exec(window.location.pathname);
+// Escape branch separators and dots so arbitrary branch names stay distinct.
+const storage_namespace = preview_objective ? `jotsum.preview.${encodeURIComponent(preview_objective[1]).replace(/\./g, '%2E')}.` : 'jotsum.';
 const SHEET_STORAGE_KEY = storage_namespace + 'sheet';
 const STORE_STORAGE_KEY = storage_namespace + 'sheets';
 const ACTIVE_STORAGE_KEY = storage_namespace + 'active';

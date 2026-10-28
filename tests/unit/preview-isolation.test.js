@@ -140,7 +140,27 @@ isolated('OBJ-8', () => {
     assert.ok(Object.entries(data).some(([key, value]) =>
         key.startsWith('jotsum.preview.OBJ-8.sheets.broken.') && value === '{unreadable'));
 });
-for (const path of ['/jotsum/', '/jotsum/preview/OBJ-5x/', '/elsewhere/preview/OBJ-5/']) {
+// pages.yml deploys the entire suffix of objective/** beneath preview/.
+// Include alternate Pages base paths and nested branch names from that rule.
+for (const [path, objective] of [
+    ['/jotsum/preview/OBJ-5-retry/', 'OBJ-5-retry'],
+    ['/jotsum/preview/obj-5/index.html', 'obj-5'],
+    ['/jotsum/preview/OBJ-5x/', 'OBJ-5x'],
+    ['/elsewhere/preview/OBJ-5/', 'OBJ-5'],
+    ['/preview/OBJ-5/', 'OBJ-5'],
+    ['/jotsum/preview/team/retry/index.html', 'team%2Fretry'],
+    ['/jotsum/preview/team.retry/', 'team%2Eretry']
+]) {
+    isolated(objective, () => {
+        const preview = page(path);
+        window.onload();
+        preview.sheet.querySelectorAll()[0].textContent = 'Branch 70';
+        preview.sheet.update_total();
+        assert.deepStrictEqual(preview.api.load_store().at(-1).lines, ['Branch 70']);
+        assert.ok(data[`jotsum.preview.${objective}.active`]);
+    });
+}
+for (const path of ['/jotsum/', '/', '/elsewhere/']) {
     const app = page(path);
     assert.strictEqual(app.api.STORE_STORAGE_KEY, 'jotsum.sheets');
     assert.strictEqual(app.api.SHEET_STORAGE_KEY, 'jotsum.sheet');
