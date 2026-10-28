@@ -172,3 +172,65 @@ for (const deleted of [false, true]) {
         assert.strictEqual(page.controls['remote-change-notice'].hidden, true);
     });
 }
+
+for (const deleted of [false, true]) {
+    for (const action of ['remote-change-close', 'remote-change-reload']) {
+        test(`failed local save then remote ${deleted ? 'deletion' : 'change'}: ${action}`, () => {
+            const { tab, page } = seeded();
+            const local = window.localStorage;
+            const setItem = local.setItem;
+            local.setItem = function (name, value) {
+                if (name === key) throw new Error('Quota exceeded');
+                setItem.call(this, name, value);
+            };
+            page.edit('Unsaved 77');
+            assert.deepStrictEqual(entries().find(entry => entry.id === 'A').lines, ['A 10']);
+            local.setItem = setItem;
+            remote(page, deleted);
+            assert.strictEqual(page.controls['remote-change-notice'].hidden, false);
+            assert.deepStrictEqual(page.texts(), ['Unsaved 77']);
+            assert.strictEqual(tab.getItem('jotsum.selected'), 'A');
+            const saved = local.getItem(key);
+            page.controls[action].handlers.click();
+            assert.strictEqual(page.controls['remote-change-notice'].hidden, true);
+            assert.strictEqual(local.getItem(key), saved);
+            if (action === 'remote-change-reload') {
+                assert.deepStrictEqual(page.texts(), deleted ? [''] : ['Remote 99']);
+                assert.strictEqual(tab.getItem('jotsum.selected'), deleted ? null : 'A');
+                page.sheet.update_total();
+                assert.strictEqual(local.getItem(key), saved);
+            } else {
+                assert.deepStrictEqual(page.texts(), ['Unsaved 77']);
+                assert.strictEqual(tab.getItem('jotsum.selected'), 'A');
+            }
+            page.edit('Continued 88');
+            const id = tab.getItem('jotsum.selected');
+            assert.strictEqual(id === 'A', action === 'remote-change-close' || !deleted);
+            assert.deepStrictEqual(entries().find(entry => entry.id === id).lines, ['Continued 88']);
+            assert.deepStrictEqual(entries().find(entry => entry.id === 'B').lines, ['B 20']);
+        });
+    }
+}
+
+for (const unreadable of ['invalid JSON', 'read failure']) {
+    test(`reload preserves edits and notice on ${unreadable}`, () => {
+        const { tab, page } = seeded();
+        remote(page, false);
+        const local = window.localStorage;
+        const getItem = local.getItem;
+        if (unreadable === 'invalid JSON') local.setItem(key, '{');
+        else local.getItem = function (name) {
+            if (name === key) throw new Error('Storage unavailable');
+            return getItem.call(this, name);
+        };
+        page.controls['remote-change-reload'].handlers.click();
+        assert.deepStrictEqual(page.texts(), ['A 10']);
+        assert.strictEqual(tab.getItem('jotsum.selected'), 'A');
+        assert.strictEqual(page.controls['remote-change-notice'].hidden, false);
+        local.getItem = getItem;
+        put([{ id: 'A', lines: ['Recovered 12'] }]);
+        page.controls['remote-change-reload'].handlers.click();
+        assert.deepStrictEqual(page.texts(), ['Recovered 12']);
+        assert.strictEqual(page.controls['remote-change-notice'].hidden, true);
+    });
+}

@@ -249,9 +249,24 @@ function show_remote_change_notice(deleted) {
 }
 
 function reload_remote_sheet() {
-    const entry = load_store().find(entry => entry.id === active_shortsave_id);
-    if (entry) open_shortsave(entry.id);
-    else new_sheet();
+    try {
+        // Reload explicitly abandons this sheet's failed local write. Read the
+        // persisted snapshot before dropping it, without overlaying mutations.
+        const entries = read_store() || [];
+        if (store_unreadable) return;
+        const entry = entries.find(entry => readable_entry(entry) && entry.id === active_shortsave_id);
+        pending_mutations.delete(active_shortsave_id);
+        store_pending = pending_mutations.size > 0;
+        store_invalid = entries.filter(entry => !readable_entry(entry));
+        store_memory = apply_pending_mutations(entries.filter(readable_entry));
+        if (entry) {
+            clear_text_url();
+            set_active_shortsave(entry.id);
+            render_sheet(entry.lines);
+        } else new_sheet();
+    } catch (error) {
+        // Keep the editor and notice when the saved snapshot cannot be read.
+    }
 }
 
 function init_remote_change_notice() {
