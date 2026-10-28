@@ -194,3 +194,28 @@ test('migration from a corrupt store retains its pending sheet until a successfu
     ]);
     assert.strictEqual(window.localStorage.getItem('jotsum.migrated'), '1');
 });
+
+for (const remote of ['deletion', 'write']) {
+    test(`focus and blur preserve a foreign ${remote} until a real edit`, () => {
+        const { tab, page } = seeded();
+        const foreign = remote === 'deletion'
+            ? [{ id: 'B', lines: ['B 20'] }]
+            : [{ id: 'A', lines: ['Remote A 99'] }, { id: 'B', lines: ['B 20'] }];
+        put(foreign);
+        const line = page.sheet.querySelectorAll()[0];
+        line.closest = () => page.sheet;
+        document.querySelectorAll = () => [];
+        accesses.length = 0;
+        line._onFocus();
+        line._onBlur();
+        // A navigation key also requests a total without changing the text.
+        page.sheet.update_total();
+        assert.deepStrictEqual(entries(), foreign);
+        assert.ok(!accesses.some(([area, op, name]) =>
+            area === 'local' && op === 'set' && name === key));
+        assert.deepStrictEqual(page.texts(), ['A 10']);
+        assert.strictEqual(tab.getItem('jotsum.selected'), 'A');
+        page.edit('Local A 12');
+        assert.deepStrictEqual(entries().find(entry => entry.id === 'A').lines, ['Local A 12']);
+    });
+}

@@ -20,6 +20,8 @@ let sheet_copy_inherited = false;
 // True for the whole of render_sheet, including its final total.
 let rendering_sheet = false;
 let active_shortsave_id = null;
+let last_editor_lines = null;
+let last_editor_sheet_id = null;
 // Undefined until read; stays authoritative in memory when sessionStorage is unavailable.
 let tab_selection;
 let restoring_sheet = false;
@@ -252,6 +254,14 @@ function set_active_shortsave(id) {
 
 function persist_shortsave(lines) {
     if (restoring_sheet) return;
+    // Focus, blur and navigation keys recalculate without editing. They must
+    // not overwrite a foreign save or resurrect a remotely deleted sheet.
+    const unchanged = last_editor_sheet_id === active_shortsave_id &&
+        same_lines(last_editor_lines, lines);
+    last_editor_lines = [...lines];
+    last_editor_sheet_id = active_shortsave_id;
+    const importing = rendering_sheet && !active_shortsave_id && lines.some(line => line.trim());
+    if (!importing && (rendering_sheet || unchanged) && !store_pending) return;
     const store = load_store();
     if (!active_shortsave_id && !lines.some(line => line.trim())) return;
     let entry = store.find(entry => entry.id === active_shortsave_id);
@@ -262,6 +272,7 @@ function persist_shortsave(lines) {
     } else {
         entry.lines = lines;
     }
+    last_editor_sheet_id = entry.id;
     save_store(store, entry.id);
 }
 
