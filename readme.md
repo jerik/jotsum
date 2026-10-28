@@ -15,21 +15,6 @@ The numbers are extracted, calculated as a line result, and all line results are
 
 Try it directly in your browser: **[jerik.github.io/jotsum](https://jerik.github.io/jotsum/)** — no account, no installation. The page can be saved for offline use.
 
-## Objective previews
-
-Each `objective/OBJ-<n>` branch is published at
-`https://jerik.github.io/jotsum/preview/OBJ-<n>/`.
-The main app at `/jotsum/` is still built from `master`. Each workflow run
-rebuilds all existing `objective/*` branches; deleted branches disappear from
-the previews on the next run. After merging, the owner must set
-**Settings → Pages → Source** to **GitHub Actions** for this workflow to publish.
-
-Each Objective preview has its own browser storage, separate from the main app
-and every other Objective. Sheets, tab selections, migration state and recovery
-copies stay within that preview. Two tabs of the same Objective share its saved
-sheets, with the tab behavior described below. Preview sheets do not appear in
-the main app or another Objective, and vice versa.
-
 ---
 
 ## At a glance
@@ -225,62 +210,6 @@ change or restore a deleted sheet. **Reload** abandons your current editor
 version, including any local edits that could not be saved. If the saved data
 cannot be read, the editor and notice remain in place. A successful save after
 continued typing dismisses the notice; a failed save leaves it visible.
-
-### Owner review in an Objective preview (KR8: open)
-
-KR8 remains **open until the owner explicitly confirms it**. Only the owner
-decides whether the notice and its actions are understandable and unobtrusive,
-and whether this documentation fits. Passing automated tests does not provide
-that confirmation.
-
-Use disposable sheets in the deployed Objective preview under review. Replace
-`OBJ-<n>` in `https://jerik.github.io/jotsum/preview/OBJ-<n>/` with its actual
-Objective ID. Use the same browser profile in both tabs so they share storage.
-Open tab B by entering the same URL in a fresh tab, without `?text=`, rather than
-using the browser's duplicate-tab command.
-
-1. In tab A, choose **New page** and type `Owner review 10`. In tab B, select
-   that sheet from **Saved sheets**. Both editors should show `Owner review 10`.
-   For the independent-selection check, choose **New page** in B and type
-   `Separate 20`: A must stay on `Owner review 10`. Reload both tabs and check
-   that each keeps its own selection. Then select `Owner review 10` again in B.
-2. **Foreign change → Reload:** In A, replace the line with `Remote 30`.
-   In B, check that the old text remains and a change notice appears. In A,
-   change it again to `Newest 40`. Click **Reload** in B: it must show
-   `Newest 40` and dismiss the notice. Type `After reload 50` in B; reload A
-   and check that the same sheet now contains `After reload 50`.
-3. **Foreign change → Dismiss → typing:** With both tabs on that sheet,
-   change A to `Foreign 60`. In B, click **Dismiss**: the notice disappears,
-   but B keeps `After reload 50`. Move the caret or focus away and back; reload
-   A to confirm that `Foreign 60` remains saved. Now change B to `Local 70`.
-   Reload A: the same sheet must contain `Local 70`.
-4. **Foreign deletion → Reload:** With B still on that sheet, delete it in
-   A's **Saved sheets** list and confirm deletion. B must retain `Local 70`
-   and show the deletion notice. Click **Reload** in B: an empty sheet must
-   open. Type `New after deletion 80`; it must appear as a new saved sheet,
-   while the deleted `Local 70` sheet stays absent.
-5. **Foreign deletion → Dismiss → typing:** Open `New after deletion 80`
-   in both tabs, then delete it in A. In B, click **Dismiss** and check that
-   its text stays visible. Focus or move the caret without editing: the sheet
-   must remain absent from A's list. Change B to `Restored 90`: the sheet must
-   reappear in A's list. Open it in A to confirm the restored text. This
-   restores the original sheet ID rather than creating a different sheet.
-6. Repeat a foreign change and a foreign deletion on disposable sheets, this
-   time typing in B while the notice is still open. Confirm the same overwrite
-   and restoration outcomes as after **Dismiss**, and that successful saving
-   hides the notice.
-7. Open the main app and, if available, a different Objective preview. Confirm
-   that the review sheets are absent there and their sheets are absent in the
-   reviewed preview. Do not clear all site data, which would also remove other
-   Objectives' and the main app's saved sheets.
-
-For explicit owner confirmation, review the sections **Objective previews**,
-**Working in multiple tabs**, **A notice about another tab**, and this checklist.
-Record the preview URL, the browser used, the results of the scenarios above,
-and whether the notice, both actions and the consequences of continued typing
-are clear and do not interfere with work. Confirm whether the README wording
-matches those observations. Until the owner explicitly accepts both the UI
-behavior and the documentation, KR8 stays open.
 
 ---
 
