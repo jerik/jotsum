@@ -105,8 +105,8 @@ for (const deleted of [false, true]) {
             remote(page, deleted);
             const notice = page.controls['remote-change-notice'];
             assert.strictEqual(notice.hidden, false);
-            assert.match(page.controls['remote-change-message'].textContent, /Neu laden/);
-            assert.match(page.controls['remote-change-message'].textContent, /weitertippst/);
+            assert.match(page.controls['remote-change-message'].textContent, /Reload/);
+            assert.match(page.controls['remote-change-message'].textContent, /keep typing/);
             assert.deepStrictEqual(page.texts(), ['A 10']);
             assert.strictEqual(tab.getItem('jotsum.selected'), 'A');
             page.sheet.update_total();

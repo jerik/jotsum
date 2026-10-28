@@ -246,8 +246,8 @@ function show_remote_change_notice(deleted) {
     const message = document.getElementById('remote-change-message');
     if (!notice || !message) return;
     message.textContent = deleted
-        ? 'Dieses Blatt wurde in einem anderen Tab gelöscht. „Neu laden“ öffnet ein neues, leeres Blatt. Wenn du weitertippst, wird dein Stand unter derselben Blatt-ID wiederhergestellt.'
-        : 'Dieses Blatt wurde in einem anderen Tab geändert. „Neu laden“ übernimmt den neuesten gespeicherten Stand. Wenn du weitertippst, überschreibt dein Stand die fremde Änderung.';
+        ? 'This sheet was deleted in another tab. Reload opens a new, empty sheet. If you keep typing, this sheet comes back with your text.'
+        : 'This sheet was changed in another tab. Reload shows the latest saved version. If you keep typing, your text replaces the other change.';
     notice.hidden = false;
 }
 
