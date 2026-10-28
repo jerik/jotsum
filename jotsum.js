@@ -10,6 +10,12 @@ const ACTIVE_STORAGE_KEY = storage_namespace + 'active';
 const MIGRATED_STORAGE_KEY = storage_namespace + 'migrated';
 // The open sheet belongs to the tab, so it lives in sessionStorage.
 const SELECTION_STORAGE_KEY = storage_namespace + 'selected';
+// Set while jotsum.sheet holds edits the store could not take (e.g. quota).
+// Loading a sheet then leaves that copy alone instead of overwriting it.
+const UNSYNCED_STORAGE_KEY = storage_namespace + 'unsynced';
+let sheet_copy_unsynced = false;
+// True for the whole of render_sheet, including its final total.
+let rendering_sheet = false;
 let active_shortsave_id = null;
 // Undefined until read; stays authoritative in memory when sessionStorage is unavailable.
 let tab_selection;
@@ -256,8 +262,20 @@ function list_shortsaves() {
     }));
 }
 
+function mark_sheet_copy_unsynced(unsynced) {
+    if (unsynced === sheet_copy_unsynced) return;
+    try {
+        if (unsynced) window.localStorage.setItem(UNSYNCED_STORAGE_KEY, '1');
+        else window.localStorage.removeItem(UNSYNCED_STORAGE_KEY);
+        sheet_copy_unsynced = unsynced;
+    } catch (error) {
+        // Retried with the next edit.
+    }
+}
+
 function render_sheet(lines) {
     const sheet = document.getElementById('sheet');
+    rendering_sheet = true;
     restoring_sheet = true;
     try {
         while (sheet.firstChild) sheet.removeChild(sheet.firstChild);
@@ -266,7 +284,11 @@ function render_sheet(lines) {
     } finally {
         restoring_sheet = false;
     }
-    sheet.update_total();
+    try {
+        sheet.update_total();
+    } finally {
+        rendering_sheet = false;
+    }
 }
 
 function new_sheet() {
@@ -387,6 +409,10 @@ class JoSheet extends HTMLElement {
             total_element.classList.remove('is-placeholder');
         }
         persist_shortsave(lines.map(line => line.textContent));
+        // Loading renders the store's content; while jotsum.sheet is ahead of
+        // the store, keep that newer copy instead of replacing it.
+        if (rendering_sheet && sheet_copy_unsynced) return;
+        if (!restoring_sheet) mark_sheet_copy_unsynced(store_pending);
         // Store content only, never the placeholder or calculated results.
         try {
             const saved_texts = lines.map(line => line.textContent);
@@ -987,6 +1013,11 @@ function handle_url_params() {
     store_invalid = [];
     store_backups = new Map();
     migration_pending = false;
+    try {
+        sheet_copy_unsynced = window.localStorage.getItem(UNSYNCED_STORAGE_KEY) !== null;
+    } catch (error) {
+        sheet_copy_unsynced = false;
+    }
     // The store decides what a selected sheet contains; without a selection
     // of its own, the tab starts with a new, empty sheet.
     const store = load_store();

@@ -168,6 +168,40 @@ test('a failed store write retries the migration without a second copy', (data) 
     assert.strictEqual(touched('jotsum.sheet', ['get']), 0);
 });
 
+test('a reload after a failed store write keeps the newer jotsum.sheet copy', (data) => {
+    data['jotsum.sheets'] = JSON.stringify([{ id: 'A', lines: ['A 10'] }]);
+    data['jotsum.migrated'] = '1';
+    const tab = storage('session');
+    tab.data['jotsum.selected'] = 'A';
+    const page = load(tab);
+    // The store hits its quota while the smaller jotsum.sheet still fits.
+    const set = window.localStorage.setItem;
+    window.localStorage.setItem = function (key, value) {
+        if (key === 'jotsum.sheets') throw new Error('QuotaExceededError');
+        return set.call(this, key, value);
+    };
+    try {
+        page.edit('A 30');
+    } finally {
+        window.localStorage.setItem = set;
+    }
+    assert.deepStrictEqual(JSON.parse(data['jotsum.sheet']), ['A 30']);
+    // The store stays authoritative for the reload, but must not overwrite
+    // the only copy of the newer text, in this tab or another.
+    const reloaded = load(tab);
+    assert.deepStrictEqual(reloaded.texts(), ['A 10']);
+    assert.deepStrictEqual(JSON.parse(data['jotsum.sheet']), ['A 30']);
+    reloaded.api.new_sheet();
+    load(storage('session'));
+    assert.deepStrictEqual(JSON.parse(data['jotsum.sheet']), ['A 30']);
+    assert.strictEqual(touched('jotsum.sheet', ['get']), 0);
+    // A deliberate edit that reaches the store mirrors the open content again.
+    const next = load(tab);
+    next.edit('Fresh 40');
+    assert.deepStrictEqual(JSON.parse(data['jotsum.sheet']), ['Fresh 40']);
+    assert.strictEqual(data['jotsum.unsynced'], undefined);
+});
+
 test('an Objective preview migrates its own legacy keys once', (data) => {
     data['jotsum.sheet'] = JSON.stringify(['App 10']);
     data['jotsum.preview.OBJ-5.sheet'] = JSON.stringify(['Preview 20']);
