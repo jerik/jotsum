@@ -212,16 +212,16 @@ version of that sheet. If it has been deleted, the tab opens an empty sheet.
 ### A notice about another tab
 
 When another tab changes or deletes your open sheet, a notice explains what
-happened without replacing your text. The buttons currently use German labels:
+happened without replacing your text:
 
 | Action | Sheet changed in another tab | Sheet deleted in another tab |
 | --- | --- | --- |
-| **Neu laden** (reload) | Replaces your editor text with the latest saved version, including saves made after the notice appeared. Further typing saves to that same sheet. | Opens a new empty sheet. Further typing creates a new saved sheet with a new ID. |
-| **Schließen** (close) | Hides the notice and keeps your text and selection. It does not save or accept the foreign version. | Hides the notice and keeps your text and its original sheet ID. It does not restore the deleted sheet by itself. |
+| **Reload** | Replaces your editor text with the latest saved version, including saves made after the notice appeared. Further typing saves to that same sheet. | Opens a new empty sheet. Further typing creates a new saved sheet with a new ID. |
+| **Dismiss** | Hides the notice and keeps your text and selection. It does not save or accept the foreign version. | Hides the notice and keeps your text and its original sheet ID. It does not restore the deleted sheet by itself. |
 | Continue typing, with the notice open or after closing it | Saves your current editor text over the foreign version of the same sheet. | Restores your current editor text as the same sheet under its original ID. |
 
 Merely focusing the editor or moving the caret does not overwrite a foreign
-change or restore a deleted sheet. **Neu laden** abandons your current editor
+change or restore a deleted sheet. **Reload** abandons your current editor
 version, including any local edits that could not be saved. If the saved data
 cannot be read, the editor and notice remain in place. A successful save after
 continued typing dismisses the notice; a failed save leaves it visible.
@@ -244,30 +244,30 @@ using the browser's duplicate-tab command.
    For the independent-selection check, choose **New page** in B and type
    `Separate 20`: A must stay on `Owner review 10`. Reload both tabs and check
    that each keeps its own selection. Then select `Owner review 10` again in B.
-2. **Foreign change → Neu laden:** In A, replace the line with `Remote 30`.
+2. **Foreign change → Reload:** In A, replace the line with `Remote 30`.
    In B, check that the old text remains and a change notice appears. In A,
-   change it again to `Newest 40`. Click **Neu laden** in B: it must show
+   change it again to `Newest 40`. Click **Reload** in B: it must show
    `Newest 40` and dismiss the notice. Type `After reload 50` in B; reload A
    and check that the same sheet now contains `After reload 50`.
-3. **Foreign change → Schließen → typing:** With both tabs on that sheet,
-   change A to `Foreign 60`. In B, click **Schließen**: the notice disappears,
+3. **Foreign change → Dismiss → typing:** With both tabs on that sheet,
+   change A to `Foreign 60`. In B, click **Dismiss**: the notice disappears,
    but B keeps `After reload 50`. Move the caret or focus away and back; reload
    A to confirm that `Foreign 60` remains saved. Now change B to `Local 70`.
    Reload A: the same sheet must contain `Local 70`.
-4. **Foreign deletion → Neu laden:** With B still on that sheet, delete it in
+4. **Foreign deletion → Reload:** With B still on that sheet, delete it in
    A's **Saved sheets** list and confirm deletion. B must retain `Local 70`
-   and show the deletion notice. Click **Neu laden** in B: an empty sheet must
+   and show the deletion notice. Click **Reload** in B: an empty sheet must
    open. Type `New after deletion 80`; it must appear as a new saved sheet,
    while the deleted `Local 70` sheet stays absent.
-5. **Foreign deletion → Schließen → typing:** Open `New after deletion 80`
-   in both tabs, then delete it in A. In B, click **Schließen** and check that
+5. **Foreign deletion → Dismiss → typing:** Open `New after deletion 80`
+   in both tabs, then delete it in A. In B, click **Dismiss** and check that
    its text stays visible. Focus or move the caret without editing: the sheet
    must remain absent from A's list. Change B to `Restored 90`: the sheet must
    reappear in A's list. Open it in A to confirm the restored text. This
    restores the original sheet ID rather than creating a different sheet.
 6. Repeat a foreign change and a foreign deletion on disposable sheets, this
    time typing in B while the notice is still open. Confirm the same overwrite
-   and restoration outcomes as after **Schließen**, and that successful saving
+   and restoration outcomes as after **Dismiss**, and that successful saving
    hides the notice.
 7. Open the main app and, if available, a different Objective preview. Confirm
    that the review sheets are absent there and their sheets are absent in the
