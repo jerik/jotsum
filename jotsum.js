@@ -1,6 +1,10 @@
-const SHEET_STORAGE_KEY = 'jotsum.sheet';
-const STORE_STORAGE_KEY = 'jotsum.sheets';
-const ACTIVE_STORAGE_KEY = 'jotsum.active';
+// Resolve once per page so every storage path, including backups, stays isolated.
+const preview_objective = typeof window !== 'undefined' && window.location &&
+    /^\/jotsum\/preview\/(OBJ-\d+)\//.exec(window.location.pathname);
+const storage_namespace = preview_objective ? `jotsum.preview.${preview_objective[1]}.` : 'jotsum.';
+const SHEET_STORAGE_KEY = storage_namespace + 'sheet';
+const STORE_STORAGE_KEY = storage_namespace + 'sheets';
+const ACTIVE_STORAGE_KEY = storage_namespace + 'active';
 let active_shortsave_id = null;
 let restoring_sheet = false;
 let sheet_id_sequence = 0;
