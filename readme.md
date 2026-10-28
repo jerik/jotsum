@@ -15,16 +15,6 @@ The numbers are extracted, calculated as a line result, and all line results are
 
 Try it directly in your browser: **[jerik.github.io/jotsum](https://jerik.github.io/jotsum/)** — no account, no installation. The page can be saved for offline use.
 
-## Vorschau
-
-Jeder Branch `objective/OBJ-<n>` wird unter
-`https://jerik.github.io/jotsum/preview/OBJ-<n>/` als Vorschau veröffentlicht.
-Die Hauptseite unter `/jotsum/` wird weiterhin aus `master` gebaut. Jeder
-Workflow-Lauf baut alle vorhandenen `objective/*`-Branches neu; gelöschte
-Branches verschwinden beim nächsten Lauf aus der Vorschau.
-Nach dem Merge muss der Owner unter **Settings → Pages → Source** auf
-**GitHub Actions** umstellen. Erst dann veröffentlicht dieser Workflow die Seite.
-
 ---
 
 ## At a glance
@@ -155,7 +145,7 @@ No hint is shown while the caret is in the line, since a half-typed line is brok
 
 **Paste.** Pasting multi-line text creates one line per row and evaluates all of them.
 
-**Saved sheets.** Every sheet is saved automatically in this browser and restored after a reload or reopening the page. Several sheets are kept side by side; see [Shortsaves](#shortsaves).
+**Saved sheets.** Sheets are saved automatically in this browser. A tab can restore its own selection after a reload when sessionStorage is available; a tab without its own selection starts empty after migration. Several sheets are kept side by side; see [Shortsaves](#shortsaves) and [Working in multiple tabs](#working-in-multiple-tabs).
 
 **URL.** `?text=...` opens the given text as a sheet of its own on load, with `%0A` as the line break. It becomes a new shortsave and does not overwrite any existing one; after a reload it is not imported again:
 
@@ -177,9 +167,49 @@ Every sheet is a shortsave. It is saved automatically on every change; there is 
 
 **Open and edit.** Tap or click an entry to open it. You keep editing it in place, and every change lands in the same shortsave.
 
-**Delete.** The delete icon next to an entry asks for confirmation (“Delete this sheet?”) and then removes it for good; there is no undo. Deleting the sheet that is open leaves an empty sheet.
+**Delete.** The delete icon next to an entry asks for confirmation (“Delete this sheet?”) and then removes the saved sheet; there is no undo button. Deleting the sheet that is open leaves an empty sheet. Another tab still displaying it can restore it by continuing to type; see [A notice about another tab](#a-notice-about-another-tab).
 
 **Only this browser.** Shortsaves live in the localStorage of this browser on this device. Nothing is synced, another browser or device does not see them, and clearing the site data deletes them. There is no export or import yet ([#7](https://github.com/jerik/jotsum/issues/7)).
+
+
+## Working in multiple tabs
+
+Each tab has its own sheet selection. Opening a saved sheet or choosing **New
+page** in one tab does not change what another tab has open. With available
+sessionStorage, that selection survives a reload in the same tab. If
+sessionStorage is unavailable, the selection falls back to memory for the
+current page only; it cannot be retained across a reload.
+
+The one-time migration preserves the old saved sheet and can select it in the
+tab performing the migration. After migration, a tab without its own valid
+selection starts with a new empty sheet, rather than taking another tab's
+selection. Existing saved sheets remain available in **Saved sheets**. A
+browser's duplicate-tab feature may copy sessionStorage, so a duplicated tab
+can initially have the same selection.
+
+There is no live synchronization of the open editor. The saved-sheet list can
+update when another tab saves, but your displayed text and selection stay as
+they are. Changes to different sheets are saved independently. If two tabs edit
+the same sheet, the last successful save wins for the whole sheet; their text
+is not merged. Reloading a tab with a retained selection reads the latest saved
+version of that sheet. If it has been deleted, the tab opens an empty sheet.
+
+### A notice about another tab
+
+When another tab changes or deletes your open sheet, a notice explains what
+happened without replacing your text:
+
+| Action | Sheet changed in another tab | Sheet deleted in another tab |
+| --- | --- | --- |
+| **Reload** | Replaces your editor text with the latest saved version, including saves made after the notice appeared. Further typing saves to that same sheet. | Opens a new empty sheet. Further typing creates a new saved sheet with a new ID. |
+| **Dismiss** | Hides the notice and keeps your text and selection. It does not save or accept the foreign version. | Hides the notice and keeps your text and its original sheet ID. It does not restore the deleted sheet by itself. |
+| Continue typing, with the notice open or after closing it | Saves your current editor text over the foreign version of the same sheet. | Restores your current editor text as the same sheet under its original ID. |
+
+Merely focusing the editor or moving the caret does not overwrite a foreign
+change or restore a deleted sheet. **Reload** abandons your current editor
+version, including any local edits that could not be saved. If the saved data
+cannot be read, the editor and notice remain in place. A successful save after
+continued typing dismisses the notice; a failed save leaves it visible.
 
 ---
 
