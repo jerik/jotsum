@@ -15,15 +15,20 @@ The numbers are extracted, calculated as a line result, and all line results are
 
 Try it directly in your browser: **[jerik.github.io/jotsum](https://jerik.github.io/jotsum/)** — no account, no installation. The page can be saved for offline use.
 
-## Vorschau
+## Objective previews
 
-Jeder Branch `objective/OBJ-<n>` wird unter
-`https://jerik.github.io/jotsum/preview/OBJ-<n>/` als Vorschau veröffentlicht.
-Die Hauptseite unter `/jotsum/` wird weiterhin aus `master` gebaut. Jeder
-Workflow-Lauf baut alle vorhandenen `objective/*`-Branches neu; gelöschte
-Branches verschwinden beim nächsten Lauf aus der Vorschau.
-Nach dem Merge muss der Owner unter **Settings → Pages → Source** auf
-**GitHub Actions** umstellen. Erst dann veröffentlicht dieser Workflow die Seite.
+Each `objective/OBJ-<n>` branch is published at
+`https://jerik.github.io/jotsum/preview/OBJ-<n>/`.
+The main app at `/jotsum/` is still built from `master`. Each workflow run
+rebuilds all existing `objective/*` branches; deleted branches disappear from
+the previews on the next run. After merging, the owner must set
+**Settings → Pages → Source** to **GitHub Actions** for this workflow to publish.
+
+Each Objective preview has its own browser storage, separate from the main app
+and every other Objective. Sheets, tab selections, migration state and recovery
+copies stay within that preview. Two tabs of the same Objective share its saved
+sheets, with the tab behavior described below. Preview sheets do not appear in
+the main app or another Objective, and vice versa.
 
 ---
 
@@ -155,7 +160,7 @@ No hint is shown while the caret is in the line, since a half-typed line is brok
 
 **Paste.** Pasting multi-line text creates one line per row and evaluates all of them.
 
-**Saved sheets.** Every sheet is saved automatically in this browser and restored after a reload or reopening the page. Several sheets are kept side by side; see [Shortsaves](#shortsaves).
+**Saved sheets.** Sheets are saved automatically in this browser. A tab can restore its own selection after a reload when sessionStorage is available; a tab without its own selection starts empty after migration. Several sheets are kept side by side; see [Shortsaves](#shortsaves) and [Working in multiple tabs](#working-in-multiple-tabs).
 
 **URL.** `?text=...` opens the given text as a sheet of its own on load, with `%0A` as the line break. It becomes a new shortsave and does not overwrite any existing one; after a reload it is not imported again:
 
@@ -177,9 +182,105 @@ Every sheet is a shortsave. It is saved automatically on every change; there is 
 
 **Open and edit.** Tap or click an entry to open it. You keep editing it in place, and every change lands in the same shortsave.
 
-**Delete.** The delete icon next to an entry asks for confirmation (“Delete this sheet?”) and then removes it for good; there is no undo. Deleting the sheet that is open leaves an empty sheet.
+**Delete.** The delete icon next to an entry asks for confirmation (“Delete this sheet?”) and then removes the saved sheet; there is no undo button. Deleting the sheet that is open leaves an empty sheet. Another tab still displaying it can restore it by continuing to type; see [A notice about another tab](#a-notice-about-another-tab).
 
 **Only this browser.** Shortsaves live in the localStorage of this browser on this device. Nothing is synced, another browser or device does not see them, and clearing the site data deletes them. There is no export or import yet ([#7](https://github.com/jerik/jotsum/issues/7)).
+
+
+## Working in multiple tabs
+
+Each tab has its own sheet selection. Opening a saved sheet or choosing **New
+page** in one tab does not change what another tab has open. With available
+sessionStorage, that selection survives a reload in the same tab. If
+sessionStorage is unavailable, the selection falls back to memory for the
+current page only; it cannot be retained across a reload.
+
+The one-time migration preserves the old saved sheet and can select it in the
+tab performing the migration. After migration, a tab without its own valid
+selection starts with a new empty sheet, rather than taking another tab's
+selection. Existing saved sheets remain available in **Saved sheets**. A
+browser's duplicate-tab feature may copy sessionStorage, so a duplicated tab
+can initially have the same selection.
+
+There is no live synchronization of the open editor. The saved-sheet list can
+update when another tab saves, but your displayed text and selection stay as
+they are. Changes to different sheets are saved independently. If two tabs edit
+the same sheet, the last successful save wins for the whole sheet; their text
+is not merged. Reloading a tab with a retained selection reads the latest saved
+version of that sheet. If it has been deleted, the tab opens an empty sheet.
+
+### A notice about another tab
+
+When another tab changes or deletes your open sheet, a notice explains what
+happened without replacing your text. The buttons currently use German labels:
+
+| Action | Sheet changed in another tab | Sheet deleted in another tab |
+| --- | --- | --- |
+| **Neu laden** (reload) | Replaces your editor text with the latest saved version, including saves made after the notice appeared. Further typing saves to that same sheet. | Opens a new empty sheet. Further typing creates a new saved sheet with a new ID. |
+| **Schließen** (close) | Hides the notice and keeps your text and selection. It does not save or accept the foreign version. | Hides the notice and keeps your text and its original sheet ID. It does not restore the deleted sheet by itself. |
+| Continue typing, with the notice open or after closing it | Saves your current editor text over the foreign version of the same sheet. | Restores your current editor text as the same sheet under its original ID. |
+
+Merely focusing the editor or moving the caret does not overwrite a foreign
+change or restore a deleted sheet. **Neu laden** abandons your current editor
+version, including any local edits that could not be saved. If the saved data
+cannot be read, the editor and notice remain in place. A successful save after
+continued typing dismisses the notice; a failed save leaves it visible.
+
+### Owner review in an Objective preview (KR8: open)
+
+KR8 remains **open until the owner explicitly confirms it**. Only the owner
+decides whether the notice and its actions are understandable and unobtrusive,
+and whether this documentation fits. Passing automated tests does not provide
+that confirmation.
+
+Use disposable sheets in the deployed Objective preview under review. Replace
+`OBJ-<n>` in `https://jerik.github.io/jotsum/preview/OBJ-<n>/` with its actual
+Objective ID. Use the same browser profile in both tabs so they share storage.
+Open tab B by entering the same URL in a fresh tab, without `?text=`, rather than
+using the browser's duplicate-tab command.
+
+1. In tab A, choose **New page** and type `Owner review 10`. In tab B, select
+   that sheet from **Saved sheets**. Both editors should show `Owner review 10`.
+   For the independent-selection check, choose **New page** in B and type
+   `Separate 20`: A must stay on `Owner review 10`. Reload both tabs and check
+   that each keeps its own selection. Then select `Owner review 10` again in B.
+2. **Foreign change → Neu laden:** In A, replace the line with `Remote 30`.
+   In B, check that the old text remains and a change notice appears. In A,
+   change it again to `Newest 40`. Click **Neu laden** in B: it must show
+   `Newest 40` and dismiss the notice. Type `After reload 50` in B; reload A
+   and check that the same sheet now contains `After reload 50`.
+3. **Foreign change → Schließen → typing:** With both tabs on that sheet,
+   change A to `Foreign 60`. In B, click **Schließen**: the notice disappears,
+   but B keeps `After reload 50`. Move the caret or focus away and back; reload
+   A to confirm that `Foreign 60` remains saved. Now change B to `Local 70`.
+   Reload A: the same sheet must contain `Local 70`.
+4. **Foreign deletion → Neu laden:** With B still on that sheet, delete it in
+   A's **Saved sheets** list and confirm deletion. B must retain `Local 70`
+   and show the deletion notice. Click **Neu laden** in B: an empty sheet must
+   open. Type `New after deletion 80`; it must appear as a new saved sheet,
+   while the deleted `Local 70` sheet stays absent.
+5. **Foreign deletion → Schließen → typing:** Open `New after deletion 80`
+   in both tabs, then delete it in A. In B, click **Schließen** and check that
+   its text stays visible. Focus or move the caret without editing: the sheet
+   must remain absent from A's list. Change B to `Restored 90`: the sheet must
+   reappear in A's list. Open it in A to confirm the restored text. This
+   restores the original sheet ID rather than creating a different sheet.
+6. Repeat a foreign change and a foreign deletion on disposable sheets, this
+   time typing in B while the notice is still open. Confirm the same overwrite
+   and restoration outcomes as after **Schließen**, and that successful saving
+   hides the notice.
+7. Open the main app and, if available, a different Objective preview. Confirm
+   that the review sheets are absent there and their sheets are absent in the
+   reviewed preview. Do not clear all site data, which would also remove other
+   Objectives' and the main app's saved sheets.
+
+For explicit owner confirmation, review the sections **Objective previews**,
+**Working in multiple tabs**, **A notice about another tab**, and this checklist.
+Record the preview URL, the browser used, the results of the scenarios above,
+and whether the notice, both actions and the consequences of continued typing
+are clear and do not interfere with work. Confirm whether the README wording
+matches those observations. Until the owner explicitly accepts both the UI
+behavior and the documentation, KR8 stays open.
 
 ---
 
