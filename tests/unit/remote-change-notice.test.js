@@ -234,3 +234,54 @@ for (const unreadable of ['invalid JSON', 'read failure']) {
         assert.strictEqual(page.controls['remote-change-notice'].hidden, true);
     });
 }
+
+// A failed write must not become the baseline for later storage events.
+test('failed save followed by an unrelated remote edit keeps the notice hidden', () => {
+    const { tab, page } = seeded();
+    const local = window.localStorage;
+    const setItem = local.setItem;
+    local.setItem = function (name, value) {
+        if (name === key) throw new Error('Quota exceeded');
+        setItem.call(this, name, value);
+    };
+    page.edit('Unsaved 77');
+    local.setItem = setItem;
+    put([{ id: 'A', lines: ['A 10'] }, { id: 'B', lines: ['Remote B 90'] }]);
+    listeners.storage({ key, storageArea: local });
+    assert.strictEqual(page.controls['remote-change-notice'].hidden, true);
+    assert.deepStrictEqual(page.texts(), ['Unsaved 77']);
+    assert.strictEqual(tab.getItem('jotsum.selected'), 'A');
+    assert.deepStrictEqual(entries().find(entry => entry.id === 'A').lines, ['A 10']);
+    page.edit('Retry 88');
+    assert.deepStrictEqual(entries().find(entry => entry.id === 'A').lines, ['Retry 88']);
+    assert.deepStrictEqual(entries().find(entry => entry.id === 'B').lines, ['Remote B 90']);
+});
+
+for (const deleted of [false, true]) {
+    test(`failed overwrite keeps the remote ${deleted ? 'deletion' : 'change'} notice until saved`, () => {
+        const { tab, page } = seeded();
+        remote(page, deleted);
+        const local = window.localStorage;
+        const saved = local.getItem(key);
+        const setItem = local.setItem;
+        local.setItem = function (name, value) {
+            if (name === key) throw new Error('Quota exceeded');
+            setItem.call(this, name, value);
+        };
+        page.edit('Unsaved overwrite 77');
+        assert.strictEqual(page.controls['remote-change-notice'].hidden, false);
+        assert.strictEqual(local.getItem(key), saved);
+        assert.deepStrictEqual(page.texts(), ['Unsaved overwrite 77']);
+        assert.strictEqual(tab.getItem('jotsum.selected'), 'A');
+        // Repeated events for the same persisted snapshot change nothing.
+        listeners.storage({ key, storageArea: local });
+        assert.strictEqual(page.controls['remote-change-notice'].hidden, false);
+        local.setItem = setItem;
+        page.edit('Successful overwrite 88');
+        assert.strictEqual(page.controls['remote-change-notice'].hidden, true);
+        assert.deepStrictEqual(entries().find(entry => entry.id === 'A').lines, ['Successful overwrite 88']);
+        assert.strictEqual(tab.getItem('jotsum.selected'), 'A');
+        listeners.storage({ key, storageArea: local });
+        assert.strictEqual(page.controls['remote-change-notice'].hidden, true);
+    });
+}

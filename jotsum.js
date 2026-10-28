@@ -181,6 +181,7 @@ function apply_pending_mutations(entries) {
 }
 
 function save_store(store, sheet_id) {
+    let saved = false;
     const ids = sheet_id === undefined ? store.map(entry => entry.id) : [sheet_id];
     for (const id of ids) {
         const entry = store.find(entry => entry.id === id);
@@ -200,6 +201,7 @@ function save_store(store, sheet_id) {
             store_backups.delete(raw);
         }
         window.localStorage.setItem(STORE_STORAGE_KEY, JSON.stringify([...store_memory, ...store_invalid]));
+        saved = true;
         pending_mutations.clear();
         store_pending = false;
         if (migration_pending) write_migration_marker();
@@ -207,6 +209,7 @@ function save_store(store, sheet_id) {
         // Retry on the next save, including any backup that still needs writing.
     }
     notify_shortsaves();
+    return saved;
 }
 
 function handle_store_change(event) {
@@ -324,14 +327,15 @@ function persist_shortsave(lines) {
     if (!entry) {
         entry = { id: active_shortsave_id || new_sheet_id(), lines };
         store.push(entry);
-        set_active_shortsave(entry.id);
+        if (active_shortsave_id !== entry.id) set_active_shortsave(entry.id);
     } else {
         entry.lines = lines;
     }
     last_editor_sheet_id = entry.id;
-    save_store(store, entry.id);
-    observed_remote_lines = [...lines];
-    close_remote_change_notice();
+    if (save_store(store, entry.id)) {
+        observed_remote_lines = [...lines];
+        close_remote_change_notice();
+    }
 }
 
 // Two decimals for display. Anything that rounds to zero is shown as 0:
