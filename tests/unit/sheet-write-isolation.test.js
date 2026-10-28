@@ -138,3 +138,59 @@ test('the final mutation read preserves a write after the initial read', () => {
     }
     assert.deepStrictEqual(entries(), [{ id: 'A', lines: ['A 12'] }, { id: 'D', lines: ['Late 55'] }]);
 });
+
+test('failed mutations on multiple sheets retry without reviving foreign deletions', () => {
+    const { page } = seeded();
+    const set = window.localStorage.setItem;
+    window.localStorage.setItem = function(name, value) {
+        if (name === key) throw new Error('Full');
+        return set.call(this, name, value);
+    };
+    page.api.save_store([{ id: 'A', lines: ['Pending A 11'] }], 'A');
+    page.api.save_store([], 'B');
+    assert.deepStrictEqual(page.api.load_store(), [
+        { id: 'A', lines: ['Pending A 11'] }, { id: 'C', lines: ['C 30'] }
+    ]);
+    window.localStorage.setItem = set;
+    put([{ id: 'A', lines: ['A 10'] }, { id: 'B', lines: ['B 20'] }, { id: 'D', lines: ['Remote 40'] }]);
+    page.api.save_store([{ id: 'E', lines: ['New 50'] }], 'E');
+    assert.deepStrictEqual(entries(), [
+        { id: 'A', lines: ['Pending A 11'] }, { id: 'D', lines: ['Remote 40'] },
+        { id: 'E', lines: ['New 50'] }
+    ]);
+    assert.deepStrictEqual(page.api.load_store(), entries());
+});
+
+test('corrupt store preserves known sheets through reads and the next write', () => {
+    const { page } = seeded();
+    window.localStorage.setItem(key, '{broken');
+    assert.deepStrictEqual(page.api.load_store().map(entry => entry.id), ['A', 'B', 'C']);
+    page.edit('A 12');
+    assert.deepStrictEqual(entries(), [
+        { id: 'A', lines: ['A 12'] }, { id: 'B', lines: ['B 20'] }, { id: 'C', lines: ['C 30'] }
+    ]);
+    assert.ok(Object.entries(window.localStorage.data).some(([name, value]) =>
+        name.startsWith(key + '.broken.') && value === '{broken'));
+});
+
+test('migration from a corrupt store retains its pending sheet until a successful write', () => {
+    window.localStorage.setItem(key, '{broken');
+    window.localStorage.setItem('jotsum.sheet', JSON.stringify(['Legacy 10']));
+    const set = window.localStorage.setItem;
+    window.localStorage.setItem = function(name, value) {
+        if (name === key) throw new Error('Full');
+        return set.call(this, name, value);
+    };
+    const page = load(storage('session'));
+    window.localStorage.setItem = set;
+    const migrated = page.api.load_store().find(entry => entry.lines[0] === 'Legacy 10');
+    assert.ok(migrated);
+    assert.strictEqual(window.localStorage.getItem('jotsum.migrated'), null);
+    // A readable foreign store arriving before retry must keep both sheets.
+    put([{ id: 'remote', lines: ['Remote 20'] }]);
+    page.api.save_store([{ id: 'new', lines: ['New 30'] }], 'new');
+    assert.deepStrictEqual(entries(), [
+        { id: 'remote', lines: ['Remote 20'] }, migrated, { id: 'new', lines: ['New 30'] }
+    ]);
+    assert.strictEqual(window.localStorage.getItem('jotsum.migrated'), '1');
+});

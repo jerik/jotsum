@@ -43,7 +43,7 @@ function new_sheet_id() {
 // Keep unreadable entries verbatim and retain failed writes in memory.
 let store_memory = [];
 let store_pending = false;
-let pending_sheet_ids = new Set();
+let pending_mutations = new Map();
 let store_initialized = false;
 let store_invalid = [];
 let store_backups = new Map();
@@ -78,17 +78,12 @@ function read_store() {
 function load_store() {
     try {
         const entries = read_store();
-        store_invalid = (entries || []).filter(entry => !readable_entry(entry));
-        const fresh = (entries || []).filter(readable_entry);
-        // Retain only the failed mutation, never a stale snapshot of other sheets.
-        if (store_pending) {
-            for (const entry of store_memory.filter(entry => pending_sheet_ids.has(entry.id))) {
-                const index = fresh.findIndex(other => other.id === entry.id);
-                if (index < 0) fresh.push(entry);
-                else fresh[index] = entry;
-            }
+        // Corrupt JSON is not evidence that the previously readable sheets vanished.
+        if (!store_unreadable) {
+            store_invalid = (entries || []).filter(entry => !readable_entry(entry));
+            store_memory = (entries || []).filter(readable_entry);
         }
-        store_memory = fresh;
+        store_memory = apply_pending_mutations(store_memory);
         if (!store_initialized) {
             store_initialized = true;
             migrate_legacy_sheet();
@@ -138,7 +133,10 @@ function migrate_legacy_sheet(select = true) {
     // The marker follows the store write, so a failed write retries the migration.
     migration_pending = true;
     if (!copied) write_migration_marker();
-    else if (store_unreadable) store_pending = true;
+    else if (store_unreadable) {
+        pending_mutations.set(match.id, match);
+        store_pending = true;
+    }
     else save_store(store_memory, match.id);
 }
 
@@ -166,28 +164,40 @@ function notify_shortsaves() {
     }
 }
 
+// A null replacement records a deletion even though no entry remains in memory.
+function apply_pending_mutations(entries) {
+    const merged = entries.slice();
+    for (const [id, replacement] of pending_mutations) {
+        const index = merged.findIndex(entry => entry.id === id);
+        if (replacement) {
+            if (index < 0) merged.push(replacement);
+            else merged[index] = replacement;
+        } else if (index >= 0) merged.splice(index, 1);
+    }
+    return merged;
+}
+
 function save_store(store, sheet_id) {
-    store_memory = store.map(entry => ({ ...entry, lines: [...entry.lines] }));
+    const ids = sheet_id === undefined ? store.map(entry => entry.id) : [sheet_id];
+    for (const id of ids) {
+        const entry = store.find(entry => entry.id === id);
+        pending_mutations.set(id, entry ? { ...entry, lines: [...entry.lines] } : null);
+    }
     store_pending = true;
-    pending_sheet_ids = new Set(sheet_id === undefined ? store.map(entry => entry.id) : [sheet_id]);
+    store_memory = sheet_id === undefined ? store.map(entry => ({ ...entry, lines: [...entry.lines] })) : apply_pending_mutations(store_memory);
     try {
         // Check again: another tab may have replaced the value since our read.
         const entries = read_store();
-        if (entries !== null) store_invalid = entries.filter(entry => !readable_entry(entry));
-        if (sheet_id !== undefined) {
-            const replacement = store_memory.find(entry => entry.id === sheet_id);
-            store_memory = (entries || []).filter(readable_entry);
-            const index = store_memory.findIndex(entry => entry.id === sheet_id);
-            if (replacement) {
-                if (index < 0) store_memory.push(replacement);
-                else store_memory[index] = replacement;
-            } else if (index >= 0) store_memory.splice(index, 1);
+        if (!store_unreadable) {
+            store_invalid = (entries || []).filter(entry => !readable_entry(entry));
+            if (sheet_id !== undefined) store_memory = apply_pending_mutations((entries || []).filter(readable_entry));
         }
         for (const [raw, key] of store_backups) {
             window.localStorage.setItem(key, raw);
             store_backups.delete(raw);
         }
         window.localStorage.setItem(STORE_STORAGE_KEY, JSON.stringify([...store_memory, ...store_invalid]));
+        pending_mutations.clear();
         store_pending = false;
         if (migration_pending) write_migration_marker();
     } catch (error) {
@@ -201,7 +211,7 @@ function handle_store_change(event) {
     if (event.storageArea && event.storageArea !== window.localStorage) return;
     try {
         const entries = read_store() || [];
-        store_invalid = entries.filter(entry => !readable_entry(entry));
+        if (!store_unreadable) store_invalid = entries.filter(entry => !readable_entry(entry));
         // Storage events refresh the sidebar, never the open editor or selection.
         notify_shortsaves();
     } catch (error) {
@@ -1049,7 +1059,7 @@ function handle_url_params() {
 
     store_memory = [];
     store_pending = false;
-    pending_sheet_ids = new Set();
+    pending_mutations = new Map();
     store_initialized = false;
     store_invalid = [];
     store_backups = new Map();
