@@ -22,6 +22,7 @@ let rendering_sheet = false;
 let active_shortsave_id = null;
 let last_editor_lines = null;
 let last_editor_sheet_id = null;
+let observed_remote_lines = null;
 // Undefined until read; stays authoritative in memory when sessionStorage is unavailable.
 let tab_selection;
 let restoring_sheet = false;
@@ -180,6 +181,7 @@ function apply_pending_mutations(entries) {
 }
 
 function save_store(store, sheet_id) {
+    let saved = false;
     const ids = sheet_id === undefined ? store.map(entry => entry.id) : [sheet_id];
     for (const id of ids) {
         const entry = store.find(entry => entry.id === id);
@@ -199,6 +201,7 @@ function save_store(store, sheet_id) {
             store_backups.delete(raw);
         }
         window.localStorage.setItem(STORE_STORAGE_KEY, JSON.stringify([...store_memory, ...store_invalid]));
+        saved = true;
         pending_mutations.clear();
         store_pending = false;
         if (migration_pending) write_migration_marker();
@@ -206,6 +209,7 @@ function save_store(store, sheet_id) {
         // Retry on the next save, including any backup that still needs writing.
     }
     notify_shortsaves();
+    return saved;
 }
 
 function handle_store_change(event) {
@@ -213,12 +217,66 @@ function handle_store_change(event) {
     if (event.storageArea && event.storageArea !== window.localStorage) return;
     try {
         const entries = read_store() || [];
-        if (!store_unreadable) store_invalid = entries.filter(entry => !readable_entry(entry));
+        if (!store_unreadable) {
+            store_invalid = entries.filter(entry => !readable_entry(entry));
+            if (active_shortsave_id) {
+                const entry = entries.find(entry => readable_entry(entry) && entry.id === active_shortsave_id);
+                const lines = entry ? entry.lines : null;
+                if (!same_lines(observed_remote_lines, lines)) {
+                    observed_remote_lines = lines && [...lines];
+                    show_remote_change_notice(!entry);
+                }
+            }
+        }
         // Storage events refresh the sidebar, never the open editor or selection.
         notify_shortsaves();
     } catch (error) {
         // An unavailable store must not discard edits in this tab.
     }
+}
+
+// The notice never changes editor content or the tab's sheet association.
+function close_remote_change_notice() {
+    const notice = document.getElementById('remote-change-notice');
+    if (notice) notice.hidden = true;
+}
+
+function show_remote_change_notice(deleted) {
+    const notice = document.getElementById('remote-change-notice');
+    const message = document.getElementById('remote-change-message');
+    if (!notice || !message) return;
+    message.textContent = deleted
+        ? 'Dieses Blatt wurde in einem anderen Tab gelöscht. „Neu laden“ öffnet ein neues, leeres Blatt. Wenn du weitertippst, wird dein Stand unter derselben Blatt-ID wiederhergestellt.'
+        : 'Dieses Blatt wurde in einem anderen Tab geändert. „Neu laden“ übernimmt den neuesten gespeicherten Stand. Wenn du weitertippst, überschreibt dein Stand die fremde Änderung.';
+    notice.hidden = false;
+}
+
+function reload_remote_sheet() {
+    try {
+        // Reload explicitly abandons this sheet's failed local write. Read the
+        // persisted snapshot before dropping it, without overlaying mutations.
+        const entries = read_store() || [];
+        if (store_unreadable) return;
+        const entry = entries.find(entry => readable_entry(entry) && entry.id === active_shortsave_id);
+        pending_mutations.delete(active_shortsave_id);
+        store_pending = pending_mutations.size > 0;
+        store_invalid = entries.filter(entry => !readable_entry(entry));
+        store_memory = apply_pending_mutations(entries.filter(readable_entry));
+        if (entry) {
+            clear_text_url();
+            set_active_shortsave(entry.id);
+            render_sheet(entry.lines);
+        } else new_sheet();
+    } catch (error) {
+        // Keep the editor and notice when the saved snapshot cannot be read.
+    }
+}
+
+function init_remote_change_notice() {
+    const reload = document.getElementById('remote-change-reload');
+    const close = document.getElementById('remote-change-close');
+    if (reload && typeof reload.addEventListener === 'function') reload.addEventListener('click', reload_remote_sheet);
+    if (close && typeof close.addEventListener === 'function') close.addEventListener('click', close_remote_change_notice);
 }
 
 function read_tab_selection() {
@@ -232,6 +290,7 @@ function read_tab_selection() {
 }
 
 function set_active_shortsave(id) {
+    close_remote_change_notice();
     active_shortsave_id = id;
     tab_selection = id;
     try {
@@ -268,12 +327,15 @@ function persist_shortsave(lines) {
     if (!entry) {
         entry = { id: active_shortsave_id || new_sheet_id(), lines };
         store.push(entry);
-        set_active_shortsave(entry.id);
+        if (active_shortsave_id !== entry.id) set_active_shortsave(entry.id);
     } else {
         entry.lines = lines;
     }
     last_editor_sheet_id = entry.id;
-    save_store(store, entry.id);
+    if (save_store(store, entry.id)) {
+        observed_remote_lines = [...lines];
+        close_remote_change_notice();
+    }
 }
 
 // Two decimals for display. Anything that rounds to zero is shown as 0:
@@ -331,6 +393,7 @@ function backup_sheet_copy() {
 }
 
 function render_sheet(lines) {
+    observed_remote_lines = active_shortsave_id ? [...lines] : null;
     const sheet = document.getElementById('sheet');
     rendering_sheet = true;
     restoring_sheet = true;
@@ -1286,6 +1349,7 @@ if (typeof window !== 'undefined') {
     }
     window.onload = function () {
         handle_url_params();
+        init_remote_change_notice();
         try {
             init_sidebar();
         } catch (error) {
