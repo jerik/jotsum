@@ -27,6 +27,9 @@
 - 12 /month oder 12 GB/month -> hier wird / nicht als operattor erkannt. wenn / gefolgt von buchstaben oder
   umrundet von buchstabn ist, dann ist es kein operattor, gilt auch für die anderen operattoren. Nur wenn zahlen
   oder :VAR folgen oder umrundet sind, dann wird es als operattor genutzt
+- escape charackter ' sollte  nicht nur bei zahlen gelten, sondern auch ebi den rechenoperatoren '/ oder '+ ...,
+  auch bei ':var?? 
+- two-tabs reload/dismiss meldung schöner. modal? damit eine entscheidung getroffen werden muss
 
 ## build
 `index.html` wird von `generate-single-html.sh` aus `jotsum.html` + `jotsum.js` erzeugt und von der
