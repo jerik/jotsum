@@ -6,7 +6,22 @@ const storage_namespace = preview_objective ? `jotsum.preview.${encodeURICompone
 const SHEET_STORAGE_KEY = storage_namespace + 'sheet';
 const STORE_STORAGE_KEY = storage_namespace + 'sheets';
 const ACTIVE_STORAGE_KEY = storage_namespace + 'active';
+// Set once the legacy keys above have been migrated; they are never read again.
+const MIGRATED_STORAGE_KEY = storage_namespace + 'migrated';
+// The open sheet belongs to the tab, so it lives in sessionStorage.
+const SELECTION_STORAGE_KEY = storage_namespace + 'selected';
+// Set while jotsum.sheet holds edits the store could not take (e.g. quota).
+// Loading a sheet then leaves that copy alone instead of overwriting it.
+const UNSYNCED_STORAGE_KEY = storage_namespace + 'unsynced';
+let sheet_copy_unsynced = false;
+// True when the marker was already set at page load: jotsum.sheet then holds
+// text this tab never showed, and it is backed up before being replaced.
+let sheet_copy_inherited = false;
+// True for the whole of render_sheet, including its final total.
+let rendering_sheet = false;
 let active_shortsave_id = null;
+// Undefined until read; stays authoritative in memory when sessionStorage is unavailable.
+let tab_selection;
 let restoring_sheet = false;
 let sheet_id_sequence = 0;
 
@@ -31,7 +46,10 @@ let store_pending = false;
 let store_initialized = false;
 let store_invalid = [];
 let store_backups = new Map();
-let migrated_shortsave_id = null;
+let store_unreadable = false;
+let migration_pending = false;
+// True while the migration could not read the legacy keys.
+let legacy_unread = false;
 
 function readable_entry(entry) {
     return entry && typeof entry.id === 'string' && Array.isArray(entry.lines) &&
@@ -39,6 +57,7 @@ function readable_entry(entry) {
 }
 
 function read_store() {
+    store_unreadable = false;
     const raw = window.localStorage.getItem(STORE_STORAGE_KEY);
     if (raw === null) return null;
     try {
@@ -47,6 +66,7 @@ function read_store() {
     } catch (error) {
         // Preserve the original text before replacing an unreadable store.
     }
+    store_unreadable = true;
     if (!store_backups.has(raw)) {
         store_backups.set(raw, STORE_STORAGE_KEY + '.broken.' + new Date().toISOString() + '.' + new_sheet_id());
         console.warn('Unreadable shortsave store; preserving a backup.');
@@ -73,22 +93,73 @@ function load_store() {
         store_memory = merge_pending(entries || []);
         if (!store_initialized) {
             store_initialized = true;
-            if (entries === null) {
-                let legacy = null;
-                try { legacy = JSON.parse(window.localStorage.getItem(SHEET_STORAGE_KEY)); } catch (error) {}
-                if (Array.isArray(legacy) && legacy.every(line => typeof line === 'string') &&
-                    legacy.some(line => line.trim())) {
-                    const entry = { id: new_sheet_id(), lines: legacy };
-                    migrated_shortsave_id = entry.id;
-                    store_memory.push(entry);
-                }
-                save_store(store_memory);
-            }
+            migrate_legacy_sheet();
         }
     } catch (error) {
         // Reads can fail independently of writes. Keep the current sheet usable.
     }
     return store_memory.map(entry => ({ ...entry, lines: [...entry.lines] }));
+}
+
+function same_lines(a, b) {
+    return JSON.stringify(a) === JSON.stringify(b);
+}
+
+// One-time transition from the single-sheet keys. Afterwards neither legacy key
+// is read again, so stale legacy data can neither copy nor restore a sheet.
+// A failed read leaves the migration open: no marker is written, and
+// jotsum.sheet is not touched until a retry has read it (see update_total).
+// Only the first attempt during page load picks the sheet to open.
+function migrate_legacy_sheet(select = true) {
+    legacy_unread = true;
+    if (window.localStorage.getItem(MIGRATED_STORAGE_KEY) !== null) {
+        legacy_unread = false;
+        return;
+    }
+    const raw = window.localStorage.getItem(SHEET_STORAGE_KEY);
+    const legacy_active = select ? window.localStorage.getItem(ACTIVE_STORAGE_KEY) : null;
+    legacy_unread = false;
+    let legacy = null;
+    try { legacy = JSON.parse(raw); } catch (error) {}
+    let match = null;
+    let copied = false;
+    if (Array.isArray(legacy) && legacy.every(line => typeof line === 'string') &&
+        legacy.some(line => line.trim())) {
+        match = store_memory.find(entry => same_lines(entry.lines, legacy));
+        if (!match) {
+            match = { id: new_sheet_id(), lines: legacy };
+            store_memory.push(match);
+            copied = true;
+        }
+    }
+    if (select) {
+        if (!match) match = store_memory.find(entry => entry.id === legacy_active);
+        const own = read_tab_selection();
+        if (match && !store_memory.some(entry => entry.id === own)) set_active_shortsave(match.id);
+    }
+    // The marker follows the store write, so a failed write retries the migration.
+    migration_pending = true;
+    if (!copied) write_migration_marker();
+    else if (store_unreadable) store_pending = true;
+    else save_store(store_memory);
+}
+
+function retry_legacy_migration() {
+    try {
+        load_store();
+        migrate_legacy_sheet(false);
+    } catch (error) {
+        // Still unreadable; jotsum.sheet stays as it is.
+    }
+}
+
+function write_migration_marker() {
+    try {
+        window.localStorage.setItem(MIGRATED_STORAGE_KEY, '1');
+        migration_pending = false;
+    } catch (error) {
+        // Retried after the next successful store write.
+    }
 }
 
 function notify_shortsaves() {
@@ -110,6 +181,7 @@ function save_store(store) {
         }
         window.localStorage.setItem(STORE_STORAGE_KEY, JSON.stringify([...store_memory, ...store_invalid]));
         store_pending = false;
+        if (migration_pending) write_migration_marker();
     } catch (error) {
         // Retry on the next save, including any backup that still needs writing.
     }
@@ -141,13 +213,34 @@ function handle_store_change(event) {
     }
 }
 
+function read_tab_selection() {
+    if (tab_selection !== undefined) return tab_selection;
+    try {
+        tab_selection = window.sessionStorage ? window.sessionStorage.getItem(SELECTION_STORAGE_KEY) : null;
+    } catch (error) {
+        tab_selection = null;
+    }
+    return tab_selection;
+}
+
 function set_active_shortsave(id) {
     active_shortsave_id = id;
+    tab_selection = id;
+    try {
+        if (id) window.sessionStorage.setItem(SELECTION_STORAGE_KEY, id);
+        else window.sessionStorage.removeItem(SELECTION_STORAGE_KEY);
+    } catch (error) {
+        // Keep the in-memory selection when sessionStorage is unavailable.
+    }
+    // Objective previews still mirror the selection: the preview isolation test
+    // asserts this key. It is never read after the migration. The app's own
+    // jotsum.active is never written.
+    if (!preview_objective) return;
     try {
         if (id) window.localStorage.setItem(ACTIVE_STORAGE_KEY, id);
         else window.localStorage.removeItem(ACTIVE_STORAGE_KEY);
     } catch (error) {
-        // Keep the in-memory association when storage is unavailable.
+        // The mirror is informational only.
     }
 }
 
@@ -193,8 +286,36 @@ function list_shortsaves() {
     }));
 }
 
+function mark_sheet_copy_unsynced(unsynced) {
+    if (unsynced === sheet_copy_unsynced) return;
+    try {
+        if (unsynced) window.localStorage.setItem(UNSYNCED_STORAGE_KEY, '1');
+        else window.localStorage.removeItem(UNSYNCED_STORAGE_KEY);
+        sheet_copy_unsynced = unsynced;
+    } catch (error) {
+        // Retried with the next edit.
+    }
+}
+
+// Moves the newer jotsum.sheet text a reload did not show to a backup key,
+// so the open content can be written without losing it. False if that failed.
+function backup_sheet_copy() {
+    try {
+        const raw = window.localStorage.getItem(SHEET_STORAGE_KEY);
+        if (raw !== null) {
+            window.localStorage.setItem(SHEET_STORAGE_KEY + '.unsynced.' + new Date().toISOString() + '.' + new_sheet_id(), raw);
+            console.warn('jotsum.sheet held text the store never received; preserving a backup.');
+        }
+        sheet_copy_inherited = false;
+        return true;
+    } catch (error) {
+        return false;
+    }
+}
+
 function render_sheet(lines) {
     const sheet = document.getElementById('sheet');
+    rendering_sheet = true;
     restoring_sheet = true;
     try {
         while (sheet.firstChild) sheet.removeChild(sheet.firstChild);
@@ -203,7 +324,11 @@ function render_sheet(lines) {
     } finally {
         restoring_sheet = false;
     }
-    sheet.update_total();
+    try {
+        sheet.update_total();
+    } finally {
+        rendering_sheet = false;
+    }
 }
 
 function new_sheet() {
@@ -324,6 +449,14 @@ class JoSheet extends HTMLElement {
             total_element.classList.remove('is-placeholder');
         }
         persist_shortsave(lines.map(line => line.textContent));
+        // Loading renders the store's content; while jotsum.sheet is ahead of
+        // the store, keep that newer copy instead of replacing it.
+        if (rendering_sheet && sheet_copy_unsynced) return;
+        // Text the migration could not read yet must not be replaced.
+        if (legacy_unread) retry_legacy_migration();
+        if (legacy_unread) return;
+        if (sheet_copy_inherited && !backup_sheet_copy()) return;
+        if (!restoring_sheet) mark_sheet_copy_unsynced(store_pending);
         // Store content only, never the placeholder or calculated results.
         try {
             const saved_texts = lines.map(line => line.textContent);
@@ -923,37 +1056,30 @@ function handle_url_params() {
     store_initialized = false;
     store_invalid = [];
     store_backups = new Map();
-    migrated_shortsave_id = null;
-    const store = load_store();
-    let stored_active = null;
+    migration_pending = false;
+    legacy_unread = false;
     try {
-        stored_active = window.localStorage.getItem(ACTIVE_STORAGE_KEY);
+        sheet_copy_unsynced = window.localStorage.getItem(UNSYNCED_STORAGE_KEY) !== null;
     } catch (error) {
-        // Loading still works without persistent storage.
+        sheet_copy_unsynced = false;
     }
-    set_active_shortsave(store.some(entry => entry.id === stored_active) ? stored_active : null);
-    let lines = null;
+    sheet_copy_inherited = sheet_copy_unsynced;
+    // The store decides what a selected sheet contains; without a selection
+    // of its own, the tab starts with a new, empty sheet.
+    const store = load_store();
+    const selected = store.find(entry => entry.id === read_tab_selection());
+    let lines = [];
     if (url_params.has('text')) {
         set_active_shortsave(null);
         // URLSearchParams already decodes the value, including literal % signs.
         lines = text_param.split('\n');
+    } else if (selected) {
+        set_active_shortsave(selected.id);
+        lines = selected.lines;
     } else {
-        try {
-            const saved = JSON.parse(window.localStorage.getItem(SHEET_STORAGE_KEY));
-            if (Array.isArray(saved) && saved.every(line => typeof line === 'string')) {
-                lines = saved;
-            }
-        } catch (error) {
-            // Ignore unavailable storage and malformed saved data.
-        }
+        set_active_shortsave(null);
     }
-
-    if (!url_params.has('text') && !active_shortsave_id && lines) {
-        const migrated = store.find(entry => entry.id === migrated_shortsave_id) ||
-            store.find(entry => JSON.stringify(entry.lines) === JSON.stringify(lines));
-        if (migrated) set_active_shortsave(migrated.id);
-    }
-    render_sheet(lines || []);
+    render_sheet(lines);
     // Once imported, reload the saved association rather than importing again.
     if (url_params.has('text')) clear_text_url();
 }

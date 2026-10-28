@@ -1,7 +1,7 @@
 {
   "scripts": {
     "test": "npx playwright test",
-    "test:unit": "node -r ./tests/unit/mock.js tests/unit/calculator.test.js && node -r ./tests/unit/mock.js tests/unit/sheet.test.js && node -r ./tests/unit/mock.js tests/unit/persistence.test.js && node -r ./tests/unit/mock.js tests/unit/shortsave.test.js && node -r ./tests/unit/mock.js tests/unit/store-safety.test.js && node -r ./tests/unit/mock.js tests/unit/url-import.test.js && node -r ./tests/unit/mock.js tests/unit/no-silent-errors.test.js && node -r ./tests/unit/mock.js tests/unit/preview-isolation.test.js"
+    "test:unit": "node -r ./tests/unit/mock.js tests/unit/calculator.test.js && node -r ./tests/unit/mock.js tests/unit/sheet.test.js && node -r ./tests/unit/mock.js tests/unit/persistence.test.js && node -r ./tests/unit/mock.js tests/unit/shortsave.test.js && node -r ./tests/unit/mock.js tests/unit/store-safety.test.js && node -r ./tests/unit/mock.js tests/unit/url-import.test.js && node -r ./tests/unit/mock.js tests/unit/no-silent-errors.test.js && node -r ./tests/unit/mock.js tests/unit/preview-isolation.test.js && node -r ./tests/unit/mock.js tests/unit/tab-selection.test.js && node -r ./tests/unit/mock.js tests/unit/legacy-sheet-migration.test.js"
   },
   "devDependencies": {
     "@playwright/test": "^1.49.1",
