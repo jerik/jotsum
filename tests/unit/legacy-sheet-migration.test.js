@@ -202,6 +202,61 @@ test('a reload after a failed store write keeps the newer jotsum.sheet copy', (d
     assert.strictEqual(data['jotsum.unsynced'], undefined);
 });
 
+test('a focus change after the reload backs up the newer jotsum.sheet copy first', (data) => {
+    data['jotsum.sheets'] = JSON.stringify([{ id: 'A', lines: ['A 10'] }]);
+    data['jotsum.migrated'] = '1';
+    // State left behind by a store write that failed while jotsum.sheet took the edit.
+    data['jotsum.sheet'] = JSON.stringify(['A 30']);
+    data['jotsum.unsynced'] = '1';
+    const tab = storage('session');
+    tab.data['jotsum.selected'] = 'A';
+    const backups = () => Object.keys(data).filter(key => key.startsWith('jotsum.sheet.unsynced.'));
+    // While the backup cannot be written, jotsum.sheet is not replaced.
+    const page = load(tab);
+    const set = window.localStorage.setItem;
+    window.localStorage.setItem = () => { throw new Error('QuotaExceededError'); };
+    try {
+        page.sheet.update_total();
+    } finally {
+        window.localStorage.setItem = set;
+    }
+    assert.deepStrictEqual(JSON.parse(data['jotsum.sheet']), ['A 30']);
+    assert.deepStrictEqual(backups(), []);
+    // Blur and focus run update_total without an edit.
+    page.sheet.update_total();
+    assert.strictEqual(backups().length, 1);
+    assert.deepStrictEqual(JSON.parse(data[backups()[0]]), ['A 30']);
+    assert.deepStrictEqual(JSON.parse(data['jotsum.sheet']), ['A 10']);
+    assert.strictEqual(data['jotsum.unsynced'], undefined);
+    page.sheet.update_total();
+    assert.strictEqual(backups().length, 1);
+});
+
+test('an unreadable jotsum.sheet leaves the migration open and the text in place', (data) => {
+    data['jotsum.sheets'] = JSON.stringify([{ id: 'A', lines: ['A 10'] }]);
+    data['jotsum.sheet'] = JSON.stringify(['Unsaved 5']);
+    const get = window.localStorage.getItem;
+    window.localStorage.getItem = function (key) {
+        if (key === 'jotsum.sheet') throw new Error('SecurityError');
+        return get.call(this, key);
+    };
+    let page;
+    try {
+        page = load();
+        page.sheet.update_total();
+    } finally {
+        window.localStorage.getItem = get;
+    }
+    assert.strictEqual(data['jotsum.migrated'], undefined);
+    assert.deepStrictEqual(JSON.parse(data['jotsum.sheet']), ['Unsaved 5']);
+    // Once readable, the next write migrates the text before replacing it.
+    page.edit('New 7');
+    assert.deepStrictEqual(page.lines(), [['A 10'], ['New 7'], ['Unsaved 5']]);
+    assert.deepStrictEqual(JSON.parse(data['jotsum.sheet']), ['New 7']);
+    assert.strictEqual(data['jotsum.migrated'], '1');
+    assert.deepStrictEqual(load().lines(), [['A 10'], ['New 7'], ['Unsaved 5']]);
+});
+
 test('an Objective preview migrates its own legacy keys once', (data) => {
     data['jotsum.sheet'] = JSON.stringify(['App 10']);
     data['jotsum.preview.OBJ-5.sheet'] = JSON.stringify(['Preview 20']);
