@@ -6,7 +6,13 @@ const storage_namespace = preview_objective ? `jotsum.preview.${encodeURICompone
 const SHEET_STORAGE_KEY = storage_namespace + 'sheet';
 const STORE_STORAGE_KEY = storage_namespace + 'sheets';
 const ACTIVE_STORAGE_KEY = storage_namespace + 'active';
+// Set once the legacy keys above have been migrated; they are never read again.
+const MIGRATED_STORAGE_KEY = storage_namespace + 'migrated';
+// The open sheet belongs to the tab, so it lives in sessionStorage.
+const SELECTION_STORAGE_KEY = storage_namespace + 'selected';
 let active_shortsave_id = null;
+// Undefined until read; stays authoritative in memory when sessionStorage is unavailable.
+let tab_selection;
 let restoring_sheet = false;
 let sheet_id_sequence = 0;
 
@@ -31,7 +37,8 @@ let store_pending = false;
 let store_initialized = false;
 let store_invalid = [];
 let store_backups = new Map();
-let migrated_shortsave_id = null;
+let store_unreadable = false;
+let migration_pending = false;
 
 function readable_entry(entry) {
     return entry && typeof entry.id === 'string' && Array.isArray(entry.lines) &&
@@ -39,6 +46,7 @@ function readable_entry(entry) {
 }
 
 function read_store() {
+    store_unreadable = false;
     const raw = window.localStorage.getItem(STORE_STORAGE_KEY);
     if (raw === null) return null;
     try {
@@ -47,6 +55,7 @@ function read_store() {
     } catch (error) {
         // Preserve the original text before replacing an unreadable store.
     }
+    store_unreadable = true;
     if (!store_backups.has(raw)) {
         store_backups.set(raw, STORE_STORAGE_KEY + '.broken.' + new Date().toISOString() + '.' + new_sheet_id());
         console.warn('Unreadable shortsave store; preserving a backup.');
@@ -73,22 +82,54 @@ function load_store() {
         store_memory = merge_pending(entries || []);
         if (!store_initialized) {
             store_initialized = true;
-            if (entries === null) {
-                let legacy = null;
-                try { legacy = JSON.parse(window.localStorage.getItem(SHEET_STORAGE_KEY)); } catch (error) {}
-                if (Array.isArray(legacy) && legacy.every(line => typeof line === 'string') &&
-                    legacy.some(line => line.trim())) {
-                    const entry = { id: new_sheet_id(), lines: legacy };
-                    migrated_shortsave_id = entry.id;
-                    store_memory.push(entry);
-                }
-                save_store(store_memory);
-            }
+            migrate_legacy_sheet();
         }
     } catch (error) {
         // Reads can fail independently of writes. Keep the current sheet usable.
     }
     return store_memory.map(entry => ({ ...entry, lines: [...entry.lines] }));
+}
+
+function same_lines(a, b) {
+    return JSON.stringify(a) === JSON.stringify(b);
+}
+
+// One-time transition from the single-sheet keys. Afterwards neither legacy key
+// is read again, so stale legacy data can neither copy nor restore a sheet.
+function migrate_legacy_sheet() {
+    if (window.localStorage.getItem(MIGRATED_STORAGE_KEY) !== null) return;
+    let legacy = null;
+    let legacy_active = null;
+    try { legacy = JSON.parse(window.localStorage.getItem(SHEET_STORAGE_KEY)); } catch (error) {}
+    try { legacy_active = window.localStorage.getItem(ACTIVE_STORAGE_KEY); } catch (error) {}
+    let match = null;
+    let copied = false;
+    if (Array.isArray(legacy) && legacy.every(line => typeof line === 'string') &&
+        legacy.some(line => line.trim())) {
+        match = store_memory.find(entry => same_lines(entry.lines, legacy));
+        if (!match) {
+            match = { id: new_sheet_id(), lines: legacy };
+            store_memory.push(match);
+            copied = true;
+        }
+    }
+    if (!match) match = store_memory.find(entry => entry.id === legacy_active);
+    const own = read_tab_selection();
+    if (match && !store_memory.some(entry => entry.id === own)) set_active_shortsave(match.id);
+    // The marker follows the store write, so a failed write retries the migration.
+    migration_pending = true;
+    if (!copied) write_migration_marker();
+    else if (store_unreadable) store_pending = true;
+    else save_store(store_memory);
+}
+
+function write_migration_marker() {
+    try {
+        window.localStorage.setItem(MIGRATED_STORAGE_KEY, '1');
+        migration_pending = false;
+    } catch (error) {
+        // Retried after the next successful store write.
+    }
 }
 
 function notify_shortsaves() {
@@ -110,6 +151,7 @@ function save_store(store) {
         }
         window.localStorage.setItem(STORE_STORAGE_KEY, JSON.stringify([...store_memory, ...store_invalid]));
         store_pending = false;
+        if (migration_pending) write_migration_marker();
     } catch (error) {
         // Retry on the next save, including any backup that still needs writing.
     }
@@ -141,13 +183,34 @@ function handle_store_change(event) {
     }
 }
 
+function read_tab_selection() {
+    if (tab_selection !== undefined) return tab_selection;
+    try {
+        tab_selection = window.sessionStorage ? window.sessionStorage.getItem(SELECTION_STORAGE_KEY) : null;
+    } catch (error) {
+        tab_selection = null;
+    }
+    return tab_selection;
+}
+
 function set_active_shortsave(id) {
     active_shortsave_id = id;
+    tab_selection = id;
+    try {
+        if (id) window.sessionStorage.setItem(SELECTION_STORAGE_KEY, id);
+        else window.sessionStorage.removeItem(SELECTION_STORAGE_KEY);
+    } catch (error) {
+        // Keep the in-memory selection when sessionStorage is unavailable.
+    }
+    // Objective previews still mirror the selection: the preview isolation test
+    // asserts this key. It is never read after the migration. The app's own
+    // jotsum.active is never written.
+    if (!preview_objective) return;
     try {
         if (id) window.localStorage.setItem(ACTIVE_STORAGE_KEY, id);
         else window.localStorage.removeItem(ACTIVE_STORAGE_KEY);
     } catch (error) {
-        // Keep the in-memory association when storage is unavailable.
+        // The mirror is informational only.
     }
 }
 
@@ -923,37 +986,23 @@ function handle_url_params() {
     store_initialized = false;
     store_invalid = [];
     store_backups = new Map();
-    migrated_shortsave_id = null;
+    migration_pending = false;
+    // The store decides what a selected sheet contains; without a selection
+    // of its own, the tab starts with a new, empty sheet.
     const store = load_store();
-    let stored_active = null;
-    try {
-        stored_active = window.localStorage.getItem(ACTIVE_STORAGE_KEY);
-    } catch (error) {
-        // Loading still works without persistent storage.
-    }
-    set_active_shortsave(store.some(entry => entry.id === stored_active) ? stored_active : null);
-    let lines = null;
+    const selected = store.find(entry => entry.id === read_tab_selection());
+    let lines = [];
     if (url_params.has('text')) {
         set_active_shortsave(null);
         // URLSearchParams already decodes the value, including literal % signs.
         lines = text_param.split('\n');
+    } else if (selected) {
+        set_active_shortsave(selected.id);
+        lines = selected.lines;
     } else {
-        try {
-            const saved = JSON.parse(window.localStorage.getItem(SHEET_STORAGE_KEY));
-            if (Array.isArray(saved) && saved.every(line => typeof line === 'string')) {
-                lines = saved;
-            }
-        } catch (error) {
-            // Ignore unavailable storage and malformed saved data.
-        }
+        set_active_shortsave(null);
     }
-
-    if (!url_params.has('text') && !active_shortsave_id && lines) {
-        const migrated = store.find(entry => entry.id === migrated_shortsave_id) ||
-            store.find(entry => JSON.stringify(entry.lines) === JSON.stringify(lines));
-        if (migrated) set_active_shortsave(migrated.id);
-    }
-    render_sheet(lines || []);
+    render_sheet(lines);
     // Once imported, reload the saved association rather than importing again.
     if (url_params.has('text')) clear_text_url();
 }
