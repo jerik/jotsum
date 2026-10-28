@@ -20,6 +20,8 @@ let sheet_copy_inherited = false;
 // True for the whole of render_sheet, including its final total.
 let rendering_sheet = false;
 let active_shortsave_id = null;
+let last_editor_lines = null;
+let last_editor_sheet_id = null;
 // Undefined until read; stays authoritative in memory when sessionStorage is unavailable.
 let tab_selection;
 let restoring_sheet = false;
@@ -43,6 +45,7 @@ function new_sheet_id() {
 // Keep unreadable entries verbatim and retain failed writes in memory.
 let store_memory = [];
 let store_pending = false;
+let pending_mutations = new Map();
 let store_initialized = false;
 let store_invalid = [];
 let store_backups = new Map();
@@ -74,23 +77,15 @@ function read_store() {
     return [];
 }
 
-function merge_pending(entries) {
-    const merged = entries.filter(readable_entry);
-    if (store_pending) {
-        for (const entry of store_memory) {
-            const index = merged.findIndex(other => other.id === entry.id);
-            if (index < 0) merged.push(entry);
-            else merged[index] = entry;
-        }
-    }
-    return merged;
-}
-
 function load_store() {
     try {
         const entries = read_store();
-        store_invalid = (entries || []).filter(entry => !readable_entry(entry));
-        store_memory = merge_pending(entries || []);
+        // Corrupt JSON is not evidence that the previously readable sheets vanished.
+        if (!store_unreadable) {
+            store_invalid = (entries || []).filter(entry => !readable_entry(entry));
+            store_memory = (entries || []).filter(readable_entry);
+        }
+        store_memory = apply_pending_mutations(store_memory);
         if (!store_initialized) {
             store_initialized = true;
             migrate_legacy_sheet();
@@ -140,8 +135,11 @@ function migrate_legacy_sheet(select = true) {
     // The marker follows the store write, so a failed write retries the migration.
     migration_pending = true;
     if (!copied) write_migration_marker();
-    else if (store_unreadable) store_pending = true;
-    else save_store(store_memory);
+    else if (store_unreadable) {
+        pending_mutations.set(match.id, match);
+        store_pending = true;
+    }
+    else save_store(store_memory, match.id);
 }
 
 function retry_legacy_migration() {
@@ -168,18 +166,40 @@ function notify_shortsaves() {
     }
 }
 
-function save_store(store) {
-    store_memory = store.map(entry => ({ ...entry, lines: [...entry.lines] }));
+// A null replacement records a deletion even though no entry remains in memory.
+function apply_pending_mutations(entries) {
+    const merged = entries.slice();
+    for (const [id, replacement] of pending_mutations) {
+        const index = merged.findIndex(entry => entry.id === id);
+        if (replacement) {
+            if (index < 0) merged.push(replacement);
+            else merged[index] = replacement;
+        } else if (index >= 0) merged.splice(index, 1);
+    }
+    return merged;
+}
+
+function save_store(store, sheet_id) {
+    const ids = sheet_id === undefined ? store.map(entry => entry.id) : [sheet_id];
+    for (const id of ids) {
+        const entry = store.find(entry => entry.id === id);
+        pending_mutations.set(id, entry ? { ...entry, lines: [...entry.lines] } : null);
+    }
     store_pending = true;
+    store_memory = sheet_id === undefined ? store.map(entry => ({ ...entry, lines: [...entry.lines] })) : apply_pending_mutations(store_memory);
     try {
         // Check again: another tab may have replaced the value since our read.
         const entries = read_store();
-        if (entries !== null) store_invalid = entries.filter(entry => !readable_entry(entry));
+        if (!store_unreadable) {
+            store_invalid = (entries || []).filter(entry => !readable_entry(entry));
+            if (sheet_id !== undefined) store_memory = apply_pending_mutations((entries || []).filter(readable_entry));
+        }
         for (const [raw, key] of store_backups) {
             window.localStorage.setItem(key, raw);
             store_backups.delete(raw);
         }
         window.localStorage.setItem(STORE_STORAGE_KEY, JSON.stringify([...store_memory, ...store_invalid]));
+        pending_mutations.clear();
         store_pending = false;
         if (migration_pending) write_migration_marker();
     } catch (error) {
@@ -193,20 +213,8 @@ function handle_store_change(event) {
     if (event.storageArea && event.storageArea !== window.localStorage) return;
     try {
         const entries = read_store() || [];
-        const active = store_memory.find(entry => entry.id === active_shortsave_id);
-        const previously_saved = event.oldValue ? JSON.parse(event.oldValue) : [];
-        const deleted = Array.isArray(previously_saved) &&
-            previously_saved.some(entry => readable_entry(entry) && entry.id === active_shortsave_id) &&
-            !entries.some(entry => readable_entry(entry) && entry.id === active_shortsave_id);
-        store_invalid = entries.filter(entry => !readable_entry(entry));
-        store_memory = entries.filter(readable_entry);
-        if (deleted) {
-            store_pending = false;
-            new_sheet();
-        } else if (active && store_pending) {
-            store_memory = store_memory.filter(entry => entry.id !== active.id);
-            store_memory.push(active);
-        }
+        if (!store_unreadable) store_invalid = entries.filter(entry => !readable_entry(entry));
+        // Storage events refresh the sidebar, never the open editor or selection.
         notify_shortsaves();
     } catch (error) {
         // An unavailable store must not discard edits in this tab.
@@ -246,17 +254,26 @@ function set_active_shortsave(id) {
 
 function persist_shortsave(lines) {
     if (restoring_sheet) return;
+    // Focus, blur and navigation keys recalculate without editing. They must
+    // not overwrite a foreign save or resurrect a remotely deleted sheet.
+    const unchanged = last_editor_sheet_id === active_shortsave_id &&
+        same_lines(last_editor_lines, lines);
+    last_editor_lines = [...lines];
+    last_editor_sheet_id = active_shortsave_id;
+    const importing = rendering_sheet && !active_shortsave_id && lines.some(line => line.trim());
+    if (!importing && (rendering_sheet || unchanged) && !store_pending) return;
     const store = load_store();
     if (!active_shortsave_id && !lines.some(line => line.trim())) return;
     let entry = store.find(entry => entry.id === active_shortsave_id);
     if (!entry) {
-        entry = { id: new_sheet_id(), lines };
+        entry = { id: active_shortsave_id || new_sheet_id(), lines };
         store.push(entry);
         set_active_shortsave(entry.id);
     } else {
         entry.lines = lines;
     }
-    save_store(store);
+    last_editor_sheet_id = entry.id;
+    save_store(store, entry.id);
 }
 
 // Two decimals for display. Anything that rounds to zero is shown as 0:
@@ -348,7 +365,7 @@ function delete_shortsave(id) {
     const store = load_store();
     if (!store.some(entry => entry.id === id) || !window.confirm('Delete this sheet?')) return;
     if (active_shortsave_id === id) new_sheet();
-    save_store(store.filter(entry => entry.id !== id));
+    save_store([], id);
 }
 
 function clear_text_url() {
@@ -1053,6 +1070,7 @@ function handle_url_params() {
 
     store_memory = [];
     store_pending = false;
+    pending_mutations = new Map();
     store_initialized = false;
     store_invalid = [];
     store_backups = new Map();
