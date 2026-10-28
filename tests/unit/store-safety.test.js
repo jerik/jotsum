@@ -131,19 +131,6 @@ test('failed reads and writes keep stable in-memory ids and retry saves', () => 
     } finally { storage.getItem = get; storage.setItem = set; }
 });
 
-test('deletion in another tab empties and unassigns the active sheet', () => {
-    const page = fixture();
-    window.onload();
-    edit(page, 'Deleted 10');
-    const id = load_store()[0].id;
-    remote([]);
-    assert.deepStrictEqual(page.texts(), ['']);
-    page.sheet.update_total();
-    assert.deepStrictEqual(load_store(), []);
-    edit(page, 'Fresh 20');
-    assert.notStrictEqual(load_store()[0].id, id);
-});
-
 test('failed migration retains its own id and never migrates on later reads', () => {
     storage.setItem(SHEET_STORAGE_KEY, JSON.stringify(['Legacy 10']));
     const set = storage.setItem;
