@@ -39,3 +39,10 @@ global.window = {
     }
 };
 global.add_calc_line = () => {};
+
+// Browser storage and URL globals for fragment-sharing tests.
+window.sessionStorage = {
+    ...window.localStorage,
+    data: {}
+};
+window.navigator = { clipboard: { writeText: async () => {} } };

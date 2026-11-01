@@ -416,6 +416,9 @@
         <nav id="header-actions" class="actions">
           <!--a class="btn" href="https://github.com/jerik/jotsum" target="_blank">Repository</a-->
           <button class="btn btn-primary" onclick="add_calc_line()">Add line</button>
+          <button type="button" id="share-sheet" class="icon-btn" aria-label="Share" title="Share">
+            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="m8.6 10.5 6.8-4M8.6 13.5l6.8 4"/></svg>
+          </button>
           <button type="button" id="new-sheet" class="icon-btn" aria-label="New page" title="New page">
             <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H6a1 1 0 0 0-1 1v16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8z"/><path d="M14 3v5h5M12 11v6M9 14h6"/></svg>
           </button>
@@ -437,6 +440,11 @@
           <p id="remote-change-message"></p>
           <button type="button" id="remote-change-reload" class="btn">Reload</button>
           <button type="button" id="remote-change-close" class="btn">Dismiss</button>
+        </section>
+        <p id="sharing-notice" role="status" hidden></p>
+        <section id="shared-sheet-banner" class="remote-change-notice" hidden>
+          <p>Shared sheet</p>
+          <button type="button" id="save-shared-sheet" class="btn">Save to my sheets</button>
         </section>
         <!-- Sheet -->
         <jo-sheet id="sheet">

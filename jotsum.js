@@ -28,6 +28,115 @@ let tab_selection;
 let restoring_sheet = false;
 let sheet_id_sequence = 0;
 
+// Shared fragments stay outside every persistence path until explicitly saved.
+let shared_preview = false;
+let shared_preview_lines = null;
+
+function sharing_notice(message) {
+    const notice = document.getElementById('sharing-notice');
+    if (notice) {
+        notice.textContent = message;
+        notice.hidden = false;
+    }
+}
+
+function base64url(bytes) {
+    let binary = '';
+    for (const byte of bytes) binary += String.fromCharCode(byte);
+    return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+
+async function encode_shared_sheet(lines) {
+    const bytes = new TextEncoder().encode(lines.join('\n'));
+    const plain = base64url(bytes);
+    const stream = new Blob([bytes]).stream().pipeThrough(new CompressionStream('deflate-raw'));
+    const compressed = base64url(new Uint8Array(await new Response(stream).arrayBuffer()));
+    return compressed.length < plain.length ? '1d.' + compressed : '1u.' + plain;
+}
+
+async function decode_shared_sheet(encoded) {
+    if (encoded.length > 64 * 1024 || !/^1[du]\.[A-Za-z0-9_-]*$/.test(encoded)) throw new Error('Invalid shared sheet');
+    const payload = encoded.slice(3);
+    if (payload.length % 4 === 1) throw new Error('Invalid base64');
+    const bytes = Uint8Array.from(atob(payload.replace(/-/g, '+').replace(/_/g, '/')), c => c.charCodeAt(0));
+    if (base64url(bytes) !== payload) throw new Error('Invalid base64');
+    let stream = new Blob([bytes]).stream();
+    if (encoded.startsWith('1d.')) stream = stream.pipeThrough(new DecompressionStream('deflate-raw'));
+    const reader = stream.getReader();
+    const chunks = [];
+    let size = 0;
+    try {
+        while (true) {
+            const { value, done } = await reader.read();
+            if (done) break;
+            size += value.length;
+            if (size > 256 * 1024) throw new Error('Shared sheet is too large');
+            chunks.push(value);
+        }
+    } finally {
+        await reader.cancel().catch(() => {});
+    }
+    const decoded = new Uint8Array(size);
+    let offset = 0;
+    for (const chunk of chunks) { decoded.set(chunk, offset); offset += chunk.length; }
+    const lines = new TextDecoder('utf-8', { fatal: true }).decode(decoded).split('\n');
+    if (lines.length > 2000) throw new Error('Too many lines');
+    return lines;
+}
+
+async function share_sheet() {
+    try {
+        const lines = Array.from(document.getElementById('sheet').querySelectorAll('jo-line'), line => line.textContent);
+        const url = window.location.origin + window.location.pathname + '#s=' + await encode_shared_sheet(lines);
+        await window.navigator.clipboard.writeText(url);
+        sharing_notice('Link copied. The sheet lives in the link – anyone with it can open it. It is a snapshot.' +
+            (url.length > 2000 ? ' The URL is longer than 2000 characters; some messengers may cut it.' : ''));
+    } catch (error) {
+        sharing_notice('Could not copy the shared sheet link.');
+    }
+}
+
+function leave_shared_preview() {
+    shared_preview = false;
+    shared_preview_lines = null;
+    const banner = document.getElementById('shared-sheet-banner');
+    if (banner) banner.hidden = true;
+    const url = new URL(window.location.href);
+    if (url.hash.startsWith('#s=')) {
+        url.hash = '';
+        window.history.replaceState(null, '', url);
+    }
+}
+
+function save_shared_sheet() {
+    if (!shared_preview || !shared_preview_lines) return;
+    leave_shared_preview();
+    const sheet = document.getElementById('sheet');
+    const lines = Array.from(sheet.querySelectorAll('jo-line'), line => line.textContent);
+    const store = load_store();
+    set_active_shortsave(new_sheet_id());
+    store.push({ id: active_shortsave_id, lines });
+    save_store(store, active_shortsave_id);
+    sheet.update_total();
+}
+
+async function open_shared_fragment() {
+    shared_preview = true;
+    shared_preview_lines = null;
+    active_shortsave_id = null;
+    try {
+        const lines = await decode_shared_sheet(window.location.hash.slice(3));
+        shared_preview_lines = lines;
+        render_sheet(lines);
+        const banner = document.getElementById('shared-sheet-banner');
+        if (banner) banner.hidden = false;
+    } catch (error) {
+        const sheet = document.getElementById('sheet');
+        while (sheet.firstChild) sheet.removeChild(sheet.firstChild);
+        sharing_notice('Could not open shared sheet: invalid or oversized link.');
+    }
+}
+
 function sheet_name(lines) {
     const first = lines.find(line => line.trim() !== '');
     if (first === undefined) return 'Untitled';
@@ -412,11 +521,13 @@ function render_sheet(lines) {
 }
 
 function new_sheet() {
+    if (shared_preview) leave_shared_preview();
     set_active_shortsave(null);
     reset_sheet();
 }
 
 function open_shortsave(id) {
+    if (shared_preview) leave_shared_preview();
     const entry = load_store().find(entry => entry.id === id);
     if (!entry) return;
     clear_text_url();
@@ -446,6 +557,10 @@ class JoSheet extends HTMLElement {
     }
 
     update_total() {
+        if (shared_preview && shared_preview_lines && !rendering_sheet &&
+            !same_lines(shared_preview_lines, Array.from(this.querySelectorAll('jo-line'), line => line.textContent))) {
+            save_shared_sheet();
+        }
         const lines = Array.from(this.querySelectorAll('jo-line'));
         const texts = lines.map(line => line.textContent.trim());
         const { sums, types, total, errors } = evaluate_sheet(texts);
@@ -528,6 +643,7 @@ class JoSheet extends HTMLElement {
             total_element.textContent = this.round(total);
             total_element.classList.remove('is-placeholder');
         }
+        if (shared_preview) return;
         persist_shortsave(lines.map(line => line.textContent));
         // Loading renders the store's content; while jotsum.sheet is ahead of
         // the store, keep that newer copy instead of replacing it.
@@ -1196,6 +1312,7 @@ let rendered_shortsaves = null;
 function render_shortsave_list() {
     const list = ui_element('shortsave-list');
     if (!list) return;
+    if (shared_preview) return;
     const entries = list_shortsaves();
     // Every keystroke writes the store; only redraw when the list really
     // changed, otherwise a focus move into the list (which blurs and saves
@@ -1348,7 +1465,12 @@ if (typeof window !== 'undefined') {
         window.addEventListener('storage', handle_store_change);
     }
     window.onload = function () {
-        handle_url_params();
+        const fragment = window.location && window.location.hash.startsWith('#s=');
+        const opening = fragment ? open_shared_fragment() : handle_url_params();
+        for (const [id, action] of [['share-sheet', share_sheet], ['save-shared-sheet', save_shared_sheet]]) {
+            const button = document.getElementById(id);
+            if (button && typeof button.addEventListener === 'function') button.addEventListener('click', action);
+        }
         init_remote_change_notice();
         try {
             init_sidebar();
@@ -1398,9 +1520,10 @@ if (typeof window !== 'undefined') {
                 document.getElementById('sheet').update_total();
             }
         });
+        return opening;
     }
 }
 
 if (typeof module !== 'undefined' && module.exports) {
-    module.exports = { render_shortsave_list, new_sheet, open_shortsave, delete_shortsave, list_shortsaves, sheet_total, ACTIVE_STORAGE_KEY, STORE_STORAGE_KEY, JoLine, JoSheet, classify_line, evaluate_sheet, handle_url_params, reset_sheet, SHEET_STORAGE_KEY, sheet_name, new_sheet_id, load_store, save_store };
+    module.exports = { encode_shared_sheet, decode_shared_sheet, share_sheet, save_shared_sheet, render_shortsave_list, new_sheet, open_shortsave, delete_shortsave, list_shortsaves, sheet_total, ACTIVE_STORAGE_KEY, STORE_STORAGE_KEY, JoLine, JoSheet, classify_line, evaluate_sheet, handle_url_params, reset_sheet, SHEET_STORAGE_KEY, sheet_name, new_sheet_id, load_store, save_store };
 }
