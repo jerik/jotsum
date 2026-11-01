@@ -419,6 +419,13 @@
           <button type="button" id="new-sheet" class="icon-btn" aria-label="New page" title="New page">
             <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H6a1 1 0 0 0-1 1v16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8z"/><path d="M14 3v5h5M12 11v6M9 14h6"/></svg>
           </button>
+          <button type="button" id="export-sheet" class="icon-btn" aria-label="Export" title="Export .txt">
+            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M7 10l5 5 5-5M5 16v5h14v-5"/></svg>
+          </button>
+          <button type="button" id="import-sheet" class="icon-btn" aria-label="Import" title="Import .txt">
+            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15V3M7 8l5-5 5 5M5 16v5h14v-5"/></svg>
+          </button>
+          <input type="file" id="import-file" accept=".txt,text/plain" hidden>
         </nav>
       </div>
     </header>
@@ -438,6 +445,7 @@
           <button type="button" id="remote-change-reload" class="btn">Reload</button>
           <button type="button" id="remote-change-close" class="btn">Dismiss</button>
         </section>
+        <p id="file-notice" class="remote-change-notice" role="status" hidden></p>
         <!-- Sheet -->
         <jo-sheet id="sheet">
         </jo-sheet>
