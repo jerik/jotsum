@@ -226,3 +226,5 @@ continued typing dismisses the notice; a failed save leaves it visible.
 ---
 
 Source and issues on [GitHub](https://github.com/jerik/jotsum).
+
+Released under the [MIT License](LICENSE).
