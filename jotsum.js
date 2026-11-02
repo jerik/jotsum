@@ -535,6 +535,105 @@ function open_shortsave(id) {
     render_sheet(entry.lines);
 }
 
+const MAX_IMPORT_BYTES = 256 * 1024;
+const MAX_IMPORT_LINES = 2000;
+
+function sheet_export(lines) {
+    const name = sheet_name(lines).replace(/[<>:"/\\|?*\x00-\x1f\x7f]/g, '_')
+        .replace(/[. ]+$/, '') || 'Untitled';
+    // Windows device names are reserved even with a .txt extension.
+    const safe_name = /^(con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\.|$)/i.test(name) ? '_' + name : name;
+    return { text: lines.join('\n'), filename: safe_name + '.txt' };
+}
+
+function export_sheet() {
+    const lines = Array.from(document.getElementById('sheet').querySelectorAll('jo-line'))
+        .map(line => line.textContent);
+    const { text, filename } = sheet_export(lines);
+    const url = URL.createObjectURL(new Blob([text], { type: 'text/plain;charset=utf-8' }));
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    // Give the browser time to start the download before releasing its URL.
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+function import_notice(message) {
+    const notice = document.getElementById('file-notice');
+    if (notice) {
+        notice.textContent = message;
+        notice.hidden = !message;
+    }
+}
+
+function import_sheet_text(text) {
+    // Validate everything before touching storage, selection or editor content.
+    const lines = text.replace(/\r\n/g, '\n').split('\n');
+    if (new Blob([text]).size > MAX_IMPORT_BYTES || lines.length > MAX_IMPORT_LINES) {
+        import_notice('Import rejected: files must be at most 256 KiB and 2000 lines.');
+        return false;
+    }
+    const entry = { id: new_sheet_id(), lines };
+    const store = load_store();
+    store.push(entry);
+    save_store(store, entry.id);
+    clear_text_url();
+    set_active_shortsave(entry.id);
+    render_sheet(lines);
+    import_notice('');
+    return true;
+}
+
+async function import_sheet_file(file) {
+    if (!file) return false;
+    if (!/\.txt$/i.test(file.name) && file.type !== 'text/plain') {
+        import_notice('Import rejected: choose a .txt file.');
+        return false;
+    }
+    if (file.size > MAX_IMPORT_BYTES) {
+        import_notice('Import rejected: files must be at most 256 KiB and 2000 lines.');
+        return false;
+    }
+    let text;
+    try {
+        text = await file.text();
+    } catch (error) {
+        import_notice('The file could not be read. Please try again.');
+        return false;
+    }
+    return import_sheet_text(text);
+}
+
+function init_sheet_files() {
+    const picker = document.getElementById('import-file');
+    const import_button = document.getElementById('import-sheet');
+    const export_button = document.getElementById('export-sheet');
+    const sheet = document.getElementById('sheet');
+    if (!picker || typeof picker.addEventListener !== 'function') return;
+    import_button.addEventListener('click', () => picker.click());
+    export_button.addEventListener('click', export_sheet);
+    picker.addEventListener('change', () => {
+        const file = picker.files[0];
+        picker.value = '';
+        void import_sheet_file(file);
+    });
+    sheet.addEventListener('dragover', event => {
+        if (Array.from(event.dataTransfer.types).includes('Files')) event.preventDefault();
+    });
+    sheet.addEventListener('drop', event => {
+        if (!event.dataTransfer.files.length) return;
+        event.preventDefault();
+        if (event.dataTransfer.files.length !== 1) {
+            import_notice('Import rejected: drop one .txt file at a time.');
+            return;
+        }
+        void import_sheet_file(event.dataTransfer.files[0]);
+    });
+}
+
 function delete_shortsave(id) {
     const store = load_store();
     if (!store.some(entry => entry.id === id) || !window.confirm('Delete this sheet?')) return;
@@ -1472,6 +1571,7 @@ if (typeof window !== 'undefined') {
             if (button && typeof button.addEventListener === 'function') button.addEventListener('click', action);
         }
         init_remote_change_notice();
+        init_sheet_files();
         try {
             init_sidebar();
         } catch (error) {
@@ -1525,5 +1625,5 @@ if (typeof window !== 'undefined') {
 }
 
 if (typeof module !== 'undefined' && module.exports) {
-    module.exports = { encode_shared_sheet, decode_shared_sheet, share_sheet, save_shared_sheet, render_shortsave_list, new_sheet, open_shortsave, delete_shortsave, list_shortsaves, sheet_total, ACTIVE_STORAGE_KEY, STORE_STORAGE_KEY, JoLine, JoSheet, classify_line, evaluate_sheet, handle_url_params, reset_sheet, SHEET_STORAGE_KEY, sheet_name, new_sheet_id, load_store, save_store };
+    module.exports = { sheet_export, export_sheet, import_sheet_text, import_sheet_file, init_sheet_files, encode_shared_sheet, decode_shared_sheet, share_sheet, save_shared_sheet, render_shortsave_list, new_sheet, open_shortsave, delete_shortsave, list_shortsaves, sheet_total, ACTIVE_STORAGE_KEY, STORE_STORAGE_KEY, JoLine, JoSheet, classify_line, evaluate_sheet, handle_url_params, reset_sheet, SHEET_STORAGE_KEY, sheet_name, new_sheet_id, load_store, save_store };
 }
