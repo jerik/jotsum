@@ -153,6 +153,8 @@ URL input preserves blank lines (including an empty `?text=`) and is decoded onc
 
 [`?text=3+apples+%2B+4+pears%0A2+bananas+*+7+melons`](https://jerik.github.io/jotsum/?text=3+apples+%2B+4+pears%0A2+bananas+*+7+melons)
 
+**Text files.** Use **Export** in the header to download the open sheet as UTF-8 `.txt`, named after its display name with unsafe filename characters replaced. Use **Import** to choose a `.txt` file, or drop one onto the sheet. Each import opens a new shortsave and leaves existing sheets unchanged. Windows line endings are normalized; blank lines are preserved. Files larger than 256 KiB (262,144 bytes) or 2000 lines are rejected with a notice.
+
 **Offline.** Saving the page stores one self-contained HTML file, including the script, so it runs without a connection.
 
 ---
@@ -169,7 +171,7 @@ Every sheet is a shortsave. It is saved automatically on every change; there is 
 
 **Delete.** The delete icon next to an entry asks for confirmation (“Delete this sheet?”) and then removes the saved sheet; there is no undo button. Deleting the sheet that is open leaves an empty sheet. Another tab still displaying it can restore it by continuing to type; see [A notice about another tab](#a-notice-about-another-tab).
 
-**Only this browser.** Shortsaves live in the localStorage of this browser on this device. Nothing is synced, another browser or device does not see them, and clearing the site data deletes them. There is no export or import yet ([#7](https://github.com/jerik/jotsum/issues/7)).
+**Only this browser.** Shortsaves live in the localStorage of this browser on this device. Nothing is synced, another browser or device does not see them, and clearing the site data deletes them. Single sheets can be exported and imported as text files; exporting all sheets at once is still open ([#7](https://github.com/jerik/jotsum/issues/7)).
 
 
 ## Working in multiple tabs
