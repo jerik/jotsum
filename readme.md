@@ -153,11 +153,16 @@ URL input preserves blank lines (including an empty `?text=`) and is decoded onc
 
 [`?text=3+apples+%2B+4+pears%0A2+bananas+*+7+melons`](https://jerik.github.io/jotsum/?text=3+apples+%2B+4+pears%0A2+bananas+*+7+melons)
 
+**Shared fragment.** `#s=1d.<base64url>` contains UTF-8 text compressed with deflate-raw; `#s=1u.<base64url>` contains uncompressed UTF-8 when that is shorter. Base64url has no padding. Lines are joined with `\n`. Opening a fragment previews and calculates the sheet without saving; **Save to my sheets** (or editing) creates a new shortsave. Invalid links, encoded parts over 64 KB, decoded text over 256 KB, and more than 2000 lines are rejected.
 **Text files.** Use **Export** in the header to download the open sheet as UTF-8 `.txt`, named after its display name with unsafe filename characters replaced. Use **Import** to choose a `.txt` file, or drop one onto the sheet. Each import opens a new shortsave and leaves existing sheets unchanged. Windows line endings are normalized; blank lines are preserved. Files larger than 256 KiB (262,144 bytes) or 2000 lines are rejected with a notice.
 
 **Offline.** Saving the page stores one self-contained HTML file, including the script, so it runs without a connection.
 
 ---
+
+## Sharing
+
+Click the **Share** icon in the header to copy a self-contained link. The sheet lives in the URL fragment, which browsers do not send to GitHub Pages; anyone with the link can open it. It is a snapshot, so later edits do not change the shared sheet. Links longer than 2000 characters show a warning because some messengers may cut them.
 
 ## Shortsaves
 
