@@ -828,6 +828,105 @@ function open_shortsave(id) {
     render_sheet(entry.lines);
 }
 
+const MAX_IMPORT_BYTES = 256 * 1024;
+const MAX_IMPORT_LINES = 2000;
+
+function sheet_export(lines) {
+    const name = sheet_name(lines).replace(/[<>:"/\\|?*\x00-\x1f\x7f]/g, '_')
+        .replace(/[. ]+$/, '') || 'Untitled';
+    // Windows device names are reserved even with a .txt extension.
+    const safe_name = /^(con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\.|$)/i.test(name) ? '_' + name : name;
+    return { text: lines.join('\n'), filename: safe_name + '.txt' };
+}
+
+function export_sheet() {
+    const lines = Array.from(document.getElementById('sheet').querySelectorAll('jo-line'))
+        .map(line => line.textContent);
+    const { text, filename } = sheet_export(lines);
+    const url = URL.createObjectURL(new Blob([text], { type: 'text/plain;charset=utf-8' }));
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    // Give the browser time to start the download before releasing its URL.
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+function import_notice(message) {
+    const notice = document.getElementById('file-notice');
+    if (notice) {
+        notice.textContent = message;
+        notice.hidden = !message;
+    }
+}
+
+function import_sheet_text(text) {
+    // Validate everything before touching storage, selection or editor content.
+    const lines = text.replace(/\r\n/g, '\n').split('\n');
+    if (new Blob([text]).size > MAX_IMPORT_BYTES || lines.length > MAX_IMPORT_LINES) {
+        import_notice('Import rejected: files must be at most 256 KiB and 2000 lines.');
+        return false;
+    }
+    const entry = { id: new_sheet_id(), lines };
+    const store = load_store();
+    store.push(entry);
+    save_store(store, entry.id);
+    clear_text_url();
+    set_active_shortsave(entry.id);
+    render_sheet(lines);
+    import_notice('');
+    return true;
+}
+
+async function import_sheet_file(file) {
+    if (!file) return false;
+    if (!/\.txt$/i.test(file.name) && file.type !== 'text/plain') {
+        import_notice('Import rejected: choose a .txt file.');
+        return false;
+    }
+    if (file.size > MAX_IMPORT_BYTES) {
+        import_notice('Import rejected: files must be at most 256 KiB and 2000 lines.');
+        return false;
+    }
+    let text;
+    try {
+        text = await file.text();
+    } catch (error) {
+        import_notice('The file could not be read. Please try again.');
+        return false;
+    }
+    return import_sheet_text(text);
+}
+
+function init_sheet_files() {
+    const picker = document.getElementById('import-file');
+    const import_button = document.getElementById('import-sheet');
+    const export_button = document.getElementById('export-sheet');
+    const sheet = document.getElementById('sheet');
+    if (!picker || typeof picker.addEventListener !== 'function') return;
+    import_button.addEventListener('click', () => picker.click());
+    export_button.addEventListener('click', export_sheet);
+    picker.addEventListener('change', () => {
+        const file = picker.files[0];
+        picker.value = '';
+        void import_sheet_file(file);
+    });
+    sheet.addEventListener('dragover', event => {
+        if (Array.from(event.dataTransfer.types).includes('Files')) event.preventDefault();
+    });
+    sheet.addEventListener('drop', event => {
+        if (!event.dataTransfer.files.length) return;
+        event.preventDefault();
+        if (event.dataTransfer.files.length !== 1) {
+            import_notice('Import rejected: drop one .txt file at a time.');
+            return;
+        }
+        void import_sheet_file(event.dataTransfer.files[0]);
+    });
+}
+
 function delete_shortsave(id) {
     const store = load_store();
     if (!store.some(entry => entry.id === id) || !window.confirm('Delete this sheet?')) return;
@@ -1754,6 +1853,7 @@ if (typeof window !== 'undefined') {
     window.onload = function () {
         handle_url_params();
         init_remote_change_notice();
+        init_sheet_files();
         try {
             init_sidebar();
         } catch (error) {
@@ -1806,7 +1906,7 @@ if (typeof window !== 'undefined') {
 }
 
 if (typeof module !== 'undefined' && module.exports) {
-    module.exports = { render_shortsave_list, new_sheet, open_shortsave, delete_shortsave, list_shortsaves, sheet_total, ACTIVE_STORAGE_KEY, STORE_STORAGE_KEY, JoLine, JoSheet, classify_line, evaluate_sheet, handle_url_params, reset_sheet, SHEET_STORAGE_KEY, sheet_name, new_sheet_id, load_store, save_store };
+    module.exports = { sheet_export, export_sheet, import_sheet_text, import_sheet_file, init_sheet_files, render_shortsave_list, new_sheet, open_shortsave, delete_shortsave, list_shortsaves, sheet_total, ACTIVE_STORAGE_KEY, STORE_STORAGE_KEY, JoLine, JoSheet, classify_line, evaluate_sheet, handle_url_params, reset_sheet, SHEET_STORAGE_KEY, sheet_name, new_sheet_id, load_store, save_store };
 }
 </script>
   </head>
@@ -1826,6 +1926,13 @@ if (typeof module !== 'undefined' && module.exports) {
           <button type="button" id="new-sheet" class="icon-btn" aria-label="New page" title="New page">
             <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H6a1 1 0 0 0-1 1v16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8z"/><path d="M14 3v5h5M12 11v6M9 14h6"/></svg>
           </button>
+          <button type="button" id="export-sheet" class="icon-btn" aria-label="Export" title="Export .txt">
+            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M7 10l5 5 5-5M5 16v5h14v-5"/></svg>
+          </button>
+          <button type="button" id="import-sheet" class="icon-btn" aria-label="Import" title="Import .txt">
+            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15V3M7 8l5-5 5 5M5 16v5h14v-5"/></svg>
+          </button>
+          <input type="file" id="import-file" accept=".txt,text/plain" hidden>
         </nav>
       </div>
     </header>
@@ -1845,6 +1952,7 @@ if (typeof module !== 'undefined' && module.exports) {
           <button type="button" id="remote-change-reload" class="btn">Reload</button>
           <button type="button" id="remote-change-close" class="btn">Dismiss</button>
         </section>
+        <p id="file-notice" class="remote-change-notice" role="status" hidden></p>
         <!-- Sheet -->
         <jo-sheet id="sheet">
         </jo-sheet>
@@ -1856,7 +1964,7 @@ if (typeof module !== 'undefined' && module.exports) {
         <!-- Footer -->
         <footer>
 		Use the operators + - * / ( ) <br/> Download for offline use • Source and docs on <a href="https://github.com/jerik/jotsum">GitHub</a>
-          <span id="version">2026-10-28T22:57:11Z<br>283-gb41bf42</span>
+          <span id="version">2026-11-02T19:40:21Z<br>288-gdd93faa</span>
         </footer>
       </main>
     </div>
