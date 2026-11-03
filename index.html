@@ -337,7 +337,8 @@
 
       /* Ab 900 px: Seitenleiste dauerhaft neben dem Blatt */
       @media (min-width: 900px) {
-        .drawer-toggle { display: none; }
+        body.sidebar-collapsed .layout { grid-template-columns: minmax(0, 1fr); }
+        body.sidebar-collapsed .sidebar { display: none; }
         .layout {
           display: grid;
           grid-template-columns: var(--side-w) minmax(0, 1fr);
@@ -395,6 +396,42 @@
       #sharing-notice { background: var(--notice); color: var(--info); }
       #shared-sheet-banner { color: var(--info); }
       .remote-change-notice { border-color: var(--warning); }
+
+      /* Calm header and disclosure */
+      .wrap { flex-wrap: nowrap; }
+      .brand { flex: none; }
+      .actions { position: relative; flex-wrap: nowrap; flex: none; gap: 4px; }
+      .header-button {
+        display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+        height: 40px; min-width: 40px; flex: none; padding: 0 8px;
+        border: 0; border-radius: 6px; background: transparent; color: var(--text);
+        font: inherit; cursor: pointer;
+      }
+      .header-button:hover { background: var(--hover); }
+      .header-button svg { width: 20px; height: 20px; }
+      .current-sheet-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); }
+      body.drawer-open .current-sheet-name { visibility: hidden; }
+      @media (min-width: 900px) {
+        body:not(.sidebar-collapsed) .current-sheet-name { visibility: hidden; }
+      }
+      @media (max-width: 519.98px) { .action-label { display: none; } }
+      .more-actions {
+        position: absolute; right: 0; top: 100%; width: max-content;
+        max-width: min(340px, calc(100vw - 24px)); max-height: 70vh; overflow: auto;
+        list-style: none; margin: 8px 0 0; padding: 6px;
+        background: var(--surface); border: 1px solid var(--border);
+        border-radius: 6px; box-shadow: 0 8px 24px var(--shadow);
+      }
+      .more-actions button, .more-actions a {
+        box-sizing: border-box; display: block; width: 100%; min-height: 40px;
+        padding: 8px 12px; text-align: left; font: inherit; color: var(--text);
+        background: transparent; border: 0; border-radius: 4px; cursor: pointer; text-decoration: none;
+      }
+      .more-actions button:hover, .more-actions a:hover { background: var(--hover); }
+      .more-actions kbd { margin-left: 24px; color: var(--muted); }
+      #shortcut-list { padding: 8px 12px 8px 28px; font-size: 13px; line-height: 1.8; }
+      .touch-action { display: none; }
+      @media (pointer: coarse) { .touch-action { display: list-item; } }
 
       /* Footer */
       footer {
@@ -1152,6 +1189,7 @@ class JoSheet extends HTMLElement {
             total_element.textContent = this.round(total);
             total_element.classList.remove('is-placeholder');
         }
+        update_header_sheet_name();
         if (shared_preview) return;
         persist_shortsave(lines.map(line => line.textContent));
         // Loading renders the store's content; while jotsum.sheet is ahead of
@@ -1799,6 +1837,8 @@ function reset_sheet() {
 // Sidebar (from 900px) and drawer (below) listing the shortsaves.
 // Everything here tolerates a missing or mocked DOM: without the sidebar
 // markup the sheet keeps working and nothing is drawn.
+const SIDEBAR_STORAGE_KEY = storage_namespace + 'sidebar-collapsed';
+let wide_sidebar_collapsed = false;
 const WIDE_LAYOUT_QUERY = '(min-width: 900px)';
 const DELETE_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg>';
 
@@ -1819,6 +1859,7 @@ function is_drawer_open() {
 let rendered_shortsaves = null;
 
 function render_shortsave_list() {
+    update_header_sheet_name();
     const list = ui_element('shortsave-list');
     if (!list) return;
     if (shared_preview) return;
@@ -1883,16 +1924,101 @@ function render_shortsave_list() {
     }
 }
 
+function update_header_sheet_name() {
+    const label = ui_element('current-sheet-name');
+    if (!label) return;
+    const sheet = document.querySelector('jo-sheet');
+    const lines = sheet && typeof sheet.querySelectorAll === 'function'
+        ? Array.from(sheet.querySelectorAll('jo-line'), line => line.textContent) : [];
+    label.textContent = sheet_name(lines);
+    label.title = label.textContent;
+}
+
+function toggle_sidebar() {
+    if (is_wide_layout()) {
+        wide_sidebar_collapsed = !wide_sidebar_collapsed;
+        try { window.localStorage.setItem(SIDEBAR_STORAGE_KEY, String(wide_sidebar_collapsed)); } catch (error) { /* Optional preference. */ }
+        sync_sidebar_layout();
+    } else {
+        set_drawer_open(!is_drawer_open());
+    }
+}
+
+function sync_sidebar_layout() {
+    const sidebar = ui_element('sidebar');
+    const restore_focus = is_wide_layout() && wide_sidebar_collapsed &&
+        sidebar && sidebar.contains(document.activeElement);
+    if (restore_focus) ui_element('drawer-toggle').focus();
+    set_drawer_open(false);
+    document.body.classList.toggle('sidebar-collapsed', wide_sidebar_collapsed);
+    const toggle = ui_element('drawer-toggle');
+    if (toggle) toggle.setAttribute('aria-expanded', String(is_wide_layout() && !wide_sidebar_collapsed));
+    if (sidebar) sidebar.inert = is_wide_layout() ? wide_sidebar_collapsed : !is_drawer_open();
+}
+
+function set_more_open(open, restore_focus = false) {
+    const menu = ui_element('more-actions');
+    const toggle = ui_element('more-toggle');
+    if (!menu || !toggle) return;
+    const was_open = !menu.hidden;
+    menu.hidden = !open;
+    toggle.setAttribute('aria-expanded', String(open));
+    if (!open && was_open && restore_focus) toggle.focus();
+}
+
+function init_header_menu() {
+    const menu = ui_element('more-actions');
+    const toggle = ui_element('more-toggle');
+    if (!menu || !toggle) return;
+    toggle.addEventListener('click', () => set_more_open(menu.hidden, true));
+    menu.addEventListener('click', event => {
+        const button = event.target.closest('button, a');
+        if (button && button.id !== 'keyboard-shortcuts') set_more_open(false);
+    });
+    ui_element('add-line').addEventListener('click', () => add_calc_line());
+    const shortcuts = ui_element('keyboard-shortcuts');
+    shortcuts.addEventListener('click', () => {
+        const list = ui_element('shortcut-list');
+        list.hidden = !list.hidden;
+        shortcuts.setAttribute('aria-expanded', String(!list.hidden));
+    });
+    document.addEventListener('click', event => {
+        if (!menu.contains(event.target) && !toggle.contains(event.target)) set_more_open(false);
+    });
+}
+
+function handle_header_keys(event) {
+    if (event.key === 'Escape') {
+        set_more_open(false, true);
+        if (is_drawer_open()) {
+            set_drawer_open(false);
+            const toggle = ui_element('drawer-toggle');
+            if (toggle) toggle.focus();
+        }
+        return;
+    }
+    if (event.metaKey || event.shiftKey || event.isComposing) return;
+    const key = event.key.toLowerCase();
+    if (event.ctrlKey && !event.altKey && key === 'b') {
+        event.preventDefault();
+        toggle_sidebar();
+    } else if (event.altKey && !event.ctrlKey && key === 'n') {
+        event.preventDefault();
+        new_sheet_from_header();
+    }
+}
+
 function set_drawer_open(open) {
     const sidebar = ui_element('sidebar');
     const toggle = ui_element('drawer-toggle');
     if (!sidebar || !toggle || !document.body) return;
-    // From 900px the sidebar is always visible, so there is nothing to open.
+    // Drawer state is never restored from the wide-window preference.
     const drawer = open && !is_wide_layout();
     const was_open = is_drawer_open();
     const had_focus = sidebar.contains(document.activeElement);
     document.body.classList.toggle('drawer-open', drawer);
-    toggle.setAttribute('aria-expanded', String(drawer));
+    toggle.setAttribute('aria-expanded', String(is_wide_layout() ? !wide_sidebar_collapsed : drawer));
+    sidebar.inert = is_wide_layout() ? wide_sidebar_collapsed : !drawer;
     // Behind the open drawer the page must not be reachable by keyboard.
     ['content', 'header-actions'].forEach(id => {
         const element = ui_element(id);
@@ -1946,21 +2072,19 @@ function init_sidebar() {
     });
 
     const toggle = ui_element('drawer-toggle');
-    if (toggle) toggle.addEventListener('click', () => set_drawer_open(!is_drawer_open()));
+    if (toggle) toggle.addEventListener('click', toggle_sidebar);
+    try { wide_sidebar_collapsed = window.localStorage.getItem(SIDEBAR_STORAGE_KEY) === 'true'; } catch (error) { /* Optional preference. */ }
+    sync_sidebar_layout();
+    init_header_menu();
     const new_button = ui_element('new-sheet');
     if (new_button) new_button.addEventListener('click', new_sheet_from_header);
     const backdrop = ui_element('drawer-backdrop');
     if (backdrop) backdrop.addEventListener('click', () => set_drawer_open(false));
 
-    document.addEventListener('keydown', event => {
-        if (event.key === 'Escape' && is_drawer_open()) {
-            set_drawer_open(false);
-            if (toggle) toggle.focus();
-        }
-    });
+    document.addEventListener('keydown', handle_header_keys);
     if (typeof window.matchMedia === 'function') {
         const wide = window.matchMedia(WIDE_LAYOUT_QUERY);
-        const on_change = () => { if (wide.matches) set_drawer_open(false); };
+        const on_change = sync_sidebar_layout;
         if (typeof wide.addEventListener === 'function') wide.addEventListener('change', on_change);
     }
     if (typeof window.addEventListener === 'function') {
@@ -2035,7 +2159,7 @@ if (typeof window !== 'undefined') {
 }
 
 if (typeof module !== 'undefined' && module.exports) {
-    module.exports = { sheet_export, export_sheet, import_sheet_text, import_sheet_file, init_sheet_files, encode_shared_sheet, decode_shared_sheet, share_sheet, save_shared_sheet, render_shortsave_list, new_sheet, open_shortsave, delete_shortsave, list_shortsaves, sheet_total, ACTIVE_STORAGE_KEY, STORE_STORAGE_KEY, JoLine, JoSheet, classify_line, evaluate_sheet, handle_url_params, reset_sheet, SHEET_STORAGE_KEY, sheet_name, new_sheet_id, load_store, save_store };
+    module.exports = { init_sidebar, handle_header_keys, toggle_sidebar, sync_sidebar_layout, set_more_open, SIDEBAR_STORAGE_KEY, sheet_export, export_sheet, import_sheet_text, import_sheet_file, init_sheet_files, encode_shared_sheet, decode_shared_sheet, share_sheet, save_shared_sheet, render_shortsave_list, new_sheet, open_shortsave, delete_shortsave, list_shortsaves, sheet_total, ACTIVE_STORAGE_KEY, STORE_STORAGE_KEY, JoLine, JoSheet, classify_line, evaluate_sheet, handle_url_params, reset_sheet, SHEET_STORAGE_KEY, sheet_name, new_sheet_id, load_store, save_store };
 }
 </script>
   </head>
@@ -2043,27 +2167,27 @@ if (typeof module !== 'undefined' && module.exports) {
     <!-- Header -->
     <header class="site-header">
       <div class="wrap">
-        <button type="button" id="drawer-toggle" class="icon-btn drawer-toggle"
-                aria-label="Saved sheets" title="Saved sheets"
-                aria-expanded="false" aria-controls="sidebar">
-          <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
-        </button>
+        <button type="button" id="drawer-toggle" class="header-button" aria-label="Saved sheets" title="Saved sheets (Ctrl+B)" aria-expanded="false" aria-controls="sidebar"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16M5 8h2M5 12h2"/></svg></button>
         <h1 class="brand">jotsum</h1>
-        <nav id="header-actions" class="actions">
-          <!--a class="btn" href="https://github.com/jerik/jotsum" target="_blank">Repository</a-->
-          <button class="btn btn-primary" onclick="add_calc_line()">Add line</button>
-          <button type="button" id="share-sheet" class="icon-btn" aria-label="Share" title="Share">
-            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="m8.6 10.5 6.8-4M8.6 13.5l6.8 4"/></svg>
-          </button>
-          <button type="button" id="new-sheet" class="icon-btn" aria-label="New page" title="New page">
-            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H6a1 1 0 0 0-1 1v16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8z"/><path d="M14 3v5h5M12 11v6M9 14h6"/></svg>
-          </button>
-          <button type="button" id="export-sheet" class="icon-btn" aria-label="Export" title="Export .txt">
-            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M7 10l5 5 5-5M5 16v5h14v-5"/></svg>
-          </button>
-          <button type="button" id="import-sheet" class="icon-btn" aria-label="Import" title="Import .txt">
-            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15V3M7 8l5-5 5 5M5 16v5h14v-5"/></svg>
-          </button>
+        <span id="current-sheet-name" class="current-sheet-name"></span>
+        <nav id="header-actions" class="actions" aria-label="Sheet actions">
+          <button type="button" id="new-sheet" class="header-button" aria-label="New sheet" title="New sheet (Alt+N)"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg><span class="action-label">New</span></button>
+          <button type="button" id="share-sheet" class="header-button" aria-label="Share" title="Share"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="m8.6 10.5 6.8-4M8.6 13.5l6.8 4"/></svg><span class="action-label">Share</span></button>
+          <button type="button" id="more-toggle" class="header-button" aria-label="More actions" title="More actions (Escape to close)" aria-expanded="false" aria-controls="more-actions"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></svg></button>
+          <ul id="more-actions" class="more-actions" hidden>
+            <li><button type="button" id="import-sheet">Import .txt…</button></li>
+            <li><button type="button" id="export-sheet">Export .txt</button></li>
+            <li class="touch-action"><button type="button" id="add-line">Add line <kbd>Enter</kbd></button></li>
+            <li><button type="button" id="keyboard-shortcuts" aria-expanded="false" aria-controls="shortcut-list">Keyboard shortcuts</button>
+              <ul id="shortcut-list" hidden>
+                <li>Ctrl+B — Saved sheets</li><li>Alt+N — New sheet</li>
+                <li>Enter — Next / new line</li><li>Ctrl+Enter — Insert below</li>
+                <li>Ctrl+Shift+Enter — Insert above</li><li>Ctrl+Delete — Remove line</li>
+                <li>↑ / ↓ — Move between lines</li><li>Escape — Close menu / drawer</li>
+              </ul>
+            </li>
+            <li><a href="https://github.com/jerik/jotsum">About / GitHub</a></li>
+          </ul>
           <input type="file" id="import-file" accept=".txt,text/plain" hidden>
         </nav>
       </div>
@@ -2101,7 +2225,7 @@ if (typeof module !== 'undefined' && module.exports) {
         <!-- Footer -->
         <footer>
 		Use the operators + - * / ( ) <br/> Download for offline use • Source and docs on <a href="https://github.com/jerik/jotsum">GitHub</a>
-          <span id="version">2026-11-03T21:24:48Z<br>297-ga17d13e</span>
+          <span id="version">2026-11-03T22:23:53Z<br>300-gb18e5fb</span>
         </footer>
       </main>
     </div>
