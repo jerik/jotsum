@@ -149,16 +149,16 @@ nodes['more-actions'].appendChild(nodes['decimals-toggle']);
 nodes['decimals-toggle'].emit('click');
 nodes['more-actions'].emit('click', { target: nodes['decimals-toggle'] });
 assert.strictEqual(nodes['more-actions'].hidden, false);
-assert.strictEqual(nodes['decimals-toggle'].textContent, 'Decimals: all');
+assert.strictEqual(nodes['decimals-toggle'].textContent, 'Decimals: 6');
 assert.strictEqual(nodes['decimals-toggle'].getAttribute('aria-pressed'), 'true');
-assert.strictEqual(String(nodes.total.textContent), '0.333333333333');
+assert.strictEqual(String(nodes.total.textContent), '0.333333');
 for (const line of sheet.querySelectorAll()) {
-    assert.strictEqual(String(line.nextElementSibling.textContent), '0.333333333333');
+    assert.strictEqual(String(line.nextElementSibling.textContent), '0.333333');
 }
 assert.deepStrictEqual(nodes['shortsave-list'].children.map(item => item.children[0].children[1].textContent),
-    ['0.333333333333', '0.666666666667']);
+    ['0.333333', '0.666667']);
 assert.strictEqual(JSON.stringify(api.load_store()), decimals_store_before);
-assert.ok(nodes.messages.children.some(node => node.children[1].textContent === 'Showing all decimals'));
+assert.ok(nodes.messages.children.some(node => node.children[1].textContent === 'Showing up to 6 decimals'));
 nodes['decimals-toggle'].emit('click');
 assert.strictEqual(nodes['decimals-toggle'].textContent, 'Decimals: 2');
 assert.strictEqual(String(nodes.total.textContent), '0.33');

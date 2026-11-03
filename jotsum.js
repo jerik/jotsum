@@ -525,7 +525,13 @@ function persist_shortsave(lines) {
 function load_decimals() {
     decimals_mode = '2';
     try {
-        if (window.localStorage.getItem(DECIMALS_STORAGE_KEY) === 'all') decimals_mode = 'all';
+        const stored = window.localStorage.getItem(DECIMALS_STORAGE_KEY);
+        if (stored === '6' || stored === 'all') decimals_mode = '6';
+        if (stored === 'all') {
+            // Migrate the old display preference without a confirmation message.
+            try { window.localStorage.setItem(DECIMALS_STORAGE_KEY, '6'); }
+            catch (error) { /* Keep the migrated preference usable in memory. */ }
+        }
     } catch (error) {
         show_message({ tone: 'error', text: "Couldn't read decimals setting in this browser." });
     }
@@ -536,31 +542,30 @@ function update_decimals_button() {
     const button = ui_element('decimals-toggle');
     if (!button) return;
     button.textContent = 'Decimals: ' + decimals_mode;
-    button.setAttribute('aria-pressed', String(decimals_mode === 'all'));
+    button.setAttribute('aria-pressed', String(decimals_mode === '6'));
 }
 
 function toggle_decimals() {
-    decimals_mode = decimals_mode === '2' ? 'all' : '2';
+    decimals_mode = decimals_mode === '2' ? '6' : '2';
     try { storage_write('setItem', DECIMALS_STORAGE_KEY, decimals_mode); }
     catch (error) { /* Keep the display usable when persistence fails. */ }
     update_decimals_button();
     const sheet = document.getElementById('sheet');
     if (sheet && sheet.update_total) sheet.update_total(true);
     render_shortsave_list();
-    show_message({ tone: 'success', text: 'Showing ' + decimals_mode + ' decimals' });
+    show_message({ tone: 'success', text: decimals_mode === '6' ? 'Showing up to 6 decimals' : 'Showing 2 decimals' });
 }
 
 function round_for_display(num) {
-    if (decimals_mode === 'all') {
-        // Number removes insignificant zeros and uses plain decimals in the
-        // normal range; extreme magnitudes retain JavaScript's notation.
-        const value = Number(num.toPrecision(12));
-        if (Math.abs(value) >= 1e-7 && Math.abs(value) < 1e-6) {
-            const [digits, exponent] = String(value).split('e-');
-            return (value < 0 ? '-' : '') + '0.' +
-                '0'.repeat(Number(exponent) - 1) + digits.replace('-', '').replace('.', '');
-        }
-        return value === 0 ? 0 : value;
+    if (decimals_mode === '6') {
+        if (!Number.isFinite(num)) return num;
+        const trim = value => value.replace(/(\.\d*?[1-9])0+$|\.0+$/, '$1');
+        const [coefficient, exponent = '0'] = String(Math.abs(num)).split('e');
+        const shifted = Number(coefficient + 'e' + (Number(exponent) + 6));
+        if (shifted > Number.MAX_SAFE_INTEGER) return trim(num.toFixed(6));
+        // Round the magnitude so ties on either side go away from zero.
+        const value = Number(String(Math.round(shifted)) + 'e-6') * Math.sign(num);
+        return value === 0 ? 0 : trim(value.toFixed(6));
     }
     if (num % 1 !== 0 && Number.isFinite(num)) {
         // Shift the decimal string, avoiding binary multiplication errors at

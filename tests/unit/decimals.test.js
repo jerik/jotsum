@@ -45,8 +45,7 @@ function fixture(search = '') {
 (async () => {
 const values = [0.1 + 0.2, 1/3, 1.005, 2.675, -1.005, 64.20, 850, 379.80, 1e21, 1e-7, 1e-8, -0, 0.004, -0.004];
 const expected = {
-    '2': ['0.30', '0.33', '1.01', '2.68', '-1.01', '64.20', '850', '379.80', '1e+21', '0', '0', '0', '0', '0'],
-    all: ['0.3', '0.333333333333', '1.005', '2.675', '-1.005', '64.2', '850', '379.8', '1e+21', '0.0000001', '1e-8', '0', '0.004', '-0.004']
+    '2': ['0.30', '0.33', '1.01', '2.68', '-1.01', '64.20', '850', '379.80', '1e+21', '0', '0', '0', '0', '0']
 };
 window.localStorage.reset();
 let page = fixture('?text=%3Ax%20%3D%201%2F3%0A%3Ax%20*%203');
@@ -58,9 +57,20 @@ for (const [value, expected] of [
 ]) {
     assert.strictEqual(api.round_for_display(value), expected);
 }
-for (const mode of ['2', 'all']) {
-    if (mode === 'all') api.toggle_decimals();
-    assert.deepStrictEqual(values.map(value => String(api.round_for_display(value))), expected[mode]);
+for (const mode of ['2', '6']) {
+    if (mode === '6') api.toggle_decimals();
+    if (mode === '2') assert.deepStrictEqual(values.map(value => String(api.round_for_display(value))), expected[mode]);
+    else {
+        const cases = [
+            [1/3, '0.333333'], [64.20, '64.2'], [1.759, '1.759'],
+            [0.5, '0.5'], [850, '850'], [0.1 + 0.2, '0.3'], [1e-7, '0'],
+            [1.0000005, '1.000001'], [-1.0000005, '-1.000001'],
+            [-1e-7, '0'], [-0, '0'], [1e21, '1e+21'],
+            [2000000000000000.5, '2000000000000000.5'],
+            [-2000000000000000.5, '-2000000000000000.5']
+        ];
+        for (const [value, display] of cases) assert.strictEqual(String(api.round_for_display(value)), display);
+    }
     const result = api.evaluate_sheet([':x = 1/3', ':x * 3', '---', ':SUBTOTAL_1 * 3']);
     const fractional_subtotal = api.evaluate_sheet(['1/3', '---', ':SUBTOTAL_1 * 3']);
     assert.strictEqual(fractional_subtotal.vars.get('SUBTOTAL_1'), 1/3);
@@ -71,14 +81,21 @@ for (const mode of ['2', 'all']) {
     assert.strictEqual(String(api.round_for_display(result.sums[1])), '1');
     console.log(mode + ': ' + values.map(value => String(api.round_for_display(value))).join(' | '));
 }
-assert.strictEqual(window.localStorage.getItem(api.DECIMALS_STORAGE_KEY), 'all');
+assert.strictEqual(window.localStorage.getItem(api.DECIMALS_STORAGE_KEY), '6');
 // Reload the module as well as the page: no in-memory preference can survive.
 delete require.cache[require.resolve('../../jotsum.js')];
 const reloaded = require('../../jotsum.js');
 window.onload();
-assert.strictEqual(String(reloaded.round_for_display(1/3)), '0.333333333333');
+assert.strictEqual(String(reloaded.round_for_display(1/3)), '0.333333');
+// A legacy preference migrates silently and is persisted as 6.
+window.localStorage.setItem(api.DECIMALS_STORAGE_KEY, 'all');
+const messagesBeforeMigration = page.total.children.length;
+reloaded.load_decimals();
+assert.strictEqual(page.total.children.length, messagesBeforeMigration);
+assert.strictEqual(window.localStorage.getItem(api.DECIMALS_STORAGE_KEY), '6');
+assert.strictEqual(String(reloaded.round_for_display(1/3)), '0.333333');
 reloaded.save_store([{ id: 'a', lines: ['1/3'] }, { id: 'b', lines: ['2/3'] }]);
-assert.deepStrictEqual(reloaded.list_shortsaves().map(entry => entry.total), ['0.333333333333', '0.666666666667']);
+assert.deepStrictEqual(reloaded.list_shortsaves().map(entry => entry.total), ['0.333333', '0.666667']);
 assert.deepStrictEqual(reloaded.load_store().map(entry => entry.lines), [['1/3'], ['2/3']]);
 const lines = [':x = 1/3', ':x * 3'];
 const shared = await reloaded.encode_shared_sheet(lines);
@@ -87,7 +104,7 @@ assert.strictEqual(reloaded.sheet_export(lines).text, lines.join('\n'));
 page = fixture('?text=1%2F3%0A%0A2%2F3&decimals=2');
 window.onload();
 assert.deepStrictEqual(page.texts(), ['1/3', '', '2/3']);
-assert.strictEqual(String(reloaded.round_for_display(1/3)), '0.333333333333');
+assert.strictEqual(String(reloaded.round_for_display(1/3)), '0.333333');
 reloaded.toggle_decimals();
 assert.strictEqual(await reloaded.encode_shared_sheet(lines), shared);
 assert.strictEqual(reloaded.sheet_export(lines).text, lines.join('\n'));
@@ -109,7 +126,7 @@ assert.ok(notices.some(node => node.children[1].textContent === "Couldn't read d
 const set = window.localStorage.setItem;
 window.localStorage.setItem = () => { throw new Error('quota'); };
 reloaded.toggle_decimals();
-assert.strictEqual(String(reloaded.round_for_display(1/3)), '0.333333333333');
+assert.strictEqual(String(reloaded.round_for_display(1/3)), '0.333333');
 window.localStorage.setItem = set;
 assert.ok(notices.some(node => node.children[1].textContent === "Couldn't save in this browser. Export to keep a copy."));
 console.log('Decimals formatting, persistence, precision and content isolation passed!');
