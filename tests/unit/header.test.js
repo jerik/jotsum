@@ -13,7 +13,7 @@ for (const entry of ['Import .txt…', 'Export .txt', 'Add line', 'Keyboard shor
 assert.match(header, /class="touch-action"><button[^>]*id="add-line"/);
 assert.match(html, /@media \(pointer: coarse\)/);
 assert.match(html, /max-width: 519\.98px/);
-assert.doesNotMatch(header, /decimals|Open shared link/);
+assert.doesNotMatch(header, /Open shared link/);
 assert.match(header, /href="https:\/\/github.com\/jerik\/jotsum"/);
 for (const button of visible.matchAll(/<button[^>]*>/g)) {
     assert.match(button[0], /class="header-button"/);
@@ -28,7 +28,7 @@ window.location = new URL('https://example.test/');
 window.history = { replaceState: (_a, _b, url) => { window.location = new URL(url); } };
 const ids = ['sidebar', 'drawer-toggle', 'shortsave-list', 'shortsave-empty', 'sidebar-title', 'new-sheet',
     'content', 'header-actions', 'drawer-backdrop', 'more-actions', 'more-toggle', 'add-line',
-    'keyboard-shortcuts', 'shortcut-list', 'current-sheet-name', 'total'];
+    'keyboard-shortcuts', 'shortcut-list', 'current-sheet-name', 'total', 'decimals-toggle', 'messages'];
 const nodes = Object.fromEntries(ids.map(id => [id, mockUiElement()]));
 for (const [id, node] of Object.entries(nodes)) node.id = id;
 nodes['more-actions'].hidden = true;
@@ -134,6 +134,37 @@ assert.strictEqual(nodes['more-actions'].hidden, true);
 assert.strictEqual(document.activeElement, nodes['more-toggle']);
 nodes['keyboard-shortcuts'].emit('click');
 assert.strictEqual(nodes['shortcut-list'].hidden, false);
+// The display toggle keeps the menu open and redraws lines, subtotals,
+// the grand total and every saved sheet's sidebar total without editing text.
+api.import_sheet_text('1/3\n---');
+for (const line of sheet.querySelectorAll()) {
+    line.nextElementSibling = mockUiElement('jo-sum');
+    line.nextElementSibling.classList.add('sum');
+}
+api.save_store([{ id: 'a', lines: ['1/3'] }, { id: 'b', lines: ['2/3'] }]);
+const decimals_store_before = JSON.stringify(api.load_store());
+api.set_more_open(true);
+nodes['decimals-toggle'].tagName = 'BUTTON';
+nodes['more-actions'].appendChild(nodes['decimals-toggle']);
+nodes['decimals-toggle'].emit('click');
+nodes['more-actions'].emit('click', { target: nodes['decimals-toggle'] });
+assert.strictEqual(nodes['more-actions'].hidden, false);
+assert.strictEqual(nodes['decimals-toggle'].textContent, 'Decimals: 6');
+assert.strictEqual(nodes['decimals-toggle'].getAttribute('aria-pressed'), 'true');
+assert.strictEqual(String(nodes.total.textContent), '0.333333');
+for (const line of sheet.querySelectorAll()) {
+    assert.strictEqual(String(line.nextElementSibling.textContent), '0.333333');
+}
+assert.deepStrictEqual(nodes['shortsave-list'].children.map(item => item.children[0].children[1].textContent),
+    ['0.333333', '0.666667']);
+assert.strictEqual(JSON.stringify(api.load_store()), decimals_store_before);
+assert.ok(nodes.messages.children.some(node => node.children[1].textContent === 'Showing up to 6 decimals'));
+nodes['decimals-toggle'].emit('click');
+assert.strictEqual(nodes['decimals-toggle'].textContent, 'Decimals: 2');
+assert.strictEqual(String(nodes.total.textContent), '0.33');
+assert.strictEqual(nodes['more-actions'].hidden, false);
+console.log('Decimals menu redraw passed!');
+
 // Initialization restores the wide preference but never opens a narrow drawer.
 window.localStorage.setItem(api.SIDEBAR_STORAGE_KEY, 'true');
 api.init_sidebar();

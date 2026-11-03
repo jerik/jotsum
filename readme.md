@@ -15,13 +15,21 @@ The numbers are extracted, calculated as a line result, and all line results are
 
 Try it directly in your browser: **[jerik.github.io/jotsum](https://jerik.github.io/jotsum/)** — no account, no installation. The page can be saved for offline use.
 
+## Appearance
+
+The page follows your system’s light/dark setting. It includes an app icon for installing jotsum as a web app.
+
+### Use it as an Omarchy app
+
+Run `omarchy-webapp-install` and enter `jotsum` as the name and `https://jerik.github.io/jotsum/` as the URL. The icon is picked up automatically.
+
 ---
 
 ## At a glance
 
 | | |
 | --- | --- |
-| Line result | Each line is evaluated on its own; the result appears on the right, rounded to two decimals |
+| Line result | Each line is evaluated on its own; the result appears on the right, rounded to two decimals by default |
 | Total | All line results are summed at the bottom |
 | Escaping | `'2024` keeps a number out of the calculation |
 | Headings | `# Rechnung 2024` labels a section without counting its numbers |
@@ -42,7 +50,13 @@ Filters 4.20            4.20
                        21.20
 ```
 
-Results are shown rounded to two decimals, whole numbers without any. Only the display is rounded — the calculation keeps full precision, so three lines of `1 / 3` each show `0.33` while the total shows `1`.
+### Display
+
+In the **⋯** menu, **Decimals: 2** (default) shows two decimal places for fractional results and none for whole numbers; **Decimals: 6** shows up to six, with trailing fractional zeros removed. Rounding is half away from zero (`1.005` → `1.01` with two decimals). The setting applies to all sheets in this browser; it is not stored in the sheet, shared link or `.txt` file.
+
+Only the display is rounded — the calculation keeps full precision, so three lines of `1 / 3` each show `0.33` by default while the total shows `1`.
+
+### Keeping numbers out
 
 An apostrophe directly before a digit keeps that number out of the calculation:
 
@@ -154,6 +168,7 @@ URL input preserves blank lines (including an empty `?text=`) and is decoded onc
 [`?text=3+apples+%2B+4+pears%0A2+bananas+*+7+melons`](https://jerik.github.io/jotsum/?text=3+apples+%2B+4+pears%0A2+bananas+*+7+melons)
 
 **Shared fragment.** `#s=1d.<base64url>` contains UTF-8 text compressed with deflate-raw; `#s=1u.<base64url>` contains uncompressed UTF-8 when that is shorter. Base64url has no padding. Lines are joined with `\n`. Opening a fragment previews and calculates the sheet without saving; **Save to my sheets** (or editing) creates a new shortsave. Invalid links, encoded parts over 64 KB, decoded text over 256 KB, and more than 2000 lines are rejected.
+
 **Text files.** Use **Export .txt** in the header’s **⋯** menu to download the open sheet as UTF-8 `.txt`, named after its display name with unsafe filename characters replaced. Use **Import .txt…** in that menu to choose a `.txt` file, or drop one onto the sheet. Each import opens a new shortsave and leaves existing sheets unchanged. Windows line endings are normalized; blank lines are preserved. Files larger than 256 KiB (262,144 bytes) or 2000 lines are rejected with a notice.
 
 **Offline.** Saving the page stores one self-contained HTML file, including the script, so it runs without a connection.
@@ -164,15 +179,19 @@ URL input preserves blank lines (including an empty `?text=`) and is decoded onc
 
 Click **Share** in the header to copy a self-contained link. The sheet lives in the URL fragment, which browsers do not send to GitHub Pages; anyone with the link can open it. It is a snapshot, so later edits do not change the shared sheet. Links longer than 2000 characters show a warning because some messengers may cut them.
 
-The header also has a **⋯** menu for importing and exporting text files, a short keyboard shortcut list, and **About / GitHub**. On touch devices it includes **Add line** (`Enter`). Below 520 px, **New** and **Share** keep their icons and hide their labels.
+The header also has a **⋯** menu for importing and exporting text files, the decimals setting, a short keyboard shortcut list, and **About / GitHub**. On touch devices it includes **Add line** (`Enter`). Below 520 px, **New** and **Share** keep their icons and hide their labels.
+
+## Messages
+
+Messages appear as an overlay at the bottom. Confirmations disappear after 5 seconds (paused while hovered or focused); messages with an action and errors stay until dismissed. Press `Esc` to dismiss the newest message when the menu and drawer are closed, or use its **×** button. A failed save in this browser shows a message with **Export** to keep a copy.
 
 ## Shortsaves
 
 Every sheet is a shortsave. It is saved automatically on every change; there is no save button.
 
-**New sheet.** **+ New** in the header opens an empty sheet. All existing shortsaves are kept.
+**New sheet.** **New** in the header opens an empty sheet. All existing shortsaves are kept.
 
-**Saved sheets.** The **Saved sheets** list shows every shortsave, named after its first line (a heading without its `#`, an empty sheet as `Untitled`). Right of the name, each entry shows the sheet's total, rounded as under the sheet; a sheet without a number shows no total, and long names are shortened. The sheet that is open is highlighted. The far-left sidebar button or `Ctrl+B` toggles the list at every width. From 900 px it is a collapsible column; only this wide-window preference is remembered. On narrower screens it starts closed as a drawer and closes with the same button, a tap on the backdrop, `Escape`, or by opening an entry. When the list is hidden, the header shows the open sheet’s name.
+**Saved sheets.** The **Saved sheets** list shows every shortsave, named after its first nonblank line (a heading without its `#`, an empty sheet as `Untitled`). Right of the name, each entry shows the sheet's total, rounded as under the sheet; a sheet without a number shows no total, and long names are shortened. The sheet that is open is highlighted. The far-left sidebar button or `Ctrl+B` toggles the list at every width. From 900 px it is a collapsible column; only this wide-window preference is remembered. On narrower screens it starts closed as a drawer and closes with the same button, a tap on the backdrop, `Escape`, or by opening an entry. When the list is hidden, the header shows the open sheet’s name.
 
 **Open and edit.** Tap or click an entry to open it. You keep editing it in place, and every change lands in the same shortsave.
 
@@ -183,8 +202,8 @@ Every sheet is a shortsave. It is saved automatically on every change; there is 
 
 ## Working in multiple tabs
 
-Each tab has its own sheet selection. Opening a saved sheet or choosing **New
-page** in one tab does not change what another tab has open. With available
+Each tab has its own sheet selection. Opening a saved sheet or choosing **New**
+in one tab does not change what another tab has open. With available
 sessionStorage, that selection survives a reload in the same tab. If
 sessionStorage is unavailable, the selection falls back to memory for the
 current page only; it cannot be retained across a reload.
