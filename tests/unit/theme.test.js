@@ -11,7 +11,7 @@ assert.match(css, /@media\s*\(prefers-color-scheme:\s*dark\)\s*{\s*:root\s*{/);
 const palettes = [...css.matchAll(/:root\s*{([^{}]*)}/g)];
 assert.strictEqual(palettes.length, 2);
 for (const [, palette] of palettes) {
-    for (const name of ['background', 'surface', 'text', 'muted', 'border', 'hover', 'active', 'selection', 'accent', 'danger', 'warning', 'info', 'success']) {
+    for (const name of ['background', 'surface', 'text', 'muted', 'border', 'hover', 'active', 'selection', 'accent', 'danger', 'warning', 'info', 'success', 'error']) {
         assert.match(palette, new RegExp(`--${name}:`));
     }
 }
@@ -38,6 +38,9 @@ for (const [index, [, palette]] of palettes.entries()) {
         assert.ok(match, `Palette ${index}: --${name} must be a hex colour`);
         return match[1];
     };
+    for (const name of ['text', 'accent', 'info', 'warning', 'danger']) {
+        assert.ok(contrast(colour(name), colour('surface')) >= 4.5, `Message ${name} contrast in palette ${index}`);
+    }
     for (const name of ['active', 'line', 'surface', 'background', 'text']) {
         const ratio = contrast(colour('selection'), colour(name));
         const minimum = name === 'text' ? 4.5 : 1.5;

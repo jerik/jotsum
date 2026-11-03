@@ -1,17 +1,21 @@
 global.HTMLElement = class HTMLElement {
     constructor() {
         this.attributes = {};
+        this.children = [];
+        this.handlers = {};
     }
     setAttribute(name, value) {
         this.attributes[name] = value;
     }
-    addEventListener() {}
+    addEventListener(type, run) { this.handlers[type] = run; }
+    appendChild(child) { this.children.push(child); child.parentElement = this; return child; }
+    removeChild(child) { this.children.splice(this.children.indexOf(child), 1); }
 };
 global.customElements = {
     define: () => {}
 };
 global.document = {
-    getElementById: () => ({}),
+    getElementById: () => new global.HTMLElement(),
     createElement: () => new global.HTMLElement(),
     querySelector: () => ({
         children: []

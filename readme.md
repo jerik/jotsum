@@ -228,7 +228,7 @@ continued typing dismisses the notice; a failed save leaves it visible.
 | --- | --- |
 | `Ctrl + B` | Toggle saved sheets |
 | `Alt + N` | New sheet |
-| `Escape` | Close the action menu or saved sheets drawer |
+| `Escape` | Close the action menu, saved sheets drawer, or newest message |
 | `Enter` | On the last line: new line. Otherwise: move down |
 | `Ctrl + Enter` | Insert a new line below the current one |
 | `Ctrl + Shift + Enter` | Insert a new line above the current one |

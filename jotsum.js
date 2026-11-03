@@ -32,13 +32,95 @@ let sheet_id_sequence = 0;
 let shared_preview = false;
 let shared_preview_lines = null;
 
-function sharing_notice(message) {
-    const notice = document.getElementById('sharing-notice');
-    if (notice) {
-        notice.textContent = message;
-        notice.hidden = false;
+// The live region exists before any message is announced. No message moves focus.
+const messages = [];
+function show_message({ tone = 'info', text, action, timeout = tone === 'success' ? 5000 : 0 }) {
+    const existing = messages.find(message => message.text === text);
+    if (existing) { existing.restart(); return existing; }
+    const container = document.getElementById('messages');
+    const node = document.createElement('section');
+    node.className = 'message message-' + tone;
+    node.setAttribute('role', tone === 'error' ? 'alert' : 'status');
+    const icon = document.createElement('span');
+    icon.setAttribute('aria-hidden', 'true');
+    icon.textContent = { success: '✓', info: 'ⓘ', warning: '⚠', error: '!' }[tone];
+    icon.className = 'message-icon';
+    const wording = document.createElement('span');
+    wording.className = 'message-text';
+    wording.textContent = text;
+    node.appendChild(icon);
+    node.appendChild(wording);
+    let timer, started, remaining, hovered = false, focused = false;
+    const duration = action || tone === 'error' ? 0 : timeout;
+    const handle = { text, tone, node, dismiss() {
+        clearTimeout(timer);
+        const index = messages.indexOf(handle);
+        if (index < 0) return;
+        messages.splice(index, 1);
+        node.parentElement.removeChild(node);
+    }, restart() {
+        clearTimeout(timer);
+        remaining = duration;
+        started = undefined;
+        resume();
+    } };
+    function resume() {
+        if (!remaining || hovered || focused) return;
+        started = Date.now();
+        timer = setTimeout(() => handle.dismiss(), remaining);
+    }
+    function pause() {
+        clearTimeout(timer);
+        if (started !== undefined) remaining = Math.max(1, remaining - (Date.now() - started));
+        started = undefined;
+    }
+    node.addEventListener('mouseenter', () => { pause(); hovered = true; });
+    node.addEventListener('mouseleave', () => { hovered = false; resume(); });
+    node.addEventListener('focusin', () => { pause(); focused = true; });
+    node.addEventListener('focusout', event => {
+        if (node.contains(event.relatedTarget)) return;
+        focused = false; resume();
+    });
+    if (action) {
+        const button = document.createElement('button');
+        button.type = 'button'; button.className = 'btn message-action'; button.textContent = action.label;
+        button.addEventListener('click', async () => {
+            try {
+                if (await action.run() !== false) handle.dismiss();
+            } catch (error) {
+                // Keep the message available when its action could not complete.
+            }
+        });
+        node.appendChild(button);
+    }
+    const dismiss = document.createElement('button');
+    dismiss.type = 'button'; dismiss.className = 'message-dismiss'; dismiss.textContent = '×';
+    dismiss.setAttribute('aria-label', 'Dismiss'); dismiss.title = 'Dismiss (Esc)';
+    dismiss.addEventListener('click', () => handle.dismiss());
+    node.appendChild(dismiss);
+    if (messages.length === 3) (messages.find(message => message.tone === 'success') || messages[0]).dismiss();
+    messages.push(handle);
+    container.appendChild(node);
+    handle.restart();
+    return handle;
+}
+
+const failed_storage_keys = new Set();
+function storage_write(method, key, value) {
+    try {
+        window.localStorage[method](key, value);
+        failed_storage_keys.delete(key);
+    } catch (error) {
+        if (!failed_storage_keys.size) show_message({ tone: 'error',
+            text: "Couldn't save in this browser. Export to keep a copy.",
+            action: { label: 'Export', run: () => { export_sheet(); return false; } } });
+        failed_storage_keys.add(key);
+        throw error;
     }
 }
+
+let preview_message, remote_message, file_message;
+function sharing_notice(text, tone = 'error') { return show_message({ tone, text }); }
 
 function base64url(bytes) {
     let binary = '';
@@ -89,8 +171,8 @@ async function share_sheet() {
         const lines = Array.from(document.getElementById('sheet').querySelectorAll('jo-line'), line => line.textContent);
         const url = window.location.origin + window.location.pathname + '#s=' + await encode_shared_sheet(lines);
         await window.navigator.clipboard.writeText(url);
-        sharing_notice('Link copied. The sheet lives in the link – anyone with it can open it. It is a snapshot.' +
-            (url.length > 2000 ? ' The URL is longer than 2000 characters; some messengers may cut it.' : ''));
+        sharing_notice('Link copied. Anyone with it can open this snapshot.' +
+            (url.length > 2000 ? ' The URL is longer than 2000 characters; some messengers may cut it.' : ''), 'success');
     } catch (error) {
         sharing_notice('Could not copy the shared sheet link.');
     }
@@ -99,8 +181,7 @@ async function share_sheet() {
 function leave_shared_preview() {
     shared_preview = false;
     shared_preview_lines = null;
-    const banner = document.getElementById('shared-sheet-banner');
-    if (banner) banner.hidden = true;
+    if (preview_message) preview_message.dismiss();
     const url = new URL(window.location.href);
     if (url.hash.startsWith('#s=')) {
         url.hash = '';
@@ -128,12 +209,12 @@ async function open_shared_fragment() {
         const lines = await decode_shared_sheet(window.location.hash.slice(3));
         shared_preview_lines = lines;
         render_sheet(lines);
-        const banner = document.getElementById('shared-sheet-banner');
-        if (banner) banner.hidden = false;
+        preview_message = show_message({ tone: 'info', text: 'Shared sheet · not saved here',
+            action: { label: 'Save to my sheets', run: save_shared_sheet } });
     } catch (error) {
         const sheet = document.getElementById('sheet');
         while (sheet.firstChild) sheet.removeChild(sheet.firstChild);
-        sharing_notice('Could not open shared sheet: invalid or oversized link.');
+        sharing_notice('Could not open shared sheet: invalid or oversized link. Try a fresh link; the limit is 256 KiB and 2000 lines.');
     }
 }
 
@@ -263,7 +344,7 @@ function retry_legacy_migration() {
 
 function write_migration_marker() {
     try {
-        window.localStorage.setItem(MIGRATED_STORAGE_KEY, '1');
+        storage_write('setItem', MIGRATED_STORAGE_KEY, '1');
         migration_pending = false;
     } catch (error) {
         // Retried after the next successful store write.
@@ -306,10 +387,10 @@ function save_store(store, sheet_id) {
             if (sheet_id !== undefined) store_memory = apply_pending_mutations((entries || []).filter(readable_entry));
         }
         for (const [raw, key] of store_backups) {
-            window.localStorage.setItem(key, raw);
+            storage_write('setItem', key, raw);
             store_backups.delete(raw);
         }
-        window.localStorage.setItem(STORE_STORAGE_KEY, JSON.stringify([...store_memory, ...store_invalid]));
+        storage_write('setItem', STORE_STORAGE_KEY, JSON.stringify([...store_memory, ...store_invalid]));
         saved = true;
         pending_mutations.clear();
         store_pending = false;
@@ -346,18 +427,15 @@ function handle_store_change(event) {
 
 // The notice never changes editor content or the tab's sheet association.
 function close_remote_change_notice() {
-    const notice = document.getElementById('remote-change-notice');
-    if (notice) notice.hidden = true;
+    if (remote_message) remote_message.dismiss();
 }
 
 function show_remote_change_notice(deleted) {
-    const notice = document.getElementById('remote-change-notice');
-    const message = document.getElementById('remote-change-message');
-    if (!notice || !message) return;
-    message.textContent = deleted
-        ? 'This sheet was deleted in another tab. Reload opens a new, empty sheet. If you keep typing, this sheet comes back with your text.'
-        : 'This sheet was changed in another tab. Reload shows the latest saved version. If you keep typing, your text replaces the other change.';
-    notice.hidden = false;
+    close_remote_change_notice();
+    remote_message = show_message({ tone: 'warning', text: deleted
+        ? 'Changed in another window. This sheet was deleted. Reload opens a new, empty sheet. If you keep typing, this sheet comes back with your text.'
+        : 'Changed in another window. Reload shows the latest saved version. If you keep typing, your text replaces the other change.',
+        action: { label: 'Reload', run: reload_remote_sheet } });
 }
 
 function reload_remote_sheet() {
@@ -365,7 +443,7 @@ function reload_remote_sheet() {
         // Reload explicitly abandons this sheet's failed local write. Read the
         // persisted snapshot before dropping it, without overlaying mutations.
         const entries = read_store() || [];
-        if (store_unreadable) return;
+        if (store_unreadable) return false;
         const entry = entries.find(entry => readable_entry(entry) && entry.id === active_shortsave_id);
         pending_mutations.delete(active_shortsave_id);
         store_pending = pending_mutations.size > 0;
@@ -378,14 +456,8 @@ function reload_remote_sheet() {
         } else new_sheet();
     } catch (error) {
         // Keep the editor and notice when the saved snapshot cannot be read.
+        return false;
     }
-}
-
-function init_remote_change_notice() {
-    const reload = document.getElementById('remote-change-reload');
-    const close = document.getElementById('remote-change-close');
-    if (reload && typeof reload.addEventListener === 'function') reload.addEventListener('click', reload_remote_sheet);
-    if (close && typeof close.addEventListener === 'function') close.addEventListener('click', close_remote_change_notice);
 }
 
 function read_tab_selection() {
@@ -413,8 +485,8 @@ function set_active_shortsave(id) {
     // jotsum.active is never written.
     if (!preview_objective) return;
     try {
-        if (id) window.localStorage.setItem(ACTIVE_STORAGE_KEY, id);
-        else window.localStorage.removeItem(ACTIVE_STORAGE_KEY);
+        if (id) storage_write('setItem', ACTIVE_STORAGE_KEY, id);
+        else storage_write('removeItem', ACTIVE_STORAGE_KEY);
     } catch (error) {
         // The mirror is informational only.
     }
@@ -477,8 +549,8 @@ function list_shortsaves() {
 function mark_sheet_copy_unsynced(unsynced) {
     if (unsynced === sheet_copy_unsynced) return;
     try {
-        if (unsynced) window.localStorage.setItem(UNSYNCED_STORAGE_KEY, '1');
-        else window.localStorage.removeItem(UNSYNCED_STORAGE_KEY);
+        if (unsynced) storage_write('setItem', UNSYNCED_STORAGE_KEY, '1');
+        else storage_write('removeItem', UNSYNCED_STORAGE_KEY);
         sheet_copy_unsynced = unsynced;
     } catch (error) {
         // Retried with the next edit.
@@ -491,7 +563,7 @@ function backup_sheet_copy() {
     try {
         const raw = window.localStorage.getItem(SHEET_STORAGE_KEY);
         if (raw !== null) {
-            window.localStorage.setItem(SHEET_STORAGE_KEY + '.unsynced.' + new Date().toISOString() + '.' + new_sheet_id(), raw);
+            storage_write('setItem', SHEET_STORAGE_KEY + '.unsynced.' + new Date().toISOString() + '.' + new_sheet_id(), raw);
             console.warn('jotsum.sheet held text the store never received; preserving a backup.');
         }
         sheet_copy_inherited = false;
@@ -561,12 +633,9 @@ function export_sheet() {
     setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
-function import_notice(message) {
-    const notice = document.getElementById('file-notice');
-    if (notice) {
-        notice.textContent = message;
-        notice.hidden = !message;
-    }
+function import_notice(text) {
+    if (file_message) file_message.dismiss();
+    if (text) file_message = show_message({ tone: 'error', text });
 }
 
 function import_sheet_text(text) {
@@ -757,9 +826,9 @@ class JoSheet extends HTMLElement {
         try {
             const saved_texts = lines.map(line => line.textContent);
             if (saved_texts.some(text => text !== '')) {
-                window.localStorage.setItem(SHEET_STORAGE_KEY, JSON.stringify(saved_texts));
+                storage_write('setItem', SHEET_STORAGE_KEY, JSON.stringify(saved_texts));
             } else {
-                window.localStorage.removeItem(SHEET_STORAGE_KEY);
+                storage_write('removeItem', SHEET_STORAGE_KEY);
             }
         } catch (error) {
             // Storage can be unavailable or full; calculations still work.
@@ -1490,7 +1559,7 @@ function update_header_sheet_name() {
 function toggle_sidebar() {
     if (is_wide_layout()) {
         wide_sidebar_collapsed = !wide_sidebar_collapsed;
-        try { window.localStorage.setItem(SIDEBAR_STORAGE_KEY, String(wide_sidebar_collapsed)); } catch (error) { /* Optional preference. */ }
+        try { storage_write('setItem', SIDEBAR_STORAGE_KEY, String(wide_sidebar_collapsed)); } catch (error) { /* Optional preference. */ }
         sync_sidebar_layout();
     } else {
         set_drawer_open(!is_drawer_open());
@@ -1542,6 +1611,9 @@ function init_header_menu() {
 
 function handle_header_keys(event) {
     if (event.key === 'Escape') {
+        const menu = ui_element('more-actions');
+        const occupied = (menu && !menu.hidden) || is_drawer_open();
+        if (!occupied && messages.length) messages[messages.length - 1].dismiss();
         set_more_open(false, true);
         if (is_drawer_open()) {
             set_drawer_open(false);
@@ -1653,11 +1725,10 @@ if (typeof window !== 'undefined') {
     window.onload = function () {
         const fragment = window.location && window.location.hash.startsWith('#s=');
         const opening = fragment ? open_shared_fragment() : handle_url_params();
-        for (const [id, action] of [['share-sheet', share_sheet], ['save-shared-sheet', save_shared_sheet]]) {
+        for (const [id, action] of [['share-sheet', share_sheet]]) {
             const button = document.getElementById(id);
             if (button && typeof button.addEventListener === 'function') button.addEventListener('click', action);
         }
-        init_remote_change_notice();
         init_sheet_files();
         try {
             init_sidebar();
@@ -1712,5 +1783,5 @@ if (typeof window !== 'undefined') {
 }
 
 if (typeof module !== 'undefined' && module.exports) {
-    module.exports = { init_sidebar, handle_header_keys, toggle_sidebar, sync_sidebar_layout, set_more_open, SIDEBAR_STORAGE_KEY, sheet_export, export_sheet, import_sheet_text, import_sheet_file, init_sheet_files, encode_shared_sheet, decode_shared_sheet, share_sheet, save_shared_sheet, render_shortsave_list, new_sheet, open_shortsave, delete_shortsave, list_shortsaves, sheet_total, ACTIVE_STORAGE_KEY, STORE_STORAGE_KEY, JoLine, JoSheet, classify_line, evaluate_sheet, handle_url_params, reset_sheet, SHEET_STORAGE_KEY, sheet_name, new_sheet_id, load_store, save_store };
+    module.exports = { show_message, init_sidebar, handle_header_keys, toggle_sidebar, sync_sidebar_layout, set_more_open, SIDEBAR_STORAGE_KEY, sheet_export, export_sheet, import_sheet_text, import_sheet_file, init_sheet_files, encode_shared_sheet, decode_shared_sheet, share_sheet, save_shared_sheet, render_shortsave_list, new_sheet, open_shortsave, delete_shortsave, list_shortsaves, sheet_total, ACTIVE_STORAGE_KEY, STORE_STORAGE_KEY, JoLine, JoSheet, classify_line, evaluate_sheet, handle_url_params, reset_sheet, SHEET_STORAGE_KEY, sheet_name, new_sheet_id, load_store, save_store };
 }
