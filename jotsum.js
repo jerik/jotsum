@@ -742,6 +742,7 @@ class JoSheet extends HTMLElement {
             total_element.textContent = this.round(total);
             total_element.classList.remove('is-placeholder');
         }
+        update_header_sheet_name();
         if (shared_preview) return;
         persist_shortsave(lines.map(line => line.textContent));
         // Loading renders the store's content; while jotsum.sheet is ahead of
@@ -1389,6 +1390,8 @@ function reset_sheet() {
 // Sidebar (from 900px) and drawer (below) listing the shortsaves.
 // Everything here tolerates a missing or mocked DOM: without the sidebar
 // markup the sheet keeps working and nothing is drawn.
+const SIDEBAR_STORAGE_KEY = storage_namespace + 'sidebar-collapsed';
+let wide_sidebar_collapsed = false;
 const WIDE_LAYOUT_QUERY = '(min-width: 900px)';
 const DELETE_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg>';
 
@@ -1409,6 +1412,7 @@ function is_drawer_open() {
 let rendered_shortsaves = null;
 
 function render_shortsave_list() {
+    update_header_sheet_name();
     const list = ui_element('shortsave-list');
     if (!list) return;
     if (shared_preview) return;
@@ -1473,16 +1477,101 @@ function render_shortsave_list() {
     }
 }
 
+function update_header_sheet_name() {
+    const label = ui_element('current-sheet-name');
+    if (!label) return;
+    const sheet = document.querySelector('jo-sheet');
+    const lines = sheet && typeof sheet.querySelectorAll === 'function'
+        ? Array.from(sheet.querySelectorAll('jo-line'), line => line.textContent) : [];
+    label.textContent = sheet_name(lines);
+    label.title = label.textContent;
+}
+
+function toggle_sidebar() {
+    if (is_wide_layout()) {
+        wide_sidebar_collapsed = !wide_sidebar_collapsed;
+        try { window.localStorage.setItem(SIDEBAR_STORAGE_KEY, String(wide_sidebar_collapsed)); } catch (error) { /* Optional preference. */ }
+        sync_sidebar_layout();
+    } else {
+        set_drawer_open(!is_drawer_open());
+    }
+}
+
+function sync_sidebar_layout() {
+    const sidebar = ui_element('sidebar');
+    const restore_focus = is_wide_layout() && wide_sidebar_collapsed &&
+        sidebar && sidebar.contains(document.activeElement);
+    if (restore_focus) ui_element('drawer-toggle').focus();
+    set_drawer_open(false);
+    document.body.classList.toggle('sidebar-collapsed', wide_sidebar_collapsed);
+    const toggle = ui_element('drawer-toggle');
+    if (toggle) toggle.setAttribute('aria-expanded', String(is_wide_layout() && !wide_sidebar_collapsed));
+    if (sidebar) sidebar.inert = is_wide_layout() ? wide_sidebar_collapsed : !is_drawer_open();
+}
+
+function set_more_open(open, restore_focus = false) {
+    const menu = ui_element('more-actions');
+    const toggle = ui_element('more-toggle');
+    if (!menu || !toggle) return;
+    const was_open = !menu.hidden;
+    menu.hidden = !open;
+    toggle.setAttribute('aria-expanded', String(open));
+    if (!open && was_open && restore_focus) toggle.focus();
+}
+
+function init_header_menu() {
+    const menu = ui_element('more-actions');
+    const toggle = ui_element('more-toggle');
+    if (!menu || !toggle) return;
+    toggle.addEventListener('click', () => set_more_open(menu.hidden, true));
+    menu.addEventListener('click', event => {
+        const button = event.target.closest('button, a');
+        if (button && button.id !== 'keyboard-shortcuts') set_more_open(false);
+    });
+    ui_element('add-line').addEventListener('click', () => add_calc_line());
+    const shortcuts = ui_element('keyboard-shortcuts');
+    shortcuts.addEventListener('click', () => {
+        const list = ui_element('shortcut-list');
+        list.hidden = !list.hidden;
+        shortcuts.setAttribute('aria-expanded', String(!list.hidden));
+    });
+    document.addEventListener('click', event => {
+        if (!menu.contains(event.target) && !toggle.contains(event.target)) set_more_open(false);
+    });
+}
+
+function handle_header_keys(event) {
+    if (event.key === 'Escape') {
+        set_more_open(false, true);
+        if (is_drawer_open()) {
+            set_drawer_open(false);
+            const toggle = ui_element('drawer-toggle');
+            if (toggle) toggle.focus();
+        }
+        return;
+    }
+    if (event.metaKey || event.shiftKey || event.isComposing) return;
+    const key = event.key.toLowerCase();
+    if (event.ctrlKey && !event.altKey && key === 'b') {
+        event.preventDefault();
+        toggle_sidebar();
+    } else if (event.altKey && !event.ctrlKey && key === 'n') {
+        event.preventDefault();
+        new_sheet_from_header();
+    }
+}
+
 function set_drawer_open(open) {
     const sidebar = ui_element('sidebar');
     const toggle = ui_element('drawer-toggle');
     if (!sidebar || !toggle || !document.body) return;
-    // From 900px the sidebar is always visible, so there is nothing to open.
+    // Drawer state is never restored from the wide-window preference.
     const drawer = open && !is_wide_layout();
     const was_open = is_drawer_open();
     const had_focus = sidebar.contains(document.activeElement);
     document.body.classList.toggle('drawer-open', drawer);
-    toggle.setAttribute('aria-expanded', String(drawer));
+    toggle.setAttribute('aria-expanded', String(is_wide_layout() ? !wide_sidebar_collapsed : drawer));
+    sidebar.inert = is_wide_layout() ? wide_sidebar_collapsed : !drawer;
     // Behind the open drawer the page must not be reachable by keyboard.
     ['content', 'header-actions'].forEach(id => {
         const element = ui_element(id);
@@ -1536,21 +1625,19 @@ function init_sidebar() {
     });
 
     const toggle = ui_element('drawer-toggle');
-    if (toggle) toggle.addEventListener('click', () => set_drawer_open(!is_drawer_open()));
+    if (toggle) toggle.addEventListener('click', toggle_sidebar);
+    try { wide_sidebar_collapsed = window.localStorage.getItem(SIDEBAR_STORAGE_KEY) === 'true'; } catch (error) { /* Optional preference. */ }
+    sync_sidebar_layout();
+    init_header_menu();
     const new_button = ui_element('new-sheet');
     if (new_button) new_button.addEventListener('click', new_sheet_from_header);
     const backdrop = ui_element('drawer-backdrop');
     if (backdrop) backdrop.addEventListener('click', () => set_drawer_open(false));
 
-    document.addEventListener('keydown', event => {
-        if (event.key === 'Escape' && is_drawer_open()) {
-            set_drawer_open(false);
-            if (toggle) toggle.focus();
-        }
-    });
+    document.addEventListener('keydown', handle_header_keys);
     if (typeof window.matchMedia === 'function') {
         const wide = window.matchMedia(WIDE_LAYOUT_QUERY);
-        const on_change = () => { if (wide.matches) set_drawer_open(false); };
+        const on_change = sync_sidebar_layout;
         if (typeof wide.addEventListener === 'function') wide.addEventListener('change', on_change);
     }
     if (typeof window.addEventListener === 'function') {
@@ -1625,5 +1712,5 @@ if (typeof window !== 'undefined') {
 }
 
 if (typeof module !== 'undefined' && module.exports) {
-    module.exports = { sheet_export, export_sheet, import_sheet_text, import_sheet_file, init_sheet_files, encode_shared_sheet, decode_shared_sheet, share_sheet, save_shared_sheet, render_shortsave_list, new_sheet, open_shortsave, delete_shortsave, list_shortsaves, sheet_total, ACTIVE_STORAGE_KEY, STORE_STORAGE_KEY, JoLine, JoSheet, classify_line, evaluate_sheet, handle_url_params, reset_sheet, SHEET_STORAGE_KEY, sheet_name, new_sheet_id, load_store, save_store };
+    module.exports = { init_sidebar, handle_header_keys, toggle_sidebar, sync_sidebar_layout, set_more_open, SIDEBAR_STORAGE_KEY, sheet_export, export_sheet, import_sheet_text, import_sheet_file, init_sheet_files, encode_shared_sheet, decode_shared_sheet, share_sheet, save_shared_sheet, render_shortsave_list, new_sheet, open_shortsave, delete_shortsave, list_shortsaves, sheet_total, ACTIVE_STORAGE_KEY, STORE_STORAGE_KEY, JoLine, JoSheet, classify_line, evaluate_sheet, handle_url_params, reset_sheet, SHEET_STORAGE_KEY, sheet_name, new_sheet_id, load_store, save_store };
 }
