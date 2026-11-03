@@ -23,6 +23,7 @@
         --border: #9aa2ad;
         --hover: #e6e9ed;
         --active: #e4ece7;
+        --selection: #9fbfe3;
         --accent: #24743c;
         --accent-hover: #1c6131;
         --on-accent: var(--surface);
@@ -45,6 +46,7 @@
           --border: #626c79;
           --hover: #353b43;
           --active: #303e37;
+          --selection: #496886;
           --accent: #99c5a5;
           --accent-hover: #b2d4bb;
           --on-accent: var(--background);
@@ -71,7 +73,7 @@
       button, input { color: var(--text); }
       input { background: var(--surface); border-color: var(--border); }
       :focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
-      ::selection { background: var(--active); color: var(--text); }
+      ::selection { background: var(--selection); color: var(--text); }
 
       /* Header */
       .site-header {

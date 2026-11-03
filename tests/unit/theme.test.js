@@ -11,8 +11,37 @@ assert.match(css, /@media\s*\(prefers-color-scheme:\s*dark\)\s*{\s*:root\s*{/);
 const palettes = [...css.matchAll(/:root\s*{([^{}]*)}/g)];
 assert.strictEqual(palettes.length, 2);
 for (const [, palette] of palettes) {
-    for (const name of ['background', 'surface', 'text', 'muted', 'border', 'hover', 'active', 'accent', 'danger', 'warning', 'info', 'success']) {
+    for (const name of ['background', 'surface', 'text', 'muted', 'border', 'hover', 'active', 'selection', 'accent', 'danger', 'warning', 'info', 'success']) {
         assert.match(palette, new RegExp(`--${name}:`));
+    }
+}
+// Selection must remain visible even inside the focused line.
+const selections = [...css.matchAll(/::selection\s*{([^{}]*)}/g)];
+assert.ok(selections.length > 0);
+for (const [, selection] of selections) {
+    assert.match(selection, /background:\s*var\(--selection\)\s*;/);
+    assert.match(selection, /color:\s*var\(--text\)\s*;/);
+    assert.doesNotMatch(selection, /var\(--(?:active|line|surface|bg|background)\)/);
+}
+function luminance(hex) {
+    const channels = hex.slice(1).match(/../g).map(value => parseInt(value, 16) / 255)
+        .map(value => value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4);
+    return channels[0] * 0.2126 + channels[1] * 0.7152 + channels[2] * 0.0722;
+}
+function contrast(a, b) {
+    const values = [luminance(a), luminance(b)];
+    return (Math.max(...values) + 0.05) / (Math.min(...values) + 0.05);
+}
+for (const [index, [, palette]] of palettes.entries()) {
+    const colour = name => {
+        const match = palette.match(new RegExp(`--${name}:\\s*(#[0-9a-f]{6});`, 'i'));
+        assert.ok(match, `Palette ${index}: --${name} must be a hex colour`);
+        return match[1];
+    };
+    for (const name of ['active', 'line', 'surface', 'background', 'text']) {
+        const ratio = contrast(colour('selection'), colour(name));
+        const minimum = name === 'text' ? 4.5 : 1.5;
+        assert.ok(ratio >= minimum, `Palette ${index}: selection/${name} contrast ${ratio} < ${minimum}`);
     }
 }
 const names = new Set(('aliceblue antiquewhite aqua aquamarine azure beige bisque black blanchedalmond blue blueviolet brown burlywood cadetblue chartreuse chocolate coral cornflowerblue cornsilk crimson cyan darkblue darkcyan darkgoldenrod darkgray darkgreen darkgrey darkkhaki darkmagenta darkolivegreen darkorange darkorchid darkred darksalmon darkseagreen darkslateblue darkslategray darkslategrey darkturquoise darkviolet deeppink deepskyblue dimgray dimgrey dodgerblue firebrick floralwhite forestgreen fuchsia gainsboro ghostwhite gold goldenrod gray green greenyellow grey honeydew hotpink indianred indigo ivory khaki lavender lavenderblush lawngreen lemonchiffon lightblue lightcoral lightcyan lightgoldenrodyellow lightgray lightgreen lightgrey lightpink lightsalmon lightseagreen lightskyblue lightslategray lightslategrey lightsteelblue lightyellow lime limegreen linen magenta maroon mediumaquamarine mediumblue mediumorchid mediumpurple mediumseagreen mediumslateblue mediumspringgreen mediumturquoise mediumvioletred midnightblue mintcream mistyrose moccasin navajowhite navy oldlace olive olivedrab orange orangered orchid palegoldenrod palegreen paleturquoise palevioletred papayawhip peachpuff peru pink plum powderblue purple rebeccapurple red rosybrown royalblue saddlebrown salmon sandybrown seagreen seashell sienna silver skyblue slateblue slategray slategrey snow springgreen steelblue tan teal thistle tomato turquoise violet wheat white whitesmoke yellow yellowgreen').split(' '));
