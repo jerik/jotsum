@@ -40,7 +40,7 @@ jobs:
             git worktree add --detach "$checkout" "$ref" || return 1
             (cd "$checkout" && ./generate-single-html.sh) &&
               mkdir -p "$destination" &&
-              cp "$checkout/index.html" "$checkout/jotsum.js" "$destination/" ||
+              cp "$checkout/index.html" "$checkout/jotsum.js" "$checkout/apple-touch-icon.png" "$checkout/icon.svg" "$destination/" ||
               status=1
             git worktree remove --force "$checkout"
             return "$status"

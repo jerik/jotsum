@@ -3,24 +3,63 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content" />
+    <meta name="theme-color" media="(prefers-color-scheme: light)" content="#ffffff" />
+    <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#25282e" />
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2064%2064%22%3E%3Crect%20x%3D%222%22%20y%3D%222%22%20width%3D%2260%22%20height%3D%2260%22%20rx%3D%2213%22%20fill%3D%22%2324743c%22%20stroke%3D%22%2399c5a5%22%20stroke-width%3D%223%22%2F%3E%3Cpath%20d%3D%22M17%2018h30M17%2029h22M17%2040h30M35%2049h12%22%20fill%3D%22none%22%20stroke%3D%22%23ffffff%22%20stroke-width%3D%225%22%20stroke-linecap%3D%22round%22%2F%3E%3C%2Fsvg%3E" />
+    <!-- Absolute URL: Omarchy resolves relative icon URLs against the origin, losing /jotsum/. -->
+    <link rel="apple-touch-icon" href="https://jerik.github.io/jotsum/apple-touch-icon.png" />
     <title>jotsum</title>
     <style>
-      /* Seitenleiste/Schublade: die Seite bleibt auch im Dark Mode hell,
-         daher wechseln dort nur Akzent, Grau und Linien (siehe unten). */
+      /* Shared page palette; only these blocks define colours. */
       :root {
+        color-scheme: light dark;
         --header-h: 61px;
         --side-w: 260px;
-        --side-bg: #ffffff;
-        --side-text: #1f2328;
-        --side-muted: #6e7781;
-        --side-border: #d0d7de;
-        --side-hover: #f6f8fa;
-        --side-active-bg: #fffbe6;
-        --side-accent: #1f883d;
-        --side-danger: #cf222e;
+        --background: #f5f6f7;
+        --surface: #ffffff;
+        --line: #eff1f3;
+        --text: #24282e;
+        --muted: #535c67;
+        --border: #9aa2ad;
+        --hover: #e6e9ed;
+        --active: #e4ece7;
+        --accent: #24743c;
+        --accent-hover: #1c6131;
+        --on-accent: var(--surface);
+        --danger: #b42332;
+        --warning: #795b19;
+        --info: #315f88;
+        --success: var(--accent);
+        --notice: #eeece6;
+        --shadow: rgba(24, 28, 34, .2);
+        --backdrop: rgba(24, 28, 34, .3);
+        --focus-ring: var(--accent);
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --background: #1e2025;
+          --surface: #25282e;
+          --line: #292d33;
+          --text: #e4e7eb;
+          --muted: #adb5c0;
+          --border: #626c79;
+          --hover: #353b43;
+          --active: #303e37;
+          --accent: #99c5a5;
+          --accent-hover: #b2d4bb;
+          --on-accent: var(--background);
+          --danger: #f09aa2;
+          --warning: #d6bd83;
+          --info: #a0bdd8;
+          --success: var(--accent);
+          --notice: #33332f;
+          --shadow: rgba(10, 12, 16, .4);
+          --backdrop: rgba(10, 12, 16, .5);
+        }
       }
       body {
         margin: 0;
+        background: var(--background); color: var(--text);
         font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
       }
       html {
@@ -28,10 +67,16 @@
         scroll-padding-top: calc(var(--header-h) + env(safe-area-inset-top) + 8px);
       }
 
+      a { color: var(--accent); }
+      button, input { color: var(--text); }
+      input { background: var(--surface); border-color: var(--border); }
+      :focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
+      ::selection { background: var(--active); color: var(--text); }
+
       /* Header */
       .site-header {
         position: sticky; top: 0; z-index: 30;
-        background: #fff; border-bottom: 1px solid #d0d7de;
+        background: var(--surface); border-bottom: 1px solid var(--border);
         padding-top: env(safe-area-inset-top);
       }
       .wrap {
@@ -43,7 +88,7 @@
       .brand { font: 600 18px/1.2 inherit; margin: 0; }
       .actions { margin-left: auto; display: flex; gap: 8px; flex-wrap: wrap; }
       .btn {
-        border: 1px solid #d0d7de; background: transparent;
+        border: 1px solid var(--border); background: transparent;
         padding: 6px 10px; border-radius: 6px; font: 500 14px inherit;
         min-height: 44px;
         cursor: pointer;
@@ -54,22 +99,22 @@
         display: inline-flex; align-items: center; justify-content: center;
         width: 44px; height: 44px; padding: 0; flex: none;
         border: 1px solid transparent; border-radius: 6px;
-        background: transparent; color: var(--side-text);
+        background: transparent; color: var(--text);
         cursor: pointer;
       }
-      .icon-btn:hover { background: var(--side-hover); border-color: var(--side-border); }
+      .icon-btn:hover { background: var(--hover); border-color: var(--border); }
       .icon-btn svg { width: 22px; height: 22px; }
       .btn:focus-visible,
       .icon-btn:focus-visible,
       .shortsave-open:focus-visible,
       .shortsave-delete:focus-visible,
       .sidebar-title:focus-visible {
-        outline: 2px solid var(--side-accent);
+        outline: 2px solid var(--focus-ring);
         outline-offset: 2px;
       }
-      .btn:hover { background: #f6f8fa; }
-      .btn-primary { background: #1f883d; border-color: #1f883d; color:#fff; }
-      .btn-primary:hover { background:#1a7f37; }
+      .btn:hover { background: var(--hover); }
+      .btn-primary { background: var(--accent); border-color: var(--accent); color:var(--on-accent); }
+      .btn-primary:hover { background:var(--accent-hover); }
       a.btn { color: inherit; text-decoration: none; }
 
 	  /* Grid / Layout – robust, auch in Safari */
@@ -109,33 +154,33 @@
       }
 
       jo-line {
-        background: #f7f7f7;
-        border-bottom: 1px solid #ffffff; /* weiße Trennlinie zwischen Zeilen */
+        background: var(--line);
+        border-bottom: 1px solid var(--surface); /* weiße Trennlinie zwischen Zeilen */
         text-align: left;
       }
       jo-sum {
-        background: #ffffff;
-        border-bottom: 1px solid #ffffff; /* gleiche Trennlinie rechts */
+        background: var(--surface);
+        border-bottom: 1px solid var(--surface); /* gleiche Trennlinie rechts */
         text-align: right;
         white-space: nowrap;
         font-variant-numeric: tabular-nums;
       }
       jo-spacer { 
         padding: 7px; 
-        border-top: 1px solid #d0d7de; /* dein Abschlussstrich */
+        border-top: 1px solid var(--border); /* dein Abschlussstrich */
       }
       jo-total {
-        background: #ffffff;
+        background: var(--surface);
         text-align: right;
         font-weight: bold;
-        border-top: 1px solid #d0d7de; /* passend zum Spacer */
+        border-top: 1px solid var(--border); /* passend zum Spacer */
         white-space: nowrap;
         font-variant-numeric: tabular-nums;
       }
 
 	  /* Aktive Zeile: sehr dezentes Highlight + schmale Akzentleiste links */
 	  jo-line.is-active {
-	    background-color: #fffbe6;             /* heller als vorher */
+	    background-color: var(--active);             /* heller als vorher */
 	    position: relative;
 	  }
 	  jo-line.is-active::before {
@@ -143,7 +188,7 @@
 	    position: absolute;
 	    left: 0; top: 0; bottom: 0;
 	    width: 3px;
-	    background: #d0d7de;                   /* GitHub-Grau als Akzent */
+	    background: var(--accent);
 	  }
 	  jo-line:focus { outline: none; }
 
@@ -157,15 +202,15 @@
 
 	  /* Variablen & Zwischensummen */
 	  jo-sum.is-muted {
-	    color: #6e7781; /* gedimmt, passend zum Footer */
+	    color: var(--muted); /* gedimmt, passend zum Footer */
 	  }
 	  jo-line.is-definition {
 	    font-style: italic;
-	    color: #6e7781;
+	    color: var(--muted);
 	  }
 	  jo-line.is-separator,
 	  jo-line.is-separator + jo-sum {
-	    border-top: 1px solid #d0d7de; /* feine Trennlinie, wie bei jo-spacer/jo-total */
+	    border-top: 1px solid var(--border); /* feine Trennlinie, wie bei jo-spacer/jo-total */
 	  }
 	  jo-line.is-separator + jo-sum {
 	    font-weight: bold;
@@ -178,12 +223,12 @@
 	  }
 	  jo-line.is-placeholder::after {
 	    content: attr(data-placeholder);
-	    color: #8c959f;
+	    color: var(--muted);
 	    pointer-events: none;
 	  }
 	  jo-sum.is-placeholder,
 	  jo-total.is-placeholder {
-	    color: #8c959f;
+	    color: var(--muted);
 	    font-weight: normal;
 	  }
 
@@ -198,48 +243,14 @@
 	    position: absolute;
 	    left: 0; top: 0; bottom: 0;
 	    width: 3px;
-	    background: #cf222e;
+	    background: var(--danger);
 	  }
 	  jo-sum.is-error {
-	    color: #cf222e;
+	    color: var(--danger);
 	    text-align: right;
 	    cursor: help;   /* zeigt, dass am ? eine Erklaerung haengt */
 	  }
 
-	  /* Dark Mode: noch dezenteres Highlight + etwas dunklere Akzentleiste */
-	  @media (prefers-color-scheme: dark){
-	    jo-line.is-active {
-	  	  background-color: rgba(255, 251, 230, 0.10);  /* zartes Gelb, transparent */
-	    }
-	    jo-line.is-active::before {
-	  	  background: #6e7781;                 /* Muted Grey im Dark Mode */
-	    }
-      /* jo-line:focus { outline: none; } */
-
-	    jo-sum.is-muted {
-	      color: #8b949e; /* etwas heller, damit es im Dark Mode lesbar bleibt */
-	    }
-	    jo-line.is-definition {
-	      color: #8b949e;
-	    }
-	    jo-line.is-separator,
-	    jo-line.is-separator + jo-sum {
-	      border-top-color: #30363d;
-	    }
-
-	    jo-line.is-placeholder::after,
-	    jo-sum.is-placeholder,
-	    jo-total.is-placeholder {
-	      color: #6e7781;
-	    }
-
-	    jo-line.is-error::before {
-	      background: #ff7b72;
-	    }
-	    jo-sum.is-error {
-	      color: #ff7b72;
-	    }
-	  }
 
 
       /* Mobile */
@@ -261,27 +272,27 @@
 
       .sidebar {
         box-sizing: border-box;
-        background: var(--side-bg); color: var(--side-text);
-        border-right: 1px solid var(--side-border);
+        background: var(--surface); color: var(--text);
+        border-right: 1px solid var(--border);
         overflow-y: auto; overscroll-behavior: contain;
         -webkit-overflow-scrolling: touch;
       }
       .sidebar-title {
         margin: 0; padding: 14px 16px 8px;
         font-size: 13px; font-weight: 600; letter-spacing: .02em;
-        text-transform: uppercase; color: var(--side-muted);
+        text-transform: uppercase; color: var(--muted);
       }
       .sidebar-title:focus { outline: none; }
       .sidebar-empty {
         margin: 0; padding: 4px 16px 16px;
-        font-size: 14px; color: var(--side-muted);
+        font-size: 14px; color: var(--muted);
       }
       .shortsave-list { list-style: none; margin: 0; padding: 0 0 16px; }
       .shortsave {
         display: flex; align-items: stretch;
         border-left: 4px solid transparent;
       }
-      .shortsave:hover { background: var(--side-hover); }
+      .shortsave:hover { background: var(--hover); }
       .shortsave-open {
         flex: 1; min-width: 0; min-height: 44px;
         display: flex; align-items: center; gap: 8px;
@@ -300,23 +311,23 @@
         flex-shrink: 0; margin-left: auto;
         white-space: nowrap; text-align: right;
         font-variant-numeric: tabular-nums;
-        color: var(--side-text);
+        color: var(--text);
       }
       .shortsave-delete {
         flex: none; width: 44px; min-height: 44px;
         display: inline-flex; align-items: center; justify-content: center;
         margin: 0; padding: 0; border: 0; background: transparent;
-        color: var(--side-muted); cursor: pointer;
+        color: var(--muted); cursor: pointer;
       }
       .shortsave-delete svg { width: 18px; height: 18px; }
-      .shortsave-delete:hover { color: var(--side-danger); }
+      .shortsave-delete:hover { color: var(--danger); }
       .shortsave-open:focus-visible,
       .shortsave-delete:focus-visible { outline-offset: -2px; }
 
       /* Aktives Blatt: Akzentleiste links + Hintergrund + fett (nicht nur Farbe) */
       .shortsave.is-active {
-        background: var(--side-active-bg);
-        border-left-color: var(--side-accent);
+        background: var(--active);
+        border-left-color: var(--accent);
       }
       .shortsave.is-active .shortsave-open { font-weight: 600; }
 
@@ -348,7 +359,7 @@
           width: min(85vw, 320px);
           padding-left: env(safe-area-inset-left);
           padding-bottom: env(safe-area-inset-bottom);
-          box-shadow: 0 8px 24px rgba(31, 35, 40, .2);
+          box-shadow: 0 8px 24px var(--shadow);
           transform: translateX(-105%);
           visibility: hidden;
           transition: transform .2s ease, visibility 0s linear .2s;
@@ -362,7 +373,7 @@
           display: block;
           position: fixed; z-index: 15; left: 0; right: 0; bottom: 0;
           top: calc(var(--header-h) + env(safe-area-inset-top));
-          background: rgba(31, 35, 40, .3);
+          background: var(--backdrop);
         }
         /* Hintergrund nicht mitscrollen, solange die Schublade offen ist */
         body.drawer-open { overflow: hidden; }
@@ -371,33 +382,26 @@
         .sidebar { transition: none !important; }
       }
 
-      /* Dark Mode: die Seite bleibt hell; nur Akzent, Grau und Linien wechseln
-         wie im Block oben. Die dort genutzten helleren Töne (#8b949e, #ff7b72)
-         erreichen auf Weiß keinen ausreichenden Kontrast, daher hier dunklere. */
-      @media (prefers-color-scheme: dark) {
-        :root {
-          --side-muted: #57606a;
-          --side-border: #30363d;
-          --side-accent: #1a7f37;
-          --side-danger: #a40e26;
-        }
-      }
 
       .remote-change-notice {
         max-width: 1008px; margin: 16px auto; padding: 12px 16px;
-        background: #fffbe6; color: #1f2328; border: 1px solid #d0d7de;
+        background: var(--notice); color: var(--text); border: 1px solid var(--border);
         border-radius: 6px;
       }
       .remote-change-notice p { margin: 0 0 8px; }
 
+      #sharing-notice { background: var(--notice); color: var(--info); }
+      #shared-sheet-banner { color: var(--info); }
+      .remote-change-notice { border-color: var(--warning); }
+
       /* Footer */
       footer {
         max-width: 1040px; margin: 40px auto; padding: 0 16px env(safe-area-inset-bottom);
-        text-align: center; font-size: 13px; color: #6e7781;
+        text-align: center; font-size: 13px; color: var(--muted);
       }
       footer a { color: inherit; }
       #version {
-        display: block; margin-bottom: 8px; font-size: 12px; color: #6e7781;
+        display: block; margin-bottom: 8px; font-size: 12px; color: var(--muted);
 		padding-top: 20px; 
       }
     </style>
@@ -412,7 +416,7 @@
                 aria-expanded="false" aria-controls="sidebar">
           <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
         </button>
-        <h1 class="brand">JotSum</h1>
+        <h1 class="brand">jotsum</h1>
         <nav id="header-actions" class="actions">
           <!--a class="btn" href="https://github.com/jerik/jotsum" target="_blank">Repository</a-->
           <button class="btn btn-primary" onclick="add_calc_line()">Add line</button>
