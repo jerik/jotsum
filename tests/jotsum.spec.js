@@ -28,13 +28,14 @@ test('initial start of page with line and sum', async ({ page }) => {
 });
 
 // https://playwright.dev/docs/running-tests
-test('button creates new empty input field', async ({ page }) => {
+test('Enter on the last line creates a new empty input field', async ({ page }) => {
   const jol_before = await page.locator('//jo-line').count(); 
   const jos_before = await page.locator('//jo-sum').count(); 
   // console.log(before); 
 
   // Expect a title "to contain" a substring.
-  await page.locator('button:text("Add line")').click();
+  await page.locator('jo-line').last().press('End');
+  await page.locator('jo-line').last().press('Enter');
   // https://www.marketingscoop.com/tech/web-scraping/playwright-how-to-find-elements-by-xpath-in-playwright/
   const jol_after = await page.locator('//jo-line').count(); 
   const jos_after = await page.locator('//jo-sum').count(); 
@@ -46,7 +47,8 @@ test('button creates new empty input field', async ({ page }) => {
 
 test('add a new calculation', async ({page}) => {
   await expect(page).toHaveTitle(/jotsum/);
-  await page.locator('button:text("Add line")').click();
+  await page.locator('jo-line').last().press('End');
+  await page.locator('jo-line').last().press('Enter');
 
   await expect(page.locator('jo-line')).toHaveCount(2);
   await expect(page.locator('//jo-line')).toHaveCount(2);
@@ -271,8 +273,10 @@ test('the hint survives a focus that arrives after the page was built', async ({
 test('the edited sheet survives a reload with blank lines and recalculated totals', async ({ page }) => {
   const lines = page.locator('jo-line');
   await lines.first().fill(':rate = 10');
-  await page.getByRole('button', { name: 'Add line' }).click();
-  await page.getByRole('button', { name: 'Add line' }).click();
+  await lines.last().press('End');
+  await lines.last().press('Enter');
+  await lines.last().press('End');
+  await lines.last().press('Enter');
   await lines.nth(2).fill('Work 2 * :rate');
   await lines.first().fill(':rate = 25');
 
@@ -282,7 +286,7 @@ test('the edited sheet survives a reload with blank lines and recalculated total
   await expect(page.locator('#total')).toHaveText('50');
 });
 
-test('URL text overrides the saved sheet and new page clears both', async ({ page }) => {
+test('URL text overrides the saved sheet and new sheet clears both', async ({ page }) => {
   await page.locator('jo-line').first().fill('Saved 100');
   await page.goto('/jotsum.html?text=' + encodeURIComponent('Discount 10%\nCost 20'));
   await expect(page.locator('jo-line')).toHaveText(['Discount 10%', 'Cost 20']);
@@ -290,7 +294,7 @@ test('URL text overrides the saved sheet and new page clears both', async ({ pag
   await expect(page.locator('jo-line')).toHaveText(['Discount 10%', 'Cost 20']);
 
   await page.goto('/jotsum.html?text=Shared%2050');
-  await page.getByRole('button', { name: 'New page' }).click();
+  await page.getByRole('button', { name: 'New sheet' }).click();
   await expect(page.locator('jo-line')).toHaveText(['']);
   expect(await page.evaluate(() => localStorage.getItem('jotsum.sheet'))).toBeNull();
   expect(new URL(page.url()).searchParams.has('text')).toBe(false);
@@ -319,6 +323,6 @@ test('malformed or unavailable storage leaves the sheet usable', async ({ page }
   await page.reload();
   await page.locator('jo-line').first().fill('Cost 42');
   await expect(page.locator('#total')).toHaveText('42');
-  await page.getByRole('button', { name: 'New page' }).click();
+  await page.getByRole('button', { name: 'New sheet' }).click();
   await expect(page.locator('jo-line')).toHaveText(['']);
 });

@@ -154,7 +154,7 @@ URL input preserves blank lines (including an empty `?text=`) and is decoded onc
 [`?text=3+apples+%2B+4+pears%0A2+bananas+*+7+melons`](https://jerik.github.io/jotsum/?text=3+apples+%2B+4+pears%0A2+bananas+*+7+melons)
 
 **Shared fragment.** `#s=1d.<base64url>` contains UTF-8 text compressed with deflate-raw; `#s=1u.<base64url>` contains uncompressed UTF-8 when that is shorter. Base64url has no padding. Lines are joined with `\n`. Opening a fragment previews and calculates the sheet without saving; **Save to my sheets** (or editing) creates a new shortsave. Invalid links, encoded parts over 64 KB, decoded text over 256 KB, and more than 2000 lines are rejected.
-**Text files.** Use **Export** in the header to download the open sheet as UTF-8 `.txt`, named after its display name with unsafe filename characters replaced. Use **Import** to choose a `.txt` file, or drop one onto the sheet. Each import opens a new shortsave and leaves existing sheets unchanged. Windows line endings are normalized; blank lines are preserved. Files larger than 256 KiB (262,144 bytes) or 2000 lines are rejected with a notice.
+**Text files.** Use **Export .txt** in the header’s **⋯** menu to download the open sheet as UTF-8 `.txt`, named after its display name with unsafe filename characters replaced. Use **Import .txt…** in that menu to choose a `.txt` file, or drop one onto the sheet. Each import opens a new shortsave and leaves existing sheets unchanged. Windows line endings are normalized; blank lines are preserved. Files larger than 256 KiB (262,144 bytes) or 2000 lines are rejected with a notice.
 
 **Offline.** Saving the page stores one self-contained HTML file, including the script, so it runs without a connection.
 
@@ -162,15 +162,17 @@ URL input preserves blank lines (including an empty `?text=`) and is decoded onc
 
 ## Sharing
 
-Click the **Share** icon in the header to copy a self-contained link. The sheet lives in the URL fragment, which browsers do not send to GitHub Pages; anyone with the link can open it. It is a snapshot, so later edits do not change the shared sheet. Links longer than 2000 characters show a warning because some messengers may cut them.
+Click **Share** in the header to copy a self-contained link. The sheet lives in the URL fragment, which browsers do not send to GitHub Pages; anyone with the link can open it. It is a snapshot, so later edits do not change the shared sheet. Links longer than 2000 characters show a warning because some messengers may cut them.
+
+The header also has a **⋯** menu for importing and exporting text files, a short keyboard shortcut list, and **About / GitHub**. On touch devices it includes **Add line** (`Enter`). Below 520 px, **New** and **Share** keep their icons and hide their labels.
 
 ## Shortsaves
 
 Every sheet is a shortsave. It is saved automatically on every change; there is no save button.
 
-**New page.** The **New page** icon in the header opens an empty sheet. All existing shortsaves are kept.
+**New sheet.** **+ New** in the header opens an empty sheet. All existing shortsaves are kept.
 
-**Saved sheets.** The **Saved sheets** list shows every shortsave, named after its first line (a heading without its `#`, an empty sheet as `Untitled`). Right of the name, each entry shows the sheet's total, rounded as under the sheet; a sheet without a number shows no total, and long names are shortened. The sheet that is open is highlighted. From 900 px width the list stands next to the sheet. On narrower screens it opens as a drawer via the menu icon in the header and closes again with the same icon, a tap on the backdrop, `Escape`, or by opening an entry.
+**Saved sheets.** The **Saved sheets** list shows every shortsave, named after its first line (a heading without its `#`, an empty sheet as `Untitled`). Right of the name, each entry shows the sheet's total, rounded as under the sheet; a sheet without a number shows no total, and long names are shortened. The sheet that is open is highlighted. The far-left sidebar button or `Ctrl+B` toggles the list at every width. From 900 px it is a collapsible column; only this wide-window preference is remembered. On narrower screens it starts closed as a drawer and closes with the same button, a tap on the backdrop, `Escape`, or by opening an entry. When the list is hidden, the header shows the open sheet’s name.
 
 **Open and edit.** Tap or click an entry to open it. You keep editing it in place, and every change lands in the same shortsave.
 
@@ -224,6 +226,9 @@ continued typing dismisses the notice; a failed save leaves it visible.
 
 | Key | Action |
 | --- | --- |
+| `Ctrl + B` | Toggle saved sheets |
+| `Alt + N` | New sheet |
+| `Escape` | Close the action menu or saved sheets drawer |
 | `Enter` | On the last line: new line. Otherwise: move down |
 | `Ctrl + Enter` | Insert a new line below the current one |
 | `Ctrl + Shift + Enter` | Insert a new line above the current one |
