@@ -19,10 +19,6 @@ Try it directly in your browser: **[jerik.github.io/jotsum](https://jerik.github
 
 The page follows your system’s light/dark setting. It includes an app icon for installing jotsum as a web app.
 
-### Use it as an Omarchy app
-
-Run `omarchy-webapp-install` and enter `jotsum` as the name and `https://jerik.github.io/jotsum/` as the URL. The icon is picked up automatically.
-
 ---
 
 ## At a glance
