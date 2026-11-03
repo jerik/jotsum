@@ -17,7 +17,9 @@ function element(node, tagName) {
     return node;
 }
 
+let previous_messages;
 function fixture(search = '') {
+    if (previous_messages) [...previous_messages.children].forEach(n => n.children.at(-1).handlers.click());
     const sheet = element(new JoSheet(), 'JO-SHEET');
     sheet.children = [];
     sheet.querySelectorAll = () => sheet.children.filter(node => node.tagName === 'JO-LINE');
@@ -39,6 +41,7 @@ function fixture(search = '') {
     window.history = {
         replaceState: (_state, _title, url) => { window.location = new URL(url); }
     };
+    previous_messages = document.getElementById('messages');
     return { sheet, total, notices, texts: () => sheet.querySelectorAll().map(line => line.textContent) };
 }
 
@@ -63,11 +66,11 @@ function fixture(search = '') {
     assert.strictEqual(page.total.textContent, 1500);
     assert.strictEqual(JSON.stringify(window.localStorage.data), before);
     assert.strictEqual(JSON.stringify(window.sessionStorage.data), sessionBefore);
-    assert.strictEqual(page.notices['shared-sheet-banner'].hidden, false);
+    assert.strictEqual(page.notices.messages.children.some(n => n.children[1].textContent === 'Shared sheet · not saved here'), true);
     save_shared_sheet();
     save_shared_sheet();
     assert.strictEqual(window.location.hash, '');
-    assert.strictEqual(page.notices['shared-sheet-banner'].hidden, true);
+    assert.strictEqual(page.notices.messages.children.length, 0);
     assert.strictEqual(load_store().filter(entry => JSON.stringify(entry.lines) === JSON.stringify(lines)).length, 1);
     assert.deepStrictEqual(load_store().find(entry => entry.lines[0] === 'Existing 8').lines, ['Existing 8']);
     assert.strictEqual(load_store().length, 2);
@@ -76,14 +79,14 @@ function fixture(search = '') {
     window.navigator.clipboard.writeText = async text => { copied = text; };
     await share_sheet();
     assert.strictEqual(copied, 'https://example.test/jotsum.html#s=' + encoded);
-    assert.ok(page.notices['sharing-notice'].textContent.includes('It is a snapshot.'));
+    assert.ok(page.notices.messages.children.some(n => n.children[1].textContent.includes('Anyone with it can open this snapshot.')));
 
     // Deterministic varied text keeps the compressed link above the messenger threshold.
     page.sheet.querySelectorAll()[0].textContent = Array.from({ length: 1500 }, (_, i) => Math.imul(i, 2654435761).toString(36)).join(' ');
     page.sheet.update_total();
     await share_sheet();
     assert.ok(copied.length > 2000);
-    assert.ok(page.notices['sharing-notice'].textContent.includes('some messengers may cut it'));
+    assert.ok(page.notices.messages.children.some(n => n.children[1].textContent.includes('some messengers may cut it')));
 
     const invalid = [
         '2u.eA', '1u.!!!', '1u.a', '1u.eB', '1d.eA',
@@ -99,7 +102,7 @@ function fixture(search = '') {
         assert.deepStrictEqual(bad.texts(), []);
         assert.strictEqual(JSON.stringify(window.localStorage.data), local);
         assert.strictEqual(JSON.stringify(window.sessionStorage.data), session);
-        assert.ok(bad.notices['sharing-notice'].textContent.includes('Could not open shared sheet'));
+        assert.ok(bad.notices.messages.children.some(n => n.children[1].textContent.includes('Could not open shared sheet')));
     }
     const editing = fixture('#s=' + encoded);
     await window.onload();

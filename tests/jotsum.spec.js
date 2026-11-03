@@ -326,3 +326,15 @@ test('malformed or unavailable storage leaves the sheet usable', async ({ page }
   await page.getByRole('button', { name: 'New sheet' }).click();
   await expect(page.locator('jo-line')).toHaveText(['']);
 });
+
+test('messages overlay the sheet and Esc dismisses the newest', async ({ page }) => {
+  const sheet = page.locator('#sheet');
+  const before = await sheet.boundingBox();
+  await page.evaluate(() => show_message({ tone: 'error', text: 'Could not open test file. Try again.' }));
+  await expect(page.locator('#messages [role="alert"]')).toContainText('Try again.');
+  expect(await sheet.boundingBox()).toEqual(before);
+  await expect(page.locator('#messages button[aria-label="Dismiss"]')).toHaveAttribute('title', 'Dismiss (Esc)');
+  await page.keyboard.press('Escape');
+  await expect(page.locator('#messages .message')).toHaveCount(0);
+  expect(await sheet.boundingBox()).toEqual(before);
+});

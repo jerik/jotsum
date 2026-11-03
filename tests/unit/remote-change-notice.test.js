@@ -49,9 +49,7 @@ function load(tab, path = '/jotsum.html') {
     Object.defineProperty(sheet, 'firstChild', { get: () => sheet.children[0] });
     const total = element(new HTMLElement(), 'SPAN');
     const controls = {};
-    for (const id of ['remote-change-notice', 'remote-change-message', 'remote-change-reload', 'remote-change-close']) {
-        controls[id] = { hidden: true, handlers: {}, addEventListener(name, callback) { this.handlers[name] = callback; } };
-    }
+    controls.messages = new HTMLElement();
     global.document = {
         getElementById: id => controls[id] || (id === 'sheet' ? sheet : total),
         createElement: tag => element(tag === 'jo-line' ? new api.JoLine() : new HTMLElement(), tag.toUpperCase()),
@@ -68,6 +66,11 @@ function load(tab, path = '/jotsum.html') {
             sheet.update_total();
         }
     };
+}
+
+function notice_action(page, action) {
+    const node = page.controls.messages.children.find(n => n.className === 'message message-warning');
+    node.children[action === 'remote-change-reload' ? 2 : 3].handlers.click();
 }
 
 function test(name, run) {
@@ -103,10 +106,10 @@ for (const deleted of [false, true]) {
         test(`${deleted ? 'deletion' : 'change'}: ${action}`, () => {
             const { tab, page } = seeded();
             remote(page, deleted);
-            const notice = page.controls['remote-change-notice'];
-            assert.strictEqual(notice.hidden, false);
-            assert.match(page.controls['remote-change-message'].textContent, /Reload/);
-            assert.match(page.controls['remote-change-message'].textContent, /keep typing/);
+            const notice = page.controls.messages.children.find(n => n.className === 'message message-warning');
+            assert.strictEqual(Boolean(notice), true);
+            assert.match(notice.children[1].textContent, /Reload/);
+            assert.match(notice.children[1].textContent, /keep typing/);
             assert.deepStrictEqual(page.texts(), ['A 10']);
             assert.strictEqual(tab.getItem('jotsum.selected'), 'A');
             page.sheet.update_total();
@@ -117,14 +120,14 @@ for (const deleted of [false, true]) {
                 put([{ id: 'A', lines: ['Newest 100'] }, { id: 'B', lines: ['B 20'] }]);
             }
             const savedBefore = window.localStorage.getItem(key);
-            page.controls[action].handlers.click();
-            assert.strictEqual(notice.hidden, true);
+            notice_action(page, action);
+            assert.strictEqual(page.controls.messages.children.includes(notice), false);
             if (action === 'remote-change-close') {
                 assert.deepStrictEqual(page.texts(), ['A 10']);
                 assert.strictEqual(tab.getItem('jotsum.selected'), 'A');
                 assert.strictEqual(window.localStorage.getItem(key), savedBefore);
                 listeners.storage({ key, storageArea: window.localStorage });
-                assert.strictEqual(notice.hidden, true);
+                assert.strictEqual(page.controls.messages.children.includes(notice), false);
                 page.sheet.update_total();
                 assert.strictEqual(window.localStorage.getItem(key), savedBefore);
                 page.edit('Continued 42');
@@ -146,7 +149,7 @@ test('unrelated sheets and production events leave a preview isolated', () => {
     const { page } = seeded();
     put([{ id: 'A', lines: ['A 10'] }, { id: 'B', lines: ['Other 80'] }]);
     listeners.storage({ key, storageArea: window.localStorage });
-    assert.strictEqual(page.controls['remote-change-notice'].hidden, true);
+    assert.strictEqual(!page.controls.messages.children.some(n => n.className === 'message message-warning'), true);
     const previewKey = 'jotsum.preview.T-112.sheets';
     window.localStorage.setItem('jotsum.preview.T-112.migrated', '1');
     window.localStorage.setItem(previewKey, JSON.stringify([{ id: 'A', lines: ['Preview 5'] }]));
@@ -154,11 +157,11 @@ test('unrelated sheets and production events leave a preview isolated', () => {
     tab.setItem('jotsum.preview.T-112.selected', 'A');
     const preview = load(tab, '/preview/T-112/index.html');
     remote(preview, false);
-    assert.strictEqual(preview.controls['remote-change-notice'].hidden, true);
+    assert.strictEqual(!preview.controls.messages.children.some(n => n.className === 'message message-warning'), true);
     assert.deepStrictEqual(preview.texts(), ['Preview 5']);
     remote(preview, false, previewKey);
-    assert.strictEqual(preview.controls['remote-change-notice'].hidden, false);
-    preview.controls['remote-change-reload'].handlers.click();
+    assert.strictEqual(!preview.controls.messages.children.some(n => n.className === 'message message-warning'), false);
+    notice_action(preview, 'remote-change-reload');
     assert.deepStrictEqual(preview.texts(), ['Remote 99']);
 });
 
@@ -169,7 +172,7 @@ for (const deleted of [false, true]) {
         page.edit('Local 66');
         assert.strictEqual(tab.getItem('jotsum.selected'), 'A');
         assert.deepStrictEqual(entries().find(entry => entry.id === 'A').lines, ['Local 66']);
-        assert.strictEqual(page.controls['remote-change-notice'].hidden, true);
+        assert.strictEqual(!page.controls.messages.children.some(n => n.className === 'message message-warning'), true);
     });
 }
 
@@ -187,12 +190,12 @@ for (const deleted of [false, true]) {
             assert.deepStrictEqual(entries().find(entry => entry.id === 'A').lines, ['A 10']);
             local.setItem = setItem;
             remote(page, deleted);
-            assert.strictEqual(page.controls['remote-change-notice'].hidden, false);
+            assert.strictEqual(!page.controls.messages.children.some(n => n.className === 'message message-warning'), false);
             assert.deepStrictEqual(page.texts(), ['Unsaved 77']);
             assert.strictEqual(tab.getItem('jotsum.selected'), 'A');
             const saved = local.getItem(key);
-            page.controls[action].handlers.click();
-            assert.strictEqual(page.controls['remote-change-notice'].hidden, true);
+            notice_action(page, action);
+            assert.strictEqual(!page.controls.messages.children.some(n => n.className === 'message message-warning'), true);
             assert.strictEqual(local.getItem(key), saved);
             if (action === 'remote-change-reload') {
                 assert.deepStrictEqual(page.texts(), deleted ? [''] : ['Remote 99']);
@@ -223,15 +226,15 @@ for (const unreadable of ['invalid JSON', 'read failure']) {
             if (name === key) throw new Error('Storage unavailable');
             return getItem.call(this, name);
         };
-        page.controls['remote-change-reload'].handlers.click();
+        notice_action(page, 'remote-change-reload');
         assert.deepStrictEqual(page.texts(), ['A 10']);
         assert.strictEqual(tab.getItem('jotsum.selected'), 'A');
-        assert.strictEqual(page.controls['remote-change-notice'].hidden, false);
+        assert.strictEqual(!page.controls.messages.children.some(n => n.className === 'message message-warning'), false);
         local.getItem = getItem;
         put([{ id: 'A', lines: ['Recovered 12'] }]);
-        page.controls['remote-change-reload'].handlers.click();
+        notice_action(page, 'remote-change-reload');
         assert.deepStrictEqual(page.texts(), ['Recovered 12']);
-        assert.strictEqual(page.controls['remote-change-notice'].hidden, true);
+        assert.strictEqual(!page.controls.messages.children.some(n => n.className === 'message message-warning'), true);
     });
 }
 
@@ -248,7 +251,7 @@ test('failed save followed by an unrelated remote edit keeps the notice hidden',
     local.setItem = setItem;
     put([{ id: 'A', lines: ['A 10'] }, { id: 'B', lines: ['Remote B 90'] }]);
     listeners.storage({ key, storageArea: local });
-    assert.strictEqual(page.controls['remote-change-notice'].hidden, true);
+    assert.strictEqual(!page.controls.messages.children.some(n => n.className === 'message message-warning'), true);
     assert.deepStrictEqual(page.texts(), ['Unsaved 77']);
     assert.strictEqual(tab.getItem('jotsum.selected'), 'A');
     assert.deepStrictEqual(entries().find(entry => entry.id === 'A').lines, ['A 10']);
@@ -269,19 +272,19 @@ for (const deleted of [false, true]) {
             setItem.call(this, name, value);
         };
         page.edit('Unsaved overwrite 77');
-        assert.strictEqual(page.controls['remote-change-notice'].hidden, false);
+        assert.strictEqual(!page.controls.messages.children.some(n => n.className === 'message message-warning'), false);
         assert.strictEqual(local.getItem(key), saved);
         assert.deepStrictEqual(page.texts(), ['Unsaved overwrite 77']);
         assert.strictEqual(tab.getItem('jotsum.selected'), 'A');
         // Repeated events for the same persisted snapshot change nothing.
         listeners.storage({ key, storageArea: local });
-        assert.strictEqual(page.controls['remote-change-notice'].hidden, false);
+        assert.strictEqual(!page.controls.messages.children.some(n => n.className === 'message message-warning'), false);
         local.setItem = setItem;
         page.edit('Successful overwrite 88');
-        assert.strictEqual(page.controls['remote-change-notice'].hidden, true);
+        assert.strictEqual(!page.controls.messages.children.some(n => n.className === 'message message-warning'), true);
         assert.deepStrictEqual(entries().find(entry => entry.id === 'A').lines, ['Successful overwrite 88']);
         assert.strictEqual(tab.getItem('jotsum.selected'), 'A');
         listeners.storage({ key, storageArea: local });
-        assert.strictEqual(page.controls['remote-change-notice'].hidden, true);
+        assert.strictEqual(!page.controls.messages.children.some(n => n.className === 'message message-warning'), true);
     });
 }

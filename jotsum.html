@@ -31,6 +31,7 @@
         --warning: #795b19;
         --info: #315f88;
         --success: var(--accent);
+        --error: var(--danger);
         --notice: #eeece6;
         --shadow: rgba(24, 28, 34, .2);
         --backdrop: rgba(24, 28, 34, .3);
@@ -54,6 +55,7 @@
           --warning: #d6bd83;
           --info: #a0bdd8;
           --success: var(--accent);
+        --error: var(--danger);
           --notice: #33332f;
           --shadow: rgba(10, 12, 16, .4);
           --backdrop: rgba(10, 12, 16, .5);
@@ -386,16 +388,26 @@
       }
 
 
-      .remote-change-notice {
-        max-width: 1008px; margin: 16px auto; padding: 12px 16px;
-        background: var(--notice); color: var(--text); border: 1px solid var(--border);
-        border-radius: 6px;
+      #messages {
+        position: fixed; z-index: 10; left: 50%; transform: translateX(-50%);
+        bottom: max(16px, env(safe-area-inset-bottom));
+        width: min(36rem, calc(100vw - 32px - env(safe-area-inset-left) - env(safe-area-inset-right)));
+        max-width: 36rem; display: flex; flex-direction: column; gap: 8px;
+        pointer-events: none;
       }
-      .remote-change-notice p { margin: 0 0 8px; }
-
-      #sharing-notice { background: var(--notice); color: var(--info); }
-      #shared-sheet-banner { color: var(--info); }
-      .remote-change-notice { border-color: var(--warning); }
+      .message {
+        --message-accent: var(--info);
+        display: flex; align-items: center; gap: 12px; padding: 12px;
+        background: var(--surface); color: var(--text); border: 1px solid var(--message-accent);
+        border-radius: 8px; box-shadow: 0 4px 16px var(--shadow); pointer-events: auto;
+      }
+      .message-success { --message-accent: var(--success); }
+      .message-warning { --message-accent: var(--warning); }
+      .message-error { --message-accent: var(--error); }
+      .message-icon { color: var(--message-accent); }
+      .message-text { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+      .message-dismiss { flex: none; color: var(--text); background: var(--surface); border: 0; padding: 8px; cursor: pointer; }
+      .message-action { flex: none; }
 
       /* Calm header and disclosure */
       .wrap { flex-wrap: nowrap; }
@@ -466,7 +478,7 @@
                 <li>Ctrl+B — Saved sheets</li><li>Alt+N — New sheet</li>
                 <li>Enter — Next / new line</li><li>Ctrl+Enter — Insert below</li>
                 <li>Ctrl+Shift+Enter — Insert above</li><li>Ctrl+Delete — Remove line</li>
-                <li>↑ / ↓ — Move between lines</li><li>Escape — Close menu / drawer</li>
+                <li>↑ / ↓ — Move between lines</li><li>Escape — Close menu / drawer / newest message</li>
               </ul>
             </li>
             <li><a href="https://github.com/jerik/jotsum">About / GitHub</a></li>
@@ -485,18 +497,8 @@
       </aside>
       <div id="drawer-backdrop" class="drawer-backdrop"></div>
 
+      <div id="messages" aria-live="polite" aria-relevant="additions text"></div>
       <main id="content" class="content">
-        <section id="remote-change-notice" class="remote-change-notice" role="status" hidden>
-          <p id="remote-change-message"></p>
-          <button type="button" id="remote-change-reload" class="btn">Reload</button>
-          <button type="button" id="remote-change-close" class="btn">Dismiss</button>
-        </section>
-        <p id="sharing-notice" role="status" hidden></p>
-        <section id="shared-sheet-banner" class="remote-change-notice" hidden>
-          <p>Shared sheet</p>
-          <button type="button" id="save-shared-sheet" class="btn">Save to my sheets</button>
-        </section>
-        <p id="file-notice" class="remote-change-notice" role="status" hidden></p>
         <!-- Sheet -->
         <jo-sheet id="sheet">
         </jo-sheet>
