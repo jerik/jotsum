@@ -5,6 +5,8 @@ const preview_objective = typeof window !== 'undefined' && window.location &&
 const storage_namespace = preview_objective ? `jotsum.preview.${encodeURIComponent(preview_objective[1]).replace(/\./g, '%2E')}.` : 'jotsum.';
 const SHEET_STORAGE_KEY = storage_namespace + 'sheet';
 const STORE_STORAGE_KEY = storage_namespace + 'sheets';
+const DECIMALS_STORAGE_KEY = storage_namespace + 'decimals';
+let decimals_mode = '2';
 const ACTIVE_STORAGE_KEY = storage_namespace + 'active';
 // Set once the legacy keys above have been migrated; they are never read again.
 const MIGRATED_STORAGE_KEY = storage_namespace + 'migrated';
@@ -519,13 +521,58 @@ function persist_shortsave(lines) {
     }
 }
 
-// Two decimals for display. Anything that rounds to zero is shown as 0:
-// 0.3 - 0.1 - 0.2 is a tiny negative float, and "-0.00" would look like a
-// debt that is not there.
+// Preferences belong to this browser, never to sheet content or exports.
+function load_decimals() {
+    decimals_mode = '2';
+    try {
+        if (window.localStorage.getItem(DECIMALS_STORAGE_KEY) === 'all') decimals_mode = 'all';
+    } catch (error) {
+        show_message({ tone: 'error', text: "Couldn't read decimals setting in this browser." });
+    }
+    update_decimals_button();
+}
+
+function update_decimals_button() {
+    const button = ui_element('decimals-toggle');
+    if (!button) return;
+    button.textContent = 'Decimals: ' + decimals_mode;
+    button.setAttribute('aria-pressed', String(decimals_mode === 'all'));
+}
+
+function toggle_decimals() {
+    decimals_mode = decimals_mode === '2' ? 'all' : '2';
+    try { storage_write('setItem', DECIMALS_STORAGE_KEY, decimals_mode); }
+    catch (error) { /* Keep the display usable when persistence fails. */ }
+    update_decimals_button();
+    const sheet = document.getElementById('sheet');
+    if (sheet && sheet.update_total) sheet.update_total(true);
+    render_shortsave_list();
+    show_message({ tone: 'success', text: 'Showing ' + decimals_mode + ' decimals' });
+}
+
 function round_for_display(num) {
-    if (num % 1 !== 0) {
-        const text = num.toFixed(2);
-        return Number(text) === 0 ? 0 : text;
+    if (decimals_mode === 'all') {
+        // Number removes insignificant zeros and uses plain decimals in the
+        // normal range; extreme magnitudes retain JavaScript's notation.
+        const value = Number(num.toPrecision(12));
+        if (Math.abs(value) >= 1e-7 && Math.abs(value) < 1e-6) {
+            const [digits, exponent] = String(value).split('e-');
+            return (value < 0 ? '-' : '') + '0.' +
+                '0'.repeat(Number(exponent) - 1) + digits.replace('-', '').replace('.', '');
+        }
+        return value === 0 ? 0 : value;
+    }
+    if (num % 1 !== 0 && Number.isFinite(num)) {
+        // Shift the decimal string, avoiding binary multiplication errors at
+        // half cents. Round the magnitude so negative ties go away from zero.
+        const [coefficient, exponent = '0'] = String(Math.abs(num)).split('e');
+        const shifted = Number(coefficient + 'e' + (Number(exponent) + 2));
+        // Beyond safe integers, shifting loses cents; doubles this large
+        // cannot land on half-cent ties, so native formatting is exact.
+        if (Math.abs(shifted) > Number.MAX_SAFE_INTEGER) return num.toFixed(2);
+        const rounded = Math.round(shifted);
+        const value = Number(String(rounded) + 'e-2') * Math.sign(num);
+        return value === 0 ? 0 : value.toFixed(2);
     }
     return num === 0 ? 0 : num;
 }
@@ -724,7 +771,7 @@ class JoSheet extends HTMLElement {
         this.addEventListener('line-added', this.update_total);
     }
 
-    update_total() {
+    update_total(display_only = false) {
         if (shared_preview && shared_preview_lines && !rendering_sheet &&
             !same_lines(shared_preview_lines, Array.from(this.querySelectorAll('jo-line'), line => line.textContent))) {
             save_shared_sheet();
@@ -812,7 +859,7 @@ class JoSheet extends HTMLElement {
             total_element.classList.remove('is-placeholder');
         }
         update_header_sheet_name();
-        if (shared_preview) return;
+        if (display_only === true || shared_preview) return;
         persist_shortsave(lines.map(line => line.textContent));
         // Loading renders the store's content; while jotsum.sheet is ahead of
         // the store, keep that newer copy instead of replacing it.
@@ -1595,8 +1642,11 @@ function init_header_menu() {
     toggle.addEventListener('click', () => set_more_open(menu.hidden, true));
     menu.addEventListener('click', event => {
         const button = event.target.closest('button, a');
-        if (button && button.id !== 'keyboard-shortcuts') set_more_open(false);
+        if (button && button.id !== 'keyboard-shortcuts' && button.id !== 'decimals-toggle') set_more_open(false);
     });
+    const decimals = ui_element('decimals-toggle');
+    if (decimals) decimals.addEventListener('click', toggle_decimals);
+    update_decimals_button();
     ui_element('add-line').addEventListener('click', () => add_calc_line());
     const shortcuts = ui_element('keyboard-shortcuts');
     shortcuts.addEventListener('click', () => {
@@ -1723,6 +1773,7 @@ if (typeof window !== 'undefined') {
         window.addEventListener('storage', handle_store_change);
     }
     window.onload = function () {
+        load_decimals();
         const fragment = window.location && window.location.hash.startsWith('#s=');
         const opening = fragment ? open_shared_fragment() : handle_url_params();
         for (const [id, action] of [['share-sheet', share_sheet]]) {
@@ -1783,5 +1834,5 @@ if (typeof window !== 'undefined') {
 }
 
 if (typeof module !== 'undefined' && module.exports) {
-    module.exports = { show_message, init_sidebar, handle_header_keys, toggle_sidebar, sync_sidebar_layout, set_more_open, SIDEBAR_STORAGE_KEY, sheet_export, export_sheet, import_sheet_text, import_sheet_file, init_sheet_files, encode_shared_sheet, decode_shared_sheet, share_sheet, save_shared_sheet, render_shortsave_list, new_sheet, open_shortsave, delete_shortsave, list_shortsaves, sheet_total, ACTIVE_STORAGE_KEY, STORE_STORAGE_KEY, JoLine, JoSheet, classify_line, evaluate_sheet, handle_url_params, reset_sheet, SHEET_STORAGE_KEY, sheet_name, new_sheet_id, load_store, save_store };
+    module.exports = { round_for_display, load_decimals, toggle_decimals, DECIMALS_STORAGE_KEY, show_message, init_sidebar, handle_header_keys, toggle_sidebar, sync_sidebar_layout, set_more_open, SIDEBAR_STORAGE_KEY, sheet_export, export_sheet, import_sheet_text, import_sheet_file, init_sheet_files, encode_shared_sheet, decode_shared_sheet, share_sheet, save_shared_sheet, render_shortsave_list, new_sheet, open_shortsave, delete_shortsave, list_shortsaves, sheet_total, ACTIVE_STORAGE_KEY, STORE_STORAGE_KEY, JoLine, JoSheet, classify_line, evaluate_sheet, handle_url_params, reset_sheet, SHEET_STORAGE_KEY, sheet_name, new_sheet_id, load_store, save_store };
 }

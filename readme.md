@@ -238,3 +238,5 @@ continued typing dismisses the notice; a failed save leaves it visible.
 ---
 
 Source and issues on [GitHub](https://github.com/jerik/jotsum).
+
+The Decimals setting in the ⋯ menu is saved in this browser for all sheets; jotsum calculates with floating point, and “all” shows 12 significant digits.
