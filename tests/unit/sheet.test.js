@@ -260,3 +260,59 @@ testEvaluateSheet();
 testEvaluateSheetErrors();
 testRoundingIsDisplayOnly();
 testInsertLine();
+
+function testDeleteLine() {
+    for (const [texts, index, expected, focusIndex] of [
+        [['5'], 0, [''], 0],
+        [['1', '2', '3'], 1, ['1', '3'], 1],
+        [['1', '2'], 1, ['1'], 0],
+        [['1', '2'], 0, ['2'], 0],
+    ]) {
+        const sheet = new JoSheet();
+        const total = mockUiElement('span');
+        const originalGetElement = document.getElementById;
+        document.getElementById = id => id === 'sheet' ? sheet : id === 'total' ? total : mockUiElement();
+        sheet.querySelectorAll = () => sheet.children.filter(node => node.tagName === 'JO-LINE');
+        let updates = 0;
+        // Use the sheet's real event subscription, without a keyup that could
+        // mask a missing line-deleted notification from a detached line.
+        sheet.dispatchEvent = event => {
+            assert.strictEqual(event.type, 'line-deleted');
+            assert.strictEqual(event.bubbles, true);
+            updates++;
+            sheet.handlers[event.type].call(sheet);
+        };
+        for (const text of texts) {
+            for (const tag of ['jo-line', 'jo-sum']) {
+                const node = mockUiElement(tag);
+                node.textContent = tag === 'jo-line' ? text : '';
+                node.parentNode = sheet;
+                for (const [property, offset] of [['nextElementSibling', 1], ['previousElementSibling', -1]]) {
+                    Object.defineProperty(node, property, {
+                        get: () => sheet.children[sheet.children.indexOf(node) + offset] || null
+                    });
+                }
+                sheet.appendChild(node);
+            }
+        }
+        const line = sheet.children[index * 2];
+        line.delete_line = JoLine.prototype.delete_line;
+        let prevented = false;
+        JoLine.prototype.handle_keys.call(line, {
+            which: 46, ctrlKey: true,
+            preventDefault() { prevented = true; }
+        });
+        assert.strictEqual(prevented, true);
+        assert.strictEqual(updates, 1);
+        assert.deepStrictEqual(sheet.querySelectorAll().map(line => line.textContent), expected);
+        assert.strictEqual(total.textContent, evaluate_sheet(expected).total);
+        const saved = window.localStorage.getItem('jotsum.sheet');
+        assert.deepStrictEqual(saved === null ? [''] : JSON.parse(saved), expected);
+        document.getElementById = originalGetElement;
+        assert.strictEqual(sheet.children.length, expected.length * 2);
+        assert.strictEqual(document.activeElement, sheet.children[focusIndex * 2]);
+    }
+    console.log('All 4 line deletion tests passed!');
+}
+
+testDeleteLine();
