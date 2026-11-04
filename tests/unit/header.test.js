@@ -5,14 +5,13 @@ const header = html.match(/<header\b[\s\S]*?<\/header>/)[0];
 const visible = header.slice(0, header.indexOf('<ul id="more-actions"'));
 assert.deepStrictEqual([...visible.matchAll(/<button[^>]*id="([^"]+)"/g)].map(m => m[1]),
     ['drawer-toggle', 'new-sheet', 'share-sheet', 'more-toggle']);
-assert.match(visible, /class="brand">jotsum/);
-assert.match(visible, /class="action-label">New/);
-assert.match(visible, /class="action-label">Share/);
+assert.doesNotMatch(visible, /class="brand"|class="action-label"/);
 assert.doesNotMatch(visible, /Add line/);
 for (const entry of ['Import .txt…', 'Export .txt', 'Add line', 'Keyboard shortcuts', 'About / GitHub']) assert.ok(header.includes(entry));
-assert.match(header, /class="touch-action"><button[^>]*id="add-line"/);
-assert.match(html, /@media \(pointer: coarse\)/);
-assert.match(html, /max-width: 519\.98px/);
+assert.match(header, /<button[^>]*id="add-line"/);
+assert.match(html, /<title>jotsum · B<\/title>/);
+assert.strictEqual([...html.matchAll(/id="total"/g)].length, 1);
+assert.match(html, /class="total-bar"[\s\S]*id="total"/);
 assert.doesNotMatch(header, /Open shared link/);
 assert.match(header, /href="https:\/\/github.com\/jerik\/jotsum"/);
 for (const button of visible.matchAll(/<button[^>]*>/g)) {
@@ -65,36 +64,25 @@ const key = (key, options = {}) => {
     (listeners.keydown || []).forEach(fn => fn(event));
     return event;
 };
-assert.strictEqual(nodes['drawer-toggle'].getAttribute('aria-expanded'), 'true');
-assert.ok(key('b', { ctrlKey: true, target: { isContentEditable: true } }).prevented);
-assert.ok(document.body.classList.contains('sidebar-collapsed'));
-assert.strictEqual(window.localStorage.getItem(api.SIDEBAR_STORAGE_KEY), 'true');
-wide = false; resize();
-assert.ok(!document.body.classList.contains('drawer-open'));
+assert.strictEqual(nodes['drawer-toggle'].getAttribute('aria-expanded'), 'false');
+assert.strictEqual(nodes.sidebar.inert, true);
 const before = JSON.stringify(window.localStorage.data);
-api.handle_header_keys({ key: 'b', ctrlKey: true, preventDefault() {} });
-assert.ok(document.body.classList.contains('drawer-open'));
-assert.strictEqual(JSON.stringify(window.localStorage.data), before);
-assert.strictEqual(nodes.content.inert, true);
-key('Escape');
-assert.ok(!document.body.classList.contains('drawer-open'));
-assert.strictEqual(document.activeElement, nodes['drawer-toggle']);
-assert.strictEqual(nodes.content.inert, false);
-wide = true; resize();
-assert.ok(document.body.classList.contains('sidebar-collapsed'));
-api.toggle_sidebar();
-assert.strictEqual(window.localStorage.getItem(api.SIDEBAR_STORAGE_KEY), 'false');
-wide = false; resize();
-assert.ok(!document.body.classList.contains('drawer-open'));
-wide = true; resize();
-assert.strictEqual(nodes['drawer-toggle'].getAttribute('aria-expanded'), 'true');
-for (const collapse of [() => key('b', { ctrlKey: true }), () => nodes['drawer-toggle'].emit('click')]) {
+for (const width of [true, false]) {
+    wide = width; resize();
+    assert.ok(!document.body.classList.contains('drawer-open'));
+    assert.ok(key('b', { ctrlKey: true, target: { isContentEditable: true } }).prevented);
+    assert.strictEqual(nodes['drawer-toggle'].getAttribute('aria-expanded'), 'true');
+    assert.strictEqual(nodes.content.inert, true);
     nodes['sidebar-title'].focus();
-    collapse();
+    key('Escape');
     assert.strictEqual(nodes.sidebar.inert, true);
     assert.strictEqual(document.activeElement, nodes['drawer-toggle']);
-    api.toggle_sidebar();
+    assert.strictEqual(nodes.content.inert, false);
+    nodes['drawer-toggle'].emit('click');
+    assert.ok(document.body.classList.contains('drawer-open'));
+    nodes['drawer-toggle'].emit('click');
 }
+assert.strictEqual(JSON.stringify(window.localStorage.data), before);
 // Only the two specified modifier combinations are intercepted.
 for (const options of [{ ctrlKey: true }, { metaKey: true }, { altKey: true, shiftKey: true }, { altKey: true, ctrlKey: true }]) {
     assert.ok(!api.handle_header_keys({ key: 'n', ...options, preventDefault() { throw Error('intercepted'); } }));
@@ -165,22 +153,17 @@ assert.strictEqual(String(nodes.total.textContent), '0.33');
 assert.strictEqual(nodes['more-actions'].hidden, false);
 console.log('Decimals menu redraw passed!');
 
-// Initialization restores the wide preference but never opens a narrow drawer.
-window.localStorage.setItem(api.SIDEBAR_STORAGE_KEY, 'true');
-api.init_sidebar();
-assert.ok(document.body.classList.contains('sidebar-collapsed'));
-wide = false;
-api.init_sidebar();
-assert.ok(!document.body.classList.contains('drawer-open'));
-assert.strictEqual(nodes['drawer-toggle'].getAttribute('aria-expanded'), 'false');
-wide = true;
-window.localStorage.setItem(api.SIDEBAR_STORAGE_KEY, 'false');
-api.init_sidebar();
-assert.ok(!document.body.classList.contains('sidebar-collapsed'));
-// Optional persistence must never block the toggle.
+// Initialization always closes the drawer, regardless of the old pinned preference.
+for (const preference of ['true', 'false']) {
+    window.localStorage.setItem(api.SIDEBAR_STORAGE_KEY, preference);
+    api.init_sidebar();
+    assert.ok(!document.body.classList.contains('drawer-open'));
+    assert.strictEqual(nodes['drawer-toggle'].getAttribute('aria-expanded'), 'false');
+}
+// Unavailable optional preference storage must not block the drawer.
 window.localStorage.setItem = () => { throw Error('blocked'); };
-api.toggle_sidebar();
-assert.ok(document.body.classList.contains('sidebar-collapsed'));
+assert.doesNotThrow(() => api.toggle_sidebar());
+assert.ok(document.body.classList.contains('drawer-open'));
 window.localStorage.getItem = () => { throw Error('blocked'); };
 assert.doesNotThrow(() => api.init_sidebar());
-console.log('Header markup, shortcuts, disclosure, sidebar and persistence checks passed!');
+console.log('Header markup, shortcuts, disclosure and drawer checks passed!');

@@ -1514,7 +1514,7 @@ function reset_sheet() {
     render_sheet([]);
 }
 
-// Sidebar (from 900px) and drawer (below) listing the shortsaves.
+// Saved sheets drawer at every window width.
 // Everything here tolerates a missing or mocked DOM: without the sidebar
 // markup the sheet keeps working and nothing is drawn.
 const SIDEBAR_STORAGE_KEY = storage_namespace + 'sidebar-collapsed';
@@ -1529,7 +1529,7 @@ function ui_element(id) {
 }
 
 function is_wide_layout() {
-    return typeof window.matchMedia === 'function' && window.matchMedia(WIDE_LAYOUT_QUERY).matches;
+    return false; // Variant B always uses the drawer layout.
 }
 
 function is_drawer_open() {
