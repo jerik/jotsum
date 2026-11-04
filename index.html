@@ -1765,6 +1765,7 @@ class JoLine extends HTMLElement {
                 next_line.focus();
             }
         } else if (e.which === 46 && e.ctrlKey) { // Ctrl+Delete
+            e.preventDefault();
             this.delete_line();
         }
     }
@@ -1799,18 +1800,23 @@ class JoLine extends HTMLElement {
         const nextLine = this.nextElementSibling ? this.nextElementSibling.nextElementSibling : null;
         const prevLine = this.previousElementSibling ? this.previousElementSibling.previousElementSibling : null;
 
-        parent.removeChild(this);
-        if (sumElement) {
-            parent.removeChild(sumElement);
+        if (!nextLine && !prevLine) {
+            this.textContent = '';
+            this.focus();
+        } else {
+            parent.removeChild(this);
+            if (sumElement) {
+                parent.removeChild(sumElement);
+            }
+
+            if (nextLine) {
+                nextLine.focus();
+            } else {
+                prevLine.focus();
+            }
         }
 
-        if (nextLine) {
-            nextLine.focus();
-        } else if (prevLine) {
-            prevLine.focus();
-        }
-
-        this.dispatchEvent(new Event('line-deleted', { bubbles: true }));
+        parent.dispatchEvent(new Event('line-deleted', { bubbles: true }));
     }
 }
 
@@ -2372,7 +2378,7 @@ if (typeof module !== 'undefined' && module.exports) {
         <!-- Footer -->
         <footer>
 		Use the operators + - * / ( ) <br/> Download for offline use • Source and docs on <a href="https://github.com/jerik/jotsum">GitHub</a>
-          <span id="version">2026-11-03T22:37:55Z<br>310-g72c3374</span>
+          <span id="version">2026-11-04T20:55:52Z<br>313-g9d5f0e0</span>
         </footer>
       </main>
     </div>
