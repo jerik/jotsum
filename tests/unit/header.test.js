@@ -1,29 +1,19 @@
 const assert = require('assert');
 const fs = require('fs');
 const html = fs.readFileSync(require('path').join(__dirname, '../../jotsum.html'), 'utf8');
-const header = html.match(/<header\b[\s\S]*?<\/header>/)[0];
-const visible = header.slice(0, header.indexOf('<ul id="more-actions"'));
-assert.deepStrictEqual([...visible.matchAll(/<button[^>]*id="([^"]+)"/g)].map(m => m[1]),
-    ['drawer-toggle', 'new-sheet', 'share-sheet', 'more-toggle']);
-assert.match(visible, /class="brand">jotsum/);
-assert.match(visible, /class="action-label">New/);
-assert.match(visible, /class="action-label">Share/);
-assert.doesNotMatch(visible, /Add line/);
-for (const entry of ['Import .txt…', 'Export .txt', 'Add line', 'Keyboard shortcuts', 'About / GitHub']) assert.ok(header.includes(entry));
-assert.match(header, /class="touch-action"><button[^>]*id="add-line"/);
-assert.match(html, /@media \(pointer: coarse\)/);
-assert.match(html, /max-width: 519\.98px/);
-assert.doesNotMatch(header, /Open shared link/);
-assert.match(header, /href="https:\/\/github.com\/jerik\/jotsum"/);
-for (const button of visible.matchAll(/<button[^>]*>/g)) {
-    assert.match(button[0], /class="header-button"/);
-    assert.match(button[0], /title="[^"]+"/);
-}
+const menu = html.match(/<nav\b[\s\S]*?<\/nav>/)[0];
+const visible = menu.slice(0, menu.indexOf('<ul id="more-actions"'));
+assert.deepStrictEqual([...visible.matchAll(/<button[^>]*id="([^"]+)"/g)].map(m => m[1]), ['more-toggle']);
+assert.doesNotMatch(html, /<header\b|<footer\b/);
+assert.match(html, /<title>jotsum · A<\/title>/);
+assert.match(menu, /A · Notizblock/);
+for (const entry of ['New sheet', 'Share', 'Saved sheets', 'Import .txt…', 'Export .txt', 'Add line', 'Keyboard shortcuts', 'About / GitHub', 'id="version"']) assert.ok(menu.includes(entry));
+assert.doesNotMatch(html, /class="touch-action"/);
+assert.match(html, /max-width: none/);
 
 const api = require('../../jotsum.js');
 let wide = true;
-let resize;
-window.matchMedia = () => ({ matches: wide, addEventListener: (_type, fn) => { resize = fn; } });
+window.matchMedia = () => ({ matches: wide });
 window.location = new URL('https://example.test/');
 window.history = { replaceState: (_a, _b, url) => { window.location = new URL(url); } };
 const ids = ['sidebar', 'drawer-toggle', 'shortsave-list', 'shortsave-empty', 'sidebar-title', 'new-sheet',
@@ -65,35 +55,28 @@ const key = (key, options = {}) => {
     (listeners.keydown || []).forEach(fn => fn(event));
     return event;
 };
-assert.strictEqual(nodes['drawer-toggle'].getAttribute('aria-expanded'), 'true');
-assert.ok(key('b', { ctrlKey: true, target: { isContentEditable: true } }).prevented);
-assert.ok(document.body.classList.contains('sidebar-collapsed'));
-assert.strictEqual(window.localStorage.getItem(api.SIDEBAR_STORAGE_KEY), 'true');
-wide = false; resize();
-assert.ok(!document.body.classList.contains('drawer-open'));
+assert.strictEqual(nodes['drawer-toggle'].getAttribute('aria-expanded'), 'false');
 const before = JSON.stringify(window.localStorage.data);
-api.handle_header_keys({ key: 'b', ctrlKey: true, preventDefault() {} });
+assert.ok(key('b', { ctrlKey: true, target: { isContentEditable: true } }).prevented);
 assert.ok(document.body.classList.contains('drawer-open'));
 assert.strictEqual(JSON.stringify(window.localStorage.data), before);
 assert.strictEqual(nodes.content.inert, true);
+assert.strictEqual(nodes['header-actions'].inert, true);
 key('Escape');
 assert.ok(!document.body.classList.contains('drawer-open'));
-assert.strictEqual(document.activeElement, nodes['drawer-toggle']);
+assert.strictEqual(document.activeElement, nodes['more-toggle']);
 assert.strictEqual(nodes.content.inert, false);
-wide = true; resize();
-assert.ok(document.body.classList.contains('sidebar-collapsed'));
-api.toggle_sidebar();
-assert.strictEqual(window.localStorage.getItem(api.SIDEBAR_STORAGE_KEY), 'false');
-wide = false; resize();
-assert.ok(!document.body.classList.contains('drawer-open'));
-wide = true; resize();
-assert.strictEqual(nodes['drawer-toggle'].getAttribute('aria-expanded'), 'true');
-for (const collapse of [() => key('b', { ctrlKey: true }), () => nodes['drawer-toggle'].emit('click')]) {
+for (const width of [false, true]) {
+    wide = width;
+    api.set_more_open(true);
+    nodes['drawer-toggle'].emit('click');
+    assert.ok(document.body.classList.contains('drawer-open'));
+    assert.strictEqual(nodes['more-actions'].hidden, true);
+    assert.strictEqual(nodes.sidebar.inert, false);
     nodes['sidebar-title'].focus();
-    collapse();
+    nodes['drawer-backdrop'].emit('click');
     assert.strictEqual(nodes.sidebar.inert, true);
-    assert.strictEqual(document.activeElement, nodes['drawer-toggle']);
-    api.toggle_sidebar();
+    assert.strictEqual(document.activeElement, nodes['more-toggle']);
 }
 // Only the two specified modifier combinations are intercepted.
 for (const options of [{ ctrlKey: true }, { metaKey: true }, { altKey: true, shiftKey: true }, { altKey: true, ctrlKey: true }]) {
@@ -165,22 +148,12 @@ assert.strictEqual(String(nodes.total.textContent), '0.33');
 assert.strictEqual(nodes['more-actions'].hidden, false);
 console.log('Decimals menu redraw passed!');
 
-// Initialization restores the wide preference but never opens a narrow drawer.
-window.localStorage.setItem(api.SIDEBAR_STORAGE_KEY, 'true');
-api.init_sidebar();
-assert.ok(document.body.classList.contains('sidebar-collapsed'));
-wide = false;
-api.init_sidebar();
-assert.ok(!document.body.classList.contains('drawer-open'));
-assert.strictEqual(nodes['drawer-toggle'].getAttribute('aria-expanded'), 'false');
-wide = true;
-window.localStorage.setItem(api.SIDEBAR_STORAGE_KEY, 'false');
-api.init_sidebar();
-assert.ok(!document.body.classList.contains('sidebar-collapsed'));
-// Optional persistence must never block the toggle.
-window.localStorage.setItem = () => { throw Error('blocked'); };
-api.toggle_sidebar();
-assert.ok(document.body.classList.contains('sidebar-collapsed'));
-window.localStorage.getItem = () => { throw Error('blocked'); };
-assert.doesNotThrow(() => api.init_sidebar());
-console.log('Header markup, shortcuts, disclosure, sidebar and persistence checks passed!');
+// A stored preference from another layout must never pin or open the drawer.
+for (const preference of ['true', 'false']) {
+    window.localStorage.setItem(api.SIDEBAR_STORAGE_KEY, preference);
+    api.init_sidebar();
+    assert.ok(!document.body.classList.contains('drawer-open'));
+    assert.strictEqual(nodes['drawer-toggle'].getAttribute('aria-expanded'), 'false');
+    assert.strictEqual(nodes.sidebar.inert, true);
+}
+console.log('Notepad markup, shortcuts, disclosure and drawer checks passed!');

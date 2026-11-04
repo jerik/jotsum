@@ -294,6 +294,8 @@ test('URL text overrides the saved sheet and new sheet clears both', async ({ pa
   await expect(page.locator('jo-line')).toHaveText(['Discount 10%', 'Cost 20']);
 
   await page.goto('/jotsum.html?text=Shared%2050');
+  // Variant A keeps New sheet in the ⋯ menu.
+  await page.locator('#more-toggle').click();
   await page.getByRole('button', { name: 'New sheet' }).click();
   await expect(page.locator('jo-line')).toHaveText(['']);
   expect(await page.evaluate(() => localStorage.getItem('jotsum.sheet'))).toBeNull();
@@ -323,6 +325,8 @@ test('malformed or unavailable storage leaves the sheet usable', async ({ page }
   await page.reload();
   await page.locator('jo-line').first().fill('Cost 42');
   await expect(page.locator('#total')).toHaveText('42');
+  // Variant A keeps New sheet in the ⋯ menu.
+  await page.locator('#more-toggle').click();
   await page.getByRole('button', { name: 'New sheet' }).click();
   await expect(page.locator('jo-line')).toHaveText(['']);
 });

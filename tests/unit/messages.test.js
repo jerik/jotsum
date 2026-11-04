@@ -73,7 +73,7 @@ tick(4999); assert.strictEqual(stack.length, 1); tick(1); assert.strictEqual(sta
     clear();
     const html = fs.readFileSync('jotsum.html', 'utf8');
     assert.match(html, /id="messages" aria-live="polite"/);
-    assert.match(html, /#messages\s*{\s*position: fixed; z-index: 10/);
+    assert.match(html, /#messages\s*{\s*position: fixed; z-index: 40/);
     assert.doesNotMatch(html, /id="(?:sharing-notice|file-notice|remote-change-notice|shared-sheet-banner)"/);
     console.log('Message lifetime, pause, actions, roles, stack, Esc and storage failure checks passed!');
 })().catch(error => { console.error(error); process.exitCode = 1; });

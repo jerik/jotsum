@@ -1518,18 +1518,12 @@ function reset_sheet() {
 // Everything here tolerates a missing or mocked DOM: without the sidebar
 // markup the sheet keeps working and nothing is drawn.
 const SIDEBAR_STORAGE_KEY = storage_namespace + 'sidebar-collapsed';
-let wide_sidebar_collapsed = false;
-const WIDE_LAYOUT_QUERY = '(min-width: 900px)';
 const DELETE_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg>';
 
 function ui_element(id) {
     if (typeof document === 'undefined' || typeof document.getElementById !== 'function') return null;
     const element = document.getElementById(id);
     return element && typeof element.appendChild === 'function' && typeof element.contains === 'function' ? element : null;
-}
-
-function is_wide_layout() {
-    return typeof window.matchMedia === 'function' && window.matchMedia(WIDE_LAYOUT_QUERY).matches;
 }
 
 function is_drawer_open() {
@@ -1615,25 +1609,12 @@ function update_header_sheet_name() {
 }
 
 function toggle_sidebar() {
-    if (is_wide_layout()) {
-        wide_sidebar_collapsed = !wide_sidebar_collapsed;
-        try { storage_write('setItem', SIDEBAR_STORAGE_KEY, String(wide_sidebar_collapsed)); } catch (error) { /* Optional preference. */ }
-        sync_sidebar_layout();
-    } else {
-        set_drawer_open(!is_drawer_open());
-    }
+    set_more_open(false);
+    set_drawer_open(!is_drawer_open());
 }
 
 function sync_sidebar_layout() {
-    const sidebar = ui_element('sidebar');
-    const restore_focus = is_wide_layout() && wide_sidebar_collapsed &&
-        sidebar && sidebar.contains(document.activeElement);
-    if (restore_focus) ui_element('drawer-toggle').focus();
     set_drawer_open(false);
-    document.body.classList.toggle('sidebar-collapsed', wide_sidebar_collapsed);
-    const toggle = ui_element('drawer-toggle');
-    if (toggle) toggle.setAttribute('aria-expanded', String(is_wide_layout() && !wide_sidebar_collapsed));
-    if (sidebar) sidebar.inert = is_wide_layout() ? wide_sidebar_collapsed : !is_drawer_open();
 }
 
 function set_more_open(open, restore_focus = false) {
@@ -1678,7 +1659,7 @@ function handle_header_keys(event) {
         set_more_open(false, true);
         if (is_drawer_open()) {
             set_drawer_open(false);
-            const toggle = ui_element('drawer-toggle');
+            const toggle = ui_element('more-toggle');
             if (toggle) toggle.focus();
         }
         return;
@@ -1698,13 +1679,13 @@ function set_drawer_open(open) {
     const sidebar = ui_element('sidebar');
     const toggle = ui_element('drawer-toggle');
     if (!sidebar || !toggle || !document.body) return;
-    // Drawer state is never restored from the wide-window preference.
-    const drawer = open && !is_wide_layout();
+    // Every window uses the same temporary drawer.
+    const drawer = open;
     const was_open = is_drawer_open();
     const had_focus = sidebar.contains(document.activeElement);
     document.body.classList.toggle('drawer-open', drawer);
-    toggle.setAttribute('aria-expanded', String(is_wide_layout() ? !wide_sidebar_collapsed : drawer));
-    sidebar.inert = is_wide_layout() ? wide_sidebar_collapsed : !drawer;
+    toggle.setAttribute('aria-expanded', String(drawer));
+    sidebar.inert = !drawer;
     // Behind the open drawer the page must not be reachable by keyboard.
     ['content', 'header-actions'].forEach(id => {
         const element = ui_element(id);
@@ -1715,7 +1696,8 @@ function set_drawer_open(open) {
             sidebar.querySelector('.shortsave-open') || ui_element('sidebar-title');
         if (target) target.focus();
     } else if (!drawer && was_open && had_focus) {
-        toggle.focus();
+        const menu_toggle = ui_element('more-toggle');
+        if (menu_toggle) menu_toggle.focus();
     }
 }
 
@@ -1759,7 +1741,6 @@ function init_sidebar() {
 
     const toggle = ui_element('drawer-toggle');
     if (toggle) toggle.addEventListener('click', toggle_sidebar);
-    try { wide_sidebar_collapsed = window.localStorage.getItem(SIDEBAR_STORAGE_KEY) === 'true'; } catch (error) { /* Optional preference. */ }
     sync_sidebar_layout();
     init_header_menu();
     const new_button = ui_element('new-sheet');
@@ -1768,11 +1749,6 @@ function init_sidebar() {
     if (backdrop) backdrop.addEventListener('click', () => set_drawer_open(false));
 
     document.addEventListener('keydown', handle_header_keys);
-    if (typeof window.matchMedia === 'function') {
-        const wide = window.matchMedia(WIDE_LAYOUT_QUERY);
-        const on_change = sync_sidebar_layout;
-        if (typeof wide.addEventListener === 'function') wide.addEventListener('change', on_change);
-    }
     if (typeof window.addEventListener === 'function') {
         window.addEventListener('shortsaves-changed', render_shortsave_list);
     }
