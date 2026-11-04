@@ -338,3 +338,46 @@ test('messages overlay the sheet and Esc dismisses the newest', async ({ page })
   await expect(page.locator('#messages .message')).toHaveCount(0);
   expect(await sheet.boundingBox()).toEqual(before);
 });
+
+
+test('Ctrl+Delete clears the only line and keeps it ready for typing', async ({ page }) => {
+  await page.goto('/jotsum.html?text=5');
+  const line = page.locator('jo-line');
+  await line.focus();
+  await page.keyboard.press('Control+Delete');
+
+  await expect(line).toHaveCount(1);
+  await expect(page.locator('jo-sum')).toHaveCount(1);
+  await expect(line).toHaveText('');
+  await expect(line).toBeFocused();
+  await expect(page.locator('#total')).toHaveText('0');
+  await page.keyboard.type('7');
+  await expect(line).toHaveText('7');
+});
+
+test('Ctrl+Delete removes the middle line and updates the total', async ({ page }) => {
+  await page.goto('/jotsum.html?text=' + encodeURIComponent('1\n2\n3'));
+  const lines = page.locator('jo-line');
+  await lines.nth(1).focus();
+  await page.keyboard.press('Control+Delete');
+
+  await expect(lines).toHaveCount(2);
+  await expect(lines).toHaveText(['1', '3']);
+  await expect(page.locator('jo-sum')).toHaveCount(2);
+  await expect(lines.nth(1)).toBeFocused();
+  await expect(page.locator('#total')).toHaveText('4');
+});
+
+test('Ctrl+Delete on the only line saves the cleared sheet', async ({ page }) => {
+  const line = page.locator('jo-line');
+  await line.first().fill('Saved 5');
+  await page.reload();
+  await expect(line).toHaveText(['Saved 5']);
+
+  await line.first().focus();
+  await page.keyboard.press('Control+Delete');
+  await page.reload();
+
+  await expect(line).toHaveText(['']);
+  await expect(page.locator('#total')).toHaveText('0');
+});

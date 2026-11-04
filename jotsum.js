@@ -1289,6 +1289,7 @@ class JoLine extends HTMLElement {
                 next_line.focus();
             }
         } else if (e.which === 46 && e.ctrlKey) { // Ctrl+Delete
+            e.preventDefault();
             this.delete_line();
         }
     }
@@ -1323,18 +1324,23 @@ class JoLine extends HTMLElement {
         const nextLine = this.nextElementSibling ? this.nextElementSibling.nextElementSibling : null;
         const prevLine = this.previousElementSibling ? this.previousElementSibling.previousElementSibling : null;
 
-        parent.removeChild(this);
-        if (sumElement) {
-            parent.removeChild(sumElement);
+        if (!nextLine && !prevLine) {
+            this.textContent = '';
+            this.focus();
+        } else {
+            parent.removeChild(this);
+            if (sumElement) {
+                parent.removeChild(sumElement);
+            }
+
+            if (nextLine) {
+                nextLine.focus();
+            } else {
+                prevLine.focus();
+            }
         }
 
-        if (nextLine) {
-            nextLine.focus();
-        } else if (prevLine) {
-            prevLine.focus();
-        }
-
-        this.dispatchEvent(new Event('line-deleted', { bubbles: true }));
+        parent.dispatchEvent(new Event('line-deleted', { bubbles: true }));
     }
 }
 
