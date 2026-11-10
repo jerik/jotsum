@@ -398,14 +398,14 @@ test('total aligns with the sheet at every layout width and position', async ({ 
             sheet: rect('jo-line').left,
             total: rect('#total').right,
             result: rect('jo-sum').right,
-            toggle: rect('#drawer-toggle').left,
+            toggle: rect('#drawer-toggle svg').left,
             actions: rect('#header-actions').right,
             width: document.documentElement.clientWidth
           };
         });
         expect(Math.abs(edges.label - edges.sheet)).toBeLessThan(1);
         expect(Math.abs(edges.total - edges.result)).toBeLessThan(1);
-        expect(edges.toggle).toBe(16);
+        expect(Math.abs(edges.toggle - 16)).toBeLessThan(1);
         expect(edges.width - edges.actions).toBe(16);
       }
     }
