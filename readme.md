@@ -26,7 +26,7 @@ The page follows your system’s light/dark setting. It includes an app icon for
 | | |
 | --- | --- |
 | Line result | Each line is evaluated on its own; the result appears on the right, rounded to two decimals by default |
-| Total | All line results are summed at the bottom |
+| Total | All contributing line results are summed in a fixed bar; move it to the top with its arrow |
 | Escaping | `'2024` keeps a number out of the calculation |
 | Headings | `# Rechnung 2024` labels a section without counting its numbers |
 | Variables | `:rate = 85`, used later as `12 * :rate` |
@@ -66,7 +66,7 @@ Only `500` is counted. The apostrophe has to sit directly in front of a digit, s
 
 ## Headings
 
-Start a line with one to six `#` characters followed by a space (for example, `# Rechnung 2024` or `## Materials`). Headings appear larger and bold, with no line result. Their numbers and expressions are excluded from the total and all subtotals. A heading does not start a new subtotal block; use `---` for that.
+Start a line with one to six `#` characters followed by a space (for example, `# Rechnung 2024` or `## Materials`). Headings appear larger and bold, with a line result of 0. Their numbers and expressions are excluded from the total and all subtotals. A heading does not start a new subtotal block; use `---` for that.
 
 ---
 
@@ -175,7 +175,9 @@ URL input preserves blank lines (including an empty `?text=`) and is decoded onc
 
 Click **Share** in the header to copy a self-contained link. The sheet lives in the URL fragment, which browsers do not send to GitHub Pages; anyone with the link can open it. It is a snapshot, so later edits do not change the shared sheet. Links longer than 2000 characters show a warning because some messengers may cut them.
 
-The header also has a **⋯** menu for importing and exporting text files, the decimals setting, a short keyboard shortcut list, and **About / GitHub**. On touch devices it includes **Add line** (`Enter`). Below 520 px, **New** and **Share** keep their icons and hide their labels.
+The compact header has icons for **Saved sheets**, **New sheet**, **Share**, and **⋯**, alongside the open sheet’s name. The menu offers text file import and export, decimals, quick help, keyboard shortcuts, offline download, **About / GitHub**, and the version. Changing decimals closes the menu.
+
+The total defaults to a fixed bottom bar. Its arrow moves it directly below the header and back; this browser remembers the choice. Messages appear above the bottom bar, or near the bottom edge when the total is at the top.
 
 ## Messages
 
@@ -187,7 +189,7 @@ Every sheet is a shortsave. It is saved automatically on every change; there is 
 
 **New sheet.** **New** in the header opens an empty sheet. All existing shortsaves are kept.
 
-**Saved sheets.** The **Saved sheets** list shows every shortsave, named after its first nonblank line (a heading without its `#`, an empty sheet as `Untitled`). Right of the name, each entry shows the sheet's total, rounded as under the sheet; a sheet without a number shows no total, and long names are shortened. The sheet that is open is highlighted. The far-left sidebar button or `Ctrl+B` toggles the list at every width. From 900 px it is a collapsible column; only this wide-window preference is remembered. On narrower screens it starts closed as a drawer and closes with the same button, a tap on the backdrop, `Escape`, or by opening an entry. When the list is hidden, the header shows the open sheet’s name.
+**Saved sheets.** The **Saved sheets** list shows every shortsave, named after its first nonblank line (a heading without its `#`, an empty sheet as `Untitled`). Right of the name, each entry shows the sheet's total, rounded as under the sheet; a sheet without a number shows no total, and long names are shortened. The sheet that is open is highlighted. The far-left sidebar button or `Alt+B` (`Ctrl+B` also works) toggles the drawer at every width. Its badge shows the sheet count, capped at `99+`. At widths of 700 px or more, the pin button keeps the sidebar beside the sheet; this preference is remembered. The heading also has a **+** button for a new sheet. An unpinned drawer closes with the sidebar button, backdrop, `Escape`, or by opening an entry. The header always shows the open sheet’s name. Tab visits pin, **+**, then the list as one stop. Inside the list, arrows move focus, Enter opens, and Delete asks to delete the focused sheet. `Alt+↑` / `Alt+↓` opens the previous / next saved sheet from anywhere, retaining focus in the editor or list.
 
 **Open and edit.** Tap or click an entry to open it. You keep editing it in place, and every change lands in the same shortsave.
 
@@ -241,9 +243,14 @@ continued typing dismisses the notice; a failed save leaves it visible.
 
 | Key | Action |
 | --- | --- |
-| `Ctrl + B` | Toggle saved sheets |
+| `Alt + B` / `Ctrl + B` | Toggle saved sheets |
+| `Alt + ↑` / `Alt + ↓` | Open previous / next saved sheet |
+| `F1` | Toggle quick help |
+| `F2` / `Ctrl + /` (also `Ctrl + ?`) | Toggle keyboard shortcuts |
+| `Delete` in saved sheets | Delete the focused sheet, after confirmation |
+| `↑` / `↓`, `Enter` in saved sheets | Move focus, open focused sheet |
 | `Alt + N` | New sheet |
-| `Escape` | Close the action menu, saved sheets drawer, or newest message |
+| `Escape` | Close help, the action menu, saved sheets drawer, or newest message |
 | `Enter` | On the last line: new line. Otherwise: move down |
 | `Ctrl + Enter` | Insert a new line below the current one |
 | `Ctrl + Shift + Enter` | Insert a new line above the current one |

@@ -546,6 +546,7 @@ function update_decimals_button() {
 }
 
 function toggle_decimals() {
+    set_more_open(false);
     decimals_mode = decimals_mode === '2' ? '6' : '2';
     try { storage_write('setItem', DECIMALS_STORAGE_KEY, decimals_mode); }
     catch (error) { /* Keep the display usable when persistence fails. */ }
@@ -1262,6 +1263,7 @@ class JoLine extends HTMLElement {
     }
 
     handle_keys(e) {
+        if (e.altKey) return;
         if (e.which === 13) { // Enter
             e.preventDefault();
             if (e.ctrlKey) {
@@ -1519,6 +1521,52 @@ function reset_sheet() {
 // markup the sheet keeps working and nothing is drawn.
 const SIDEBAR_STORAGE_KEY = storage_namespace + 'sidebar-pinned';
 let sidebar_pinned = false;
+const TOTAL_POSITION_STORAGE_KEY = storage_namespace + 'total-position';
+function set_total_position(top) {
+    document.body.classList.toggle('total-top', top);
+    const button = ui_element('total-position');
+    if (button) {
+        button.setAttribute('aria-label', top ? 'Move total to bottom' : 'Move total to top');
+        button.title = button.getAttribute('aria-label');
+    }
+}
+function toggle_total_position() {
+    const top = !document.body.classList.contains('total-top');
+    set_total_position(top);
+    try { storage_write('setItem', TOTAL_POSITION_STORAGE_KEY, top ? 'top' : 'bottom'); } catch (error) { /* Optional preference. */ }
+}
+function load_total_position() {
+    let top = false;
+    try { top = window.localStorage.getItem(TOTAL_POSITION_STORAGE_KEY) === 'top'; } catch (error) { /* Optional preference. */ }
+    set_total_position(top);
+}
+let roving_sheet_id = null;
+function set_roving_entry(target) {
+    if (!target) return;
+    roving_sheet_id = target.getAttribute('data-id');
+    ui_element('shortsave-list').querySelectorAll('.shortsave-open').forEach(entry => {
+        entry.setAttribute('tabindex', entry === target ? '0' : '-1');
+    });
+}
+function navigate_saved_sheet(direction) {
+    const entries = list_shortsaves();
+    const index = entries.findIndex(entry => entry.active);
+    const next = entries[index + direction];
+    if (index < 0 || !next) return;
+    const list = ui_element('shortsave-list');
+    const in_list = list && list.contains(document.activeElement);
+    const previous = document.activeElement;
+    const in_sheet = previous && previous.tagName === 'JO-LINE';
+    open_shortsave(next.id);
+    roving_sheet_id = next.id;
+    render_shortsave_list();
+    if (in_list) {
+        const target = Array.from(list.querySelectorAll('.shortsave-open')).find(entry => entry.getAttribute('data-id') === next.id);
+        set_roving_entry(target);
+        if (target) target.focus();
+    } else if (in_sheet) focus_sheet();
+    else if (previous && previous.focus) previous.focus();
+}
 const WIDE_LAYOUT_QUERY = '(min-width: 700px)';
 const DELETE_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg>';
 
@@ -1544,7 +1592,7 @@ function render_shortsave_list() {
     if (!list) return;
     const entries = list_shortsaves();
     const badge = ui_element('sheet-count');
-    if (badge) badge.textContent = String(entries.length);
+    if (badge) badge.textContent = entries.length > 99 ? '99+' : String(entries.length);
     const toggle = ui_element('drawer-toggle');
     if (toggle) toggle.setAttribute('aria-label', `Saved sheets (${entries.length})`);
     if (shared_preview) return;
@@ -1561,12 +1609,15 @@ function render_shortsave_list() {
     const focus_action = focus_id ? focused.getAttribute('data-action') : null;
 
     while (list.firstChild) list.removeChild(list.firstChild);
+    const tab_id = entries.some(entry => entry.id === roving_sheet_id) ? roving_sheet_id : (entries.find(entry => entry.active) || entries[0] || {}).id;
     entries.forEach(entry => {
         const item = document.createElement('li');
         item.className = entry.active ? 'shortsave is-active' : 'shortsave';
 
         const open = document.createElement('button');
         open.type = 'button';
+        open.setAttribute('tabindex', entry.id === tab_id ? '0' : '-1');
+        open.addEventListener('focus', () => set_roving_entry(open));
         open.className = 'shortsave-open';
         open.setAttribute('data-action', 'open');
         open.setAttribute('data-id', entry.id);
@@ -1587,6 +1638,7 @@ function render_shortsave_list() {
 
         const remove = document.createElement('button');
         remove.type = 'button';
+        remove.setAttribute('tabindex', '-1');
         remove.className = 'shortsave-delete';
         remove.setAttribute('data-action', 'delete');
         remove.setAttribute('data-id', entry.id);
@@ -1649,22 +1701,27 @@ function sync_sidebar_layout() {
 }
 
 function handle_sheet_list_keys(event) {
+    if (event.altKey || event.ctrlKey || event.metaKey) return;
     const entries = Array.from(ui_element('shortsave-list').querySelectorAll('.shortsave-open'));
     const index = entries.indexOf(event.target);
     if (index < 0) return;
     if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
         event.preventDefault();
         entries[Math.max(0, Math.min(entries.length - 1, index + (event.key === 'ArrowDown' ? 1 : -1)))].focus();
+    } else if (event.key === 'Delete') {
+        event.preventDefault();
+        delete_from_sidebar(event.target.getAttribute('data-id'));
     } else if (event.key === 'Enter') {
         event.preventDefault();
         open_from_sidebar(event.target.getAttribute('data-id'));
     }
 }
 
-const HELP_EXAMPLES = ['(18 + 4) * 2 / 4 - 1', '# Shopping\n12\n8', '12\n8\n---\n5', ':foo = 18 + 4\n:foo * 2', "Order '123\n12", '12 / 0'];
+const HELP_EXAMPLES = ['(18 + 4) * 2 / 4 - 1', '# Shopping\n12\n8', '12\n8\n---\n5', ':foo = 18 + 4\n:foo * 2', "Order '123\n12", '12 / 0'].map((text, index) => '# quickhelp ' + ['operators', 'headings', 'subtotals', 'variables', 'escaping', 'errors'][index] + '\n' + text);
 function open_help_dialog(id) {
     const dialog = ui_element(id);
-    if (!dialog || dialog.open) return;
+    if (!dialog) return;
+    if (dialog.open) { dialog.close(); return; }
     // Only one help dialog at a time.
     ['quick-help-dialog', 'shortcuts-dialog'].forEach(other => {
         const element = ui_element(other);
@@ -1718,7 +1775,7 @@ function init_header_menu() {
     toggle.addEventListener('click', () => set_more_open(menu.hidden, true));
     menu.addEventListener('click', event => {
         const button = event.target.closest('button, a');
-        if (button && button.id !== 'decimals-toggle') set_more_open(false);
+        if (button) set_more_open(false);
     });
     const decimals = ui_element('decimals-toggle');
     if (decimals) decimals.addEventListener('click', toggle_decimals);
@@ -1736,7 +1793,7 @@ function init_header_menu() {
 
 function handle_header_keys(event) {
     if (event.isComposing) return;
-    if (event.key === 'F1' || (event.ctrlKey && !event.altKey && !event.metaKey && (event.key === '/' || event.key === '?'))) {
+    if (event.key === 'F1' || event.key === 'F2' || (event.ctrlKey && !event.altKey && !event.metaKey && (event.key === '/' || event.key === '?'))) {
         event.preventDefault();
         open_help_dialog(event.key === 'F1' ? 'quick-help-dialog' : 'shortcuts-dialog');
         return;
@@ -1755,9 +1812,12 @@ function handle_header_keys(event) {
     }
     if (event.metaKey || event.shiftKey || event.isComposing) return;
     const key = event.key.toLowerCase();
-    if (event.ctrlKey && !event.altKey && key === 'b') {
+    if (((event.ctrlKey && !event.altKey) || (event.altKey && !event.ctrlKey)) && key === 'b') {
         event.preventDefault();
         toggle_sidebar();
+    } else if (event.altKey && !event.ctrlKey && (event.key === 'ArrowUp' || event.key === 'ArrowDown')) {
+        event.preventDefault();
+        navigate_saved_sheet(event.key === 'ArrowDown' ? 1 : -1);
     } else if (event.altKey && !event.ctrlKey && key === 'n') {
         event.preventDefault();
         new_sheet_from_header();
@@ -1841,6 +1901,11 @@ function init_sidebar() {
     });
     try { sidebar_pinned = window.localStorage.getItem(SIDEBAR_STORAGE_KEY) === 'true'; } catch (error) { /* Optional preference. */ }
     sync_sidebar_layout();
+    load_total_position();
+    const total_position = ui_element('total-position');
+    if (total_position) total_position.addEventListener('click', toggle_total_position);
+    const sidebar_new = ui_element('sidebar-new-sheet');
+    if (sidebar_new) sidebar_new.addEventListener('click', new_sheet_from_header);
     init_header_menu();
     const new_button = ui_element('new-sheet');
     if (new_button) new_button.addEventListener('click', new_sheet_from_header);
@@ -1925,5 +1990,5 @@ if (typeof window !== 'undefined') {
 }
 
 if (typeof module !== 'undefined' && module.exports) {
-    module.exports = { handle_sheet_list_keys, open_help_dialog, try_help_example, round_for_display, load_decimals, toggle_decimals, DECIMALS_STORAGE_KEY, show_message, init_sidebar, handle_header_keys, toggle_sidebar, sync_sidebar_layout, set_more_open, SIDEBAR_STORAGE_KEY, sheet_export, export_sheet, import_sheet_text, import_sheet_file, init_sheet_files, encode_shared_sheet, decode_shared_sheet, share_sheet, save_shared_sheet, render_shortsave_list, new_sheet, open_shortsave, delete_shortsave, list_shortsaves, sheet_total, ACTIVE_STORAGE_KEY, STORE_STORAGE_KEY, JoLine, JoSheet, classify_line, evaluate_sheet, handle_url_params, reset_sheet, SHEET_STORAGE_KEY, sheet_name, new_sheet_id, load_store, save_store };
+    module.exports = { TOTAL_POSITION_STORAGE_KEY, toggle_total_position, load_total_position, HELP_EXAMPLES, handle_sheet_list_keys, open_help_dialog, try_help_example, round_for_display, load_decimals, toggle_decimals, DECIMALS_STORAGE_KEY, show_message, init_sidebar, handle_header_keys, toggle_sidebar, sync_sidebar_layout, set_more_open, SIDEBAR_STORAGE_KEY, sheet_export, export_sheet, import_sheet_text, import_sheet_file, init_sheet_files, encode_shared_sheet, decode_shared_sheet, share_sheet, save_shared_sheet, render_shortsave_list, new_sheet, open_shortsave, delete_shortsave, list_shortsaves, sheet_total, ACTIVE_STORAGE_KEY, STORE_STORAGE_KEY, JoLine, JoSheet, classify_line, evaluate_sheet, handle_url_params, reset_sheet, SHEET_STORAGE_KEY, sheet_name, new_sheet_id, load_store, save_store };
 }

@@ -9,7 +9,7 @@ assert.doesNotMatch(visible, /class="brand"|class="action-label"/);
 assert.doesNotMatch(visible, /Add line/);
 for (const entry of ['Import .txt…', 'Export .txt', 'Quick help', 'Keyboard shortcuts', 'About / GitHub']) assert.ok(header.includes(entry));
 assert.doesNotMatch(header, /Add line|id="add-line"/);
-assert.match(html, /<title>jotsum · B2<\/title>/);
+assert.match(html, /<title>jotsum<\/title>/);
 assert.strictEqual([...html.matchAll(/id="total"/g)].length, 1);
 assert.match(html, /class="total-bar"[\s\S]*id="total"/);
 assert.doesNotMatch(header, /Open shared link/);
@@ -27,7 +27,7 @@ window.location = new URL('https://example.test/');
 window.history = { replaceState: (_a, _b, url) => { window.location = new URL(url); } };
 const ids = ['sidebar', 'drawer-toggle', 'shortsave-list', 'shortsave-empty', 'sidebar-title', 'new-sheet',
     'content', 'header-actions', 'drawer-backdrop', 'more-actions', 'more-toggle', 'add-line',
-    'quick-help', 'quick-help-dialog', 'shortcuts-dialog', 'pin-sidebar', 'sheet-count', 'keyboard-shortcuts', 'shortcut-list', 'current-sheet-name', 'total', 'decimals-toggle', 'messages'];
+    'quick-help', 'quick-help-dialog', 'shortcuts-dialog', 'pin-sidebar', 'sheet-count', 'keyboard-shortcuts', 'shortcut-list', 'current-sheet-name', 'total', 'total-position', 'sidebar-new-sheet', 'decimals-toggle', 'messages'];
 const nodes = Object.fromEntries(ids.map(id => [id, mockUiElement(id.endsWith('-dialog') ? 'dialog' : 'div')]));
 for (const [id, node] of Object.entries(nodes)) node.id = id;
 nodes['more-actions'].hidden = true;
@@ -115,7 +115,7 @@ assert.strictEqual(document.activeElement, nodes['more-toggle']);
 nodes['keyboard-shortcuts'].emit('click');
 assert.strictEqual(nodes['shortcuts-dialog'].open, true);
 nodes['shortcuts-dialog'].close();
-// The display toggle keeps the menu open and redraws lines, subtotals,
+// The display toggle closes the menu and redraws lines, subtotals,
 // the grand total and every saved sheet's sidebar total without editing text.
 api.import_sheet_text('1/3\n---');
 for (const line of sheet.querySelectorAll()) {
@@ -129,7 +129,7 @@ nodes['decimals-toggle'].tagName = 'BUTTON';
 nodes['more-actions'].appendChild(nodes['decimals-toggle']);
 nodes['decimals-toggle'].emit('click');
 nodes['more-actions'].emit('click', { target: nodes['decimals-toggle'] });
-assert.strictEqual(nodes['more-actions'].hidden, false);
+assert.strictEqual(nodes['more-actions'].hidden, true);
 assert.strictEqual(nodes['decimals-toggle'].textContent, 'Decimals: 6');
 assert.strictEqual(nodes['decimals-toggle'].getAttribute('aria-pressed'), 'true');
 assert.strictEqual(String(nodes.total.textContent), '0.333333');
@@ -143,7 +143,7 @@ assert.ok(nodes.messages.children.some(node => node.children[1].textContent === 
 nodes['decimals-toggle'].emit('click');
 assert.strictEqual(nodes['decimals-toggle'].textContent, 'Decimals: 2');
 assert.strictEqual(String(nodes.total.textContent), '0.33');
-assert.strictEqual(nodes['more-actions'].hidden, false);
+assert.strictEqual(nodes['more-actions'].hidden, true);
 console.log('Decimals menu redraw passed!');
 
 // Pin preferences persist and affect wide layouts only.
@@ -153,7 +153,7 @@ assert.strictEqual(window.localStorage.getItem(api.SIDEBAR_STORAGE_KEY), 'true')
 assert.strictEqual(nodes['pin-sidebar'].getAttribute('aria-pressed'), 'true');
 assert.ok(document.body.classList.contains('sidebar-pinned'));
 assert.strictEqual(nodes.content.inert, false);
-api.init_sidebar();
+api.sync_sidebar_layout();
 assert.strictEqual(nodes.sidebar.inert, false);
 wide = false; resize();
 assert.strictEqual(nodes.sidebar.inert, true);
@@ -189,7 +189,89 @@ window.confirm = () => true;
 api.delete_shortsave(entries[0].getAttribute('data-id'));
 api.render_shortsave_list();
 assert.strictEqual(nodes['sheet-count'].textContent, String(api.load_store().length));
+// Dynamic list queries model redraws and real focus events.
+const list = nodes['shortsave-list'];
+list.querySelectorAll = () => list.children.map(item => item.children[0]);
+list.querySelector = selector => list.querySelectorAll().find(entry => selector.includes(entry.getAttribute('data-id'))) || null;
+nodes.sidebar.appendChild(list);
+const originalCreate = document.createElement;
+document.createElement = tag => {
+    const node = originalCreate(tag);
+    node.focus = () => { document.activeElement = node; node.emit('focus'); };
+    return node;
+};
+api.save_store([{ id: 'nav-a', lines: ['# A', '1'] }, { id: 'nav-b', lines: ['# B', '2'] }, { id: 'nav-c', lines: ['# C', '3'] }]);
+api.open_shortsave('nav-a');
+api.render_shortsave_list();
+const roving = () => assert.strictEqual(list.querySelectorAll().filter(entry => entry.getAttribute('tabindex') === '0').length, 1);
+roving();
+assert.ok(list.children.every(item => item.children[1].getAttribute('tabindex') === '-1'));
+sheet.querySelectorAll()[0].focus();
+key('ArrowDown', { altKey: true });
+assert.strictEqual(sheet.querySelectorAll()[0].textContent, '# B');
+assert.strictEqual(document.activeElement, sheet.querySelectorAll()[0]);
+key('ArrowUp', { altKey: true });
+assert.strictEqual(sheet.querySelectorAll()[0].textContent, '# A');
+key('ArrowUp', { altKey: true });
+assert.strictEqual(sheet.querySelectorAll()[0].textContent, '# A');
+list.querySelectorAll()[0].focus();
+key('ArrowDown', { altKey: true });
+assert.strictEqual(document.activeElement.getAttribute('data-id'), 'nav-b');
+roving();
+api.handle_sheet_list_keys({ key: 'Delete', target: document.activeElement, preventDefault() {} });
+assert.ok(!api.load_store().some(entry => entry.id === 'nav-b'));
+roving();
+api.sync_sidebar_layout();
+key('b', { altKey: true });
+assert.ok(document.body.classList.contains('drawer-open'));
+key('b', { altKey: true });
+assert.ok(!document.body.classList.contains('drawer-open'));
+for (const [shortcut, options, id] of [
+    ['F1', {}, 'quick-help-dialog'], ['F2', {}, 'shortcuts-dialog'],
+    ['/', { ctrlKey: true }, 'shortcuts-dialog'], ['?', { ctrlKey: true }, 'shortcuts-dialog']
+]) {
+    key(shortcut, options); assert.strictEqual(nodes[id].open, true);
+    key(shortcut, options); assert.strictEqual(nodes[id].open, false);
+}
+key('F1'); key('F2');
+assert.strictEqual(nodes['quick-help-dialog'].open, false);
+nodes['shortcuts-dialog'].close();
+for (let i = 0; i < api.HELP_EXAMPLES.length; i++) {
+    api.try_help_example(i);
+    assert.match(sheet.querySelectorAll()[0].textContent, /^# quickhelp /);
+    assert.ok(sheet.querySelectorAll().length >= 2);
+    assert.strictEqual(api.sheet_name(sheet.querySelectorAll().map(line => line.textContent)),
+        api.HELP_EXAMPLES[i].split('\n')[0].slice(2));
+    assert.ok(html.includes(api.HELP_EXAMPLES[i].replace(/'/g, '&#x27;')));
+}
+api.import_sheet_text('# Heading 100\n5\n---');
+const heading = sheet.querySelectorAll()[0];
+heading.nextElementSibling = mockUiElement('jo-sum');
+sheet.update_total(true);
+assert.strictEqual(String(heading.nextElementSibling.textContent), '0');
+assert.deepStrictEqual(api.evaluate_sheet(['# Heading 100', '5', '---']).sums, [0, 5, 5]);
+assert.strictEqual(api.evaluate_sheet(['# Heading 100', '5', '---']).total, 5);
+assert.strictEqual(api.evaluate_sheet(['# Heading 100']).counted[0], false);
+api.load_total_position();
+assert.ok(!document.body.classList.contains('total-top'));
+nodes['total-position'].emit('click');
+assert.strictEqual(window.localStorage.getItem(api.TOTAL_POSITION_STORAGE_KEY), 'top');
+assert.strictEqual(nodes['total-position'].getAttribute('aria-label'), 'Move total to bottom');
+document.body.classList.remove('total-top');
+api.load_total_position();
+assert.ok(document.body.classList.contains('total-top'));
+nodes['total-position'].emit('click');
+assert.strictEqual(window.localStorage.getItem(api.TOTAL_POSITION_STORAGE_KEY), 'bottom');
+api.save_store(Array.from({ length: 100 }, (_, i) => ({ id: 'badge-' + i, lines: ['1'] })));
+api.render_shortsave_list();
+assert.strictEqual(nodes['sheet-count'].textContent, '99+');
+assert.strictEqual(nodes['drawer-toggle'].getAttribute('aria-label'), 'Saved sheets (100)');
 window.location = new URL('https://example.test/preview/layout-b1/');
 delete require.cache[require.resolve('../../jotsum.js')];
-assert.strictEqual(require('../../jotsum.js').SIDEBAR_STORAGE_KEY, 'jotsum.preview.layout-b1.sidebar-pinned');
-console.log('B2 header, sidebar, help and keyboard checks passed!');
+const previewApi = require('../../jotsum.js');
+assert.strictEqual(previewApi.SIDEBAR_STORAGE_KEY, 'jotsum.preview.layout-b1.sidebar-pinned');
+assert.strictEqual(previewApi.TOTAL_POSITION_STORAGE_KEY, 'jotsum.preview.layout-b1.total-position');
+previewApi.toggle_total_position();
+assert.strictEqual(window.localStorage.getItem(previewApi.TOTAL_POSITION_STORAGE_KEY), 'top');
+assert.strictEqual(window.localStorage.getItem(api.TOTAL_POSITION_STORAGE_KEY), 'bottom');
+console.log('App header, sidebar, help and keyboard checks passed!');
