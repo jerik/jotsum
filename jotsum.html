@@ -13,7 +13,8 @@
       /* Shared page palette; only these blocks define colours. */
       :root {
         color-scheme: light dark;
-        --header-h: 61px;
+        --header-h: 40px;
+        --total-h: 44px;
         --side-w: 260px;
         --background: #f5f6f7;
         --surface: #ffffff;
@@ -207,9 +208,7 @@
 	    font-size: 1.2em;
 	    font-weight: bold;
 	  }
-	  jo-line.is-heading + jo-sum {
-	    visibility: hidden;
-	  }
+
 
 	  /* Variablen & Zwischensummen */
 	  jo-sum.is-muted {
@@ -354,52 +353,33 @@
 
       .drawer-backdrop { display: none; }
 
-      /* Ab 900 px: Seitenleiste dauerhaft neben dem Blatt */
-      @media (min-width: 900px) {
-        body.sidebar-collapsed .layout { grid-template-columns: minmax(0, 1fr); }
-        body.sidebar-collapsed .sidebar { display: none; }
-        .layout {
-          display: grid;
-          grid-template-columns: var(--side-w) minmax(0, 1fr);
-          align-items: start;
-        }
-        .sidebar {
-          position: sticky;
-          top: calc(var(--header-h) + env(safe-area-inset-top));
-          height: calc(100vh - var(--header-h) - env(safe-area-inset-top));
-          padding-left: env(safe-area-inset-left);
-        }
+      /* Saved sheets are a drawer at every window width. */
+      .content { padding-left: max(16px, env(safe-area-inset-left)); }
+      .sidebar {
+        position: fixed; z-index: 20; left: 0;
+        top: calc(var(--header-h) + env(safe-area-inset-top));
+        bottom: 0;
+        width: min(85vw, 320px);
+        padding-left: env(safe-area-inset-left);
+        padding-bottom: env(safe-area-inset-bottom);
+        box-shadow: 0 8px 24px var(--shadow);
+        transform: translateX(-105%);
+        visibility: hidden;
+        transition: transform .2s ease, visibility 0s linear .2s;
       }
-
-      /* Unter 900 px: Schublade von links, unterhalb des Headers */
-      @media (max-width: 899.98px) {
-        .content { padding-left: max(16px, env(safe-area-inset-left)); }
-        .sidebar {
-          position: fixed; z-index: 20; left: 0;
-          top: calc(var(--header-h) + env(safe-area-inset-top));
-          bottom: 0;
-          width: min(85vw, 320px);
-          padding-left: env(safe-area-inset-left);
-          padding-bottom: env(safe-area-inset-bottom);
-          box-shadow: 0 8px 24px var(--shadow);
-          transform: translateX(-105%);
-          visibility: hidden;
-          transition: transform .2s ease, visibility 0s linear .2s;
-        }
-        body.drawer-open .sidebar {
-          transform: none;
-          visibility: visible;
-          transition: transform .2s ease;
-        }
-        body.drawer-open .drawer-backdrop {
-          display: block;
-          position: fixed; z-index: 15; left: 0; right: 0; bottom: 0;
-          top: calc(var(--header-h) + env(safe-area-inset-top));
-          background: var(--backdrop);
-        }
-        /* Hintergrund nicht mitscrollen, solange die Schublade offen ist */
-        body.drawer-open { overflow: hidden; }
+      body.drawer-open .sidebar {
+        transform: none;
+        visibility: visible;
+        transition: transform .2s ease;
       }
+      body.drawer-open .drawer-backdrop {
+        display: block;
+        position: fixed; z-index: 15; left: 0; right: 0; bottom: 0;
+        top: calc(var(--header-h) + env(safe-area-inset-top));
+        background: var(--backdrop);
+      }
+      /* Hintergrund nicht mitscrollen, solange die Schublade offen ist */
+      body.drawer-open { overflow: hidden; }
       @media (prefers-reduced-motion: reduce) {
         .sidebar { transition: none !important; }
       }
@@ -439,11 +419,6 @@
       .header-button:hover { background: var(--hover); }
       .header-button svg { width: 20px; height: 20px; }
       .current-sheet-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); }
-      body.drawer-open .current-sheet-name { visibility: hidden; }
-      @media (min-width: 900px) {
-        body:not(.sidebar-collapsed) .current-sheet-name { visibility: hidden; }
-      }
-      @media (max-width: 519.98px) { .action-label { display: none; } }
       .more-actions {
         position: absolute; right: 0; top: 100%; width: max-content;
         max-width: min(340px, calc(100vw - 24px)); max-height: 70vh; overflow: auto;
@@ -472,6 +447,73 @@
         display: block; margin-bottom: 8px; font-size: 12px; color: var(--muted);
 		padding-top: 20px; 
       }
+      /* Compact calculator arrangement; sheet typography stays unchanged. */
+      .wrap { min-height: 40px; height: 40px; box-sizing: border-box; padding-top: 0; padding-bottom: 0; gap: 8px; }
+      .header-button { height: 36px; min-width: 36px; padding: 0 6px; }
+      .current-sheet-name { flex: 1; }
+      .content { padding-bottom: calc(var(--total-h) + env(safe-area-inset-bottom) + 20px); }
+      html { scroll-padding-bottom: calc(var(--total-h) + env(safe-area-inset-bottom) + 20px); }
+      .total-bar {
+        position: fixed; bottom: 0; left: 0; right: 0; z-index: 10;
+        display: flex; align-items: center; gap: 16px;
+        box-sizing: border-box; height: calc(var(--total-h) + env(safe-area-inset-bottom));
+        padding: 8px max(16px, env(safe-area-inset-right)) calc(8px + env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+        background: var(--surface); border-top: 1px solid var(--border);
+      }
+      .total-bar jo-total { flex: 1; border: 0; font-size: 18px; }
+      #messages { z-index: 40; bottom: calc(var(--total-h) + env(safe-area-inset-bottom) + 16px); }
+      .sidebar footer { margin: 16px auto; }
+      jo-sum { min-width: 10ch; }
+      .breadcrumb { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      .breadcrumb-brand { color: var(--muted); font-weight: normal; }
+      #drawer-toggle { position: relative; margin-right: 6px; }
+      .sheet-count { position: absolute; right: -6px; top: 0; min-width: 20px; height: 16px; box-sizing: border-box; padding: 0 4px; border-radius: 8px; font-size: 11px; line-height: 16px; font-weight: 600; text-align: center; color: var(--surface); background: var(--muted); }
+      .sidebar-heading { display: flex; align-items: center; justify-content: space-between; }
+      .menu-meta { padding: 8px 12px; color: var(--muted); font-size: 12px; }
+      .menu-meta span { display: block; }
+      #version { padding: 0; margin: 0 0 4px; }
+      dialog { box-sizing: border-box; width: min(540px, calc(100% - 32px)); max-height: 85dvh; overflow: auto; background: var(--surface); color: var(--text); border: 1px solid var(--border); border-radius: 8px; }
+      dialog::backdrop { background: var(--backdrop); }
+      dialog h3 { margin-bottom: 4px; }
+      dialog p { margin: 4px 0 8px; }
+      dialog h2 { margin: 0 0 12px; font-size: 18px; }
+      dialog h3 { font-size: 15px; margin: 0 0 2px; }
+      .help-topic { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; padding: 10px 0; border-top: 1px solid var(--border); }
+      .help-topic pre { margin: 4px 0 0; font-size: 13px; color: var(--muted); white-space: pre-wrap; }
+      .help-topic .btn { flex: none; }
+      .help-note { font-size: 12px; color: var(--muted); }
+      .total-bar { padding-left: max(16px, calc((100% - 1040px) / 2)); padding-right: max(16px, calc((100% - 1040px) / 2)); }
+      @media (min-width: 700px) {
+        body.sidebar-pinned { overflow: auto; }
+        body.sidebar-pinned .sidebar { width: var(--side-w); transform: none; visibility: visible; box-shadow: none; }
+        body.sidebar-pinned .layout { margin-left: var(--side-w); }
+        body.sidebar-pinned .total-bar { left: var(--side-w); }
+        body.sidebar-pinned .drawer-backdrop { display: none; }
+      }
+      /* Header and total use the same gutters as the sheet. */
+      .wrap { max-width: none; padding-left: 16px; padding-right: 16px; }
+      .total-bar { display: block; padding: 0 0 env(safe-area-inset-bottom); }
+      .total-inner {
+        position: relative; display: flex; align-items: center; height: var(--total-h);
+        box-sizing: border-box; width: 100%; max-width: 1072px; margin: 0 auto;
+        padding: 0 max(16px, env(safe-area-inset-right)) 0 max(16px, env(safe-area-inset-left));
+      }
+      .total-inner jo-total { margin-left: auto; padding: 7px; }
+      #total-position { position: absolute; right: 0; width: 16px; min-width: 16px; padding: 0; color: var(--muted); }
+      #total-position svg { width: 14px; height: 14px; transition: transform .2s ease; }
+      body.total-top #total-position svg { transform: rotate(180deg); }
+      /* The toggle's icon, not its button, lines up with the sidebar title. */
+      #drawer-toggle { margin-left: -8px; }
+      .sidebar-heading { height: var(--total-h); box-sizing: border-box; }
+      .sidebar-heading .sidebar-title { padding: 0 0 0 16px; margin-right: auto; }
+      .sidebar-heading .icon-btn { width: 36px; height: 36px; }
+      body.total-top .content { padding-top: calc(var(--total-h) + 8px); padding-bottom: 20px; }
+      html:has(body.total-top) { scroll-padding-bottom: 20px; scroll-padding-top: calc(var(--header-h) + var(--total-h) + env(safe-area-inset-top) + 8px); }
+      body.total-top .total-bar {
+        top: calc(var(--header-h) + env(safe-area-inset-top)); bottom: auto;
+        height: var(--total-h); padding: 0; border-top: 0; border-bottom: 1px solid var(--border);
+      }
+      body.total-top #messages { bottom: calc(16px + env(safe-area-inset-bottom)); }
     </style>
     <script type="text/javascript" src="./jotsum.js" charset="utf-8"></script>
   </head>
@@ -479,27 +521,21 @@
     <!-- Header -->
     <header class="site-header">
       <div class="wrap">
-        <button type="button" id="drawer-toggle" class="header-button" aria-label="Saved sheets" title="Saved sheets (Ctrl+B)" aria-expanded="false" aria-controls="sidebar"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16M5 8h2M5 12h2"/></svg></button>
-        <h1 class="brand">jotsum</h1>
-        <span id="current-sheet-name" class="current-sheet-name"></span>
+        <button type="button" id="drawer-toggle" class="header-button" aria-label="Saved sheets (0)" title="Saved sheets (Alt+B / Ctrl+B)" aria-expanded="false" aria-controls="sidebar"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16M5 8h2M5 12h2"/></svg><span id="sheet-count" class="sheet-count" aria-hidden="true">0</span></button>
+        <span class="breadcrumb"><span class="breadcrumb-brand">jotsum / </span><span id="current-sheet-name" class="current-sheet-name"></span></span>
         <nav id="header-actions" class="actions" aria-label="Sheet actions">
-          <button type="button" id="new-sheet" class="header-button" aria-label="New sheet" title="New sheet (Alt+N)"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg><span class="action-label">New</span></button>
-          <button type="button" id="share-sheet" class="header-button" aria-label="Share" title="Share"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="m8.6 10.5 6.8-4M8.6 13.5l6.8 4"/></svg><span class="action-label">Share</span></button>
+          <button type="button" id="new-sheet" class="header-button" aria-label="New sheet" title="New sheet (Alt+N)"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg></button>
+          <button type="button" id="share-sheet" class="header-button" aria-label="Share" title="Share"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="m8.6 10.5 6.8-4M8.6 13.5l6.8 4"/></svg></button>
           <button type="button" id="more-toggle" class="header-button" aria-label="More actions" title="More actions (Escape to close)" aria-expanded="false" aria-controls="more-actions"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></svg></button>
           <ul id="more-actions" class="more-actions" hidden>
             <li><button type="button" id="import-sheet">Import .txt…</button></li>
             <li><button type="button" id="export-sheet">Export .txt</button></li>
-            <li class="touch-action"><button type="button" id="add-line">Add line <kbd>Enter</kbd></button></li>
             <li><button type="button" id="decimals-toggle" aria-pressed="false">Decimals: 2</button></li>
-            <li><button type="button" id="keyboard-shortcuts" aria-expanded="false" aria-controls="shortcut-list">Keyboard shortcuts</button>
-              <ul id="shortcut-list" hidden>
-                <li>Ctrl+B — Saved sheets</li><li>Alt+N — New sheet</li>
-                <li>Enter — Next / new line</li><li>Ctrl+Enter — Insert below</li>
-                <li>Ctrl+Shift+Enter — Insert above</li><li>Ctrl+Delete — Remove line</li>
-                <li>↑ / ↓ — Move between lines</li><li>Escape — Close menu / drawer / newest message</li>
-              </ul>
-            </li>
-            <li><a href="https://github.com/jerik/jotsum">About / GitHub</a></li>
+            <li><button type="button" id="quick-help">Quick help <kbd>F1</kbd></button></li>
+            <li><button type="button" id="keyboard-shortcuts">Keyboard shortcuts <kbd>F2 / Ctrl+/</kbd></button></li>
+            <li><a href="https://jerik.github.io/jotsum/index.html" download="jotsum.html">Download for offline use</a></li>
+            <li><a href="https://github.com/jerik/jotsum" target="_blank" rel="noopener">About / GitHub</a></li>
+            <li class="menu-meta"><span id="version"></span></li>
           </ul>
           <input type="file" id="import-file" accept=".txt,text/plain" hidden>
         </nav>
@@ -507,11 +543,12 @@
     </header>
 
     <div class="layout">
-      <!-- Shortsaves: Seitenleiste ab 900 px, darunter Schublade -->
+      <!-- Saved sheets drawer -->
       <aside id="sidebar" class="sidebar" aria-labelledby="sidebar-title">
-        <h2 id="sidebar-title" class="sidebar-title" tabindex="-1">Saved sheets</h2>
+        <div class="sidebar-heading"><h2 id="sidebar-title" class="sidebar-title" tabindex="-1">Saved sheets</h2><button type="button" id="pin-sidebar" class="icon-btn" aria-pressed="false" title="Pin sidebar" aria-label="Pin sidebar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M9 3h6l-1 6 4 4v2H6v-2l4-4zM12 15v7"/></svg></button><button type="button" id="sidebar-new-sheet" class="icon-btn" aria-label="New sheet" title="New sheet (Alt+N)"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg></button></div>
         <ul id="shortsave-list" class="shortsave-list"></ul>
         <p id="shortsave-empty" class="sidebar-empty">Nothing saved yet. Sheets save automatically while you type.</p>
+
       </aside>
       <div id="drawer-backdrop" class="drawer-backdrop"></div>
 
@@ -520,18 +557,31 @@
         <!-- Sheet -->
         <jo-sheet id="sheet">
         </jo-sheet>
-        <jo-lastline>
-          <jo-spacer></jo-spacer>
-          <jo-total id="total"></jo-total>
-        </jo-lastline>
-
-        <!-- Footer -->
-        <footer>
-		Use the operators + - * / ( ) <br/> Download for offline use • Source and docs on <a href="https://github.com/jerik/jotsum">GitHub</a>
-          <span id="version"></span>
-        </footer>
       </main>
     </div>
+    <div class="total-bar" aria-label="Sheet total">
+      <div class="total-inner"><span>Total</span>
+      <jo-total id="total"></jo-total><button type="button" id="total-position" class="header-button" aria-label="Move total to top" title="Move total to top"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M6 11l6-6 6 6"/></svg></button></div>
+    </div>
+    <dialog id="quick-help-dialog" aria-labelledby="help-title"><h2 id="help-title">Quick help</h2><section class="help-topic"><div><h3>Operators</h3><p>+ - * / and parentheses.</p><pre># quickhelp operators
+(18 + 4) * 2 / 4 - 1</pre></div><button type="button" class="btn" data-example="0">Try it</button></section><section class="help-topic"><div><h3>Headings</h3><p>A line starting with # is a heading and does not count.</p><pre># quickhelp headings
+# Shopping
+12
+8</pre></div><button type="button" class="btn" data-example="1">Try it</button></section><section class="help-topic"><div><h3>Subtotals</h3><p>--- adds up the lines above it.</p><pre># quickhelp subtotals
+12
+8
+---
+5</pre></div><button type="button" class="btn" data-example="2">Try it</button></section><section class="help-topic"><div><h3>Variables</h3><p>Define :name = value (also an expression), then use :name.</p><pre># quickhelp variables
+:foo = 18 + 4
+:foo * 2</pre></div><button type="button" class="btn" data-example="3">Try it</button></section><section class="help-topic"><div><h3>Escaping</h3><p>An apostrophe keeps a number out of the sum.</p><pre># quickhelp escaping
+Order &#x27;123
+12</pre></div><button type="button" class="btn" data-example="4">Try it</button></section><section class="help-topic"><div><h3>Errors</h3><p>? marks a line that cannot be calculated; it does not count.</p><pre># quickhelp errors
+12 / 0</pre></div><button type="button" class="btn" data-example="5">Try it</button></section><p class="help-note">Try it opens the example as a new sheet.</p><form method="dialog"><button class="btn">Close</button></form></dialog><dialog id="shortcuts-dialog" aria-labelledby="shortcuts-title"><h2 id="shortcuts-title">Keyboard shortcuts</h2><ul id="shortcut-list">
+                <li>F1 — Toggle quick help</li><li>F2 / Ctrl+/ — Toggle keyboard shortcuts</li><li>Alt+B / Ctrl+B — Saved sheets</li><li>Alt+↑ / Alt+↓ — Previous / next sheet</li><li>Delete — Delete focused saved sheet</li><li>Alt+N — New sheet</li>
+                <li>Enter — Next / new line</li><li>Ctrl+Enter — Insert below</li>
+                <li>Ctrl+Shift+Enter — Insert above</li><li>Ctrl+Delete — Remove line</li>
+                <li>↑ / ↓ — Move between lines</li><li>Escape — Close menu / drawer / newest message</li>
+              </ul><form method="dialog"><button class="btn">Close</button></form></dialog>
   </body>
 </html>
 

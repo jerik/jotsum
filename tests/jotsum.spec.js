@@ -381,3 +381,33 @@ test('Ctrl+Delete on the only line saves the cleared sheet', async ({ page }) =>
   await expect(line).toHaveText(['']);
   await expect(page.locator('#total')).toHaveText('0');
 });
+
+test('total aligns with the sheet at every layout width and position', async ({ page }) => {
+  for (const width of [400, 700, 1024, 1440, 1920]) {
+    await page.setViewportSize({ width, height: 900 });
+    for (const pinned of [false, true]) {
+      for (const top of [false, true]) {
+        await page.evaluate(({ pinned, top }) => {
+          document.body.classList.toggle('sidebar-pinned', pinned);
+          document.body.classList.toggle('total-top', top);
+        }, { pinned, top });
+        const edges = await page.evaluate(() => {
+          const rect = selector => document.querySelector(selector).getBoundingClientRect();
+          return {
+            label: rect('.total-inner > span').left,
+            sheet: rect('jo-line').left,
+            total: rect('#total').right,
+            result: rect('jo-sum').right,
+            toggle: rect('#drawer-toggle svg').left,
+            actions: rect('#header-actions').right,
+            width: document.documentElement.clientWidth
+          };
+        });
+        expect(Math.abs(edges.label - edges.sheet)).toBeLessThan(1);
+        expect(Math.abs(edges.total - edges.result)).toBeLessThan(1);
+        expect(Math.abs(edges.toggle - 16)).toBeLessThan(1);
+        expect(edges.width - edges.actions).toBe(16);
+      }
+    }
+  }
+});
