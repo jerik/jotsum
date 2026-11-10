@@ -84,5 +84,9 @@ global.mockUiElement = function (tagName = 'DIV') {
     node.querySelector = () => null;
     node.querySelectorAll = () => [];
     node.focus = () => { document.activeElement = node; };
+    if (node.tagName === 'DIALOG') {
+        node.showModal = () => { node.open = true; };
+        node.close = () => { node.open = false; node.emit('close'); };
+    }
     return node;
 };

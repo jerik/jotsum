@@ -1514,12 +1514,12 @@ function reset_sheet() {
     render_sheet([]);
 }
 
-// Saved sheets drawer at every window width.
+// Saved sheets drawer with an optional pinned wide layout.
 // Everything here tolerates a missing or mocked DOM: without the sidebar
 // markup the sheet keeps working and nothing is drawn.
-const SIDEBAR_STORAGE_KEY = storage_namespace + 'sidebar-collapsed';
-let wide_sidebar_collapsed = false;
-const WIDE_LAYOUT_QUERY = '(min-width: 900px)';
+const SIDEBAR_STORAGE_KEY = storage_namespace + 'sidebar-pinned';
+let sidebar_pinned = false;
+const WIDE_LAYOUT_QUERY = '(min-width: 700px)';
 const DELETE_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg>';
 
 function ui_element(id) {
@@ -1529,7 +1529,7 @@ function ui_element(id) {
 }
 
 function is_wide_layout() {
-    return false; // Variant B always uses the drawer layout.
+    return sidebar_pinned && typeof window.matchMedia === 'function' && window.matchMedia(WIDE_LAYOUT_QUERY).matches;
 }
 
 function is_drawer_open() {
@@ -1544,6 +1544,10 @@ function render_shortsave_list() {
     if (!list) return;
     if (shared_preview) return;
     const entries = list_shortsaves();
+    const badge = ui_element('sheet-count');
+    if (badge) badge.textContent = String(entries.length);
+    const toggle = ui_element('drawer-toggle');
+    if (toggle) toggle.setAttribute('aria-label', `Saved sheets (${entries.length})`);
     // Every keystroke writes the store; only redraw when the list really
     // changed, otherwise a focus move into the list (which blurs and saves
     // the edited line) would remove the button it just focused. The total is
@@ -1614,26 +1618,62 @@ function update_header_sheet_name() {
     label.title = label.textContent;
 }
 
+function focus_sidebar_entry() {
+    const sidebar = ui_element('sidebar');
+    const target = sidebar && (sidebar.querySelector('.shortsave-open[aria-current]') || sidebar.querySelector('.shortsave-open')) || ui_element('sidebar-title');
+    if (target) target.focus();
+}
+
 function toggle_sidebar() {
     if (is_wide_layout()) {
-        wide_sidebar_collapsed = !wide_sidebar_collapsed;
-        try { storage_write('setItem', SIDEBAR_STORAGE_KEY, String(wide_sidebar_collapsed)); } catch (error) { /* Optional preference. */ }
-        sync_sidebar_layout();
-    } else {
-        set_drawer_open(!is_drawer_open());
-    }
+        if (ui_element('sidebar').contains(document.activeElement)) focus_sheet();
+        else focus_sidebar_entry();
+    } else set_drawer_open(!is_drawer_open());
+}
+
+function focus_sheet() {
+    const sheet = document.querySelector('jo-sheet');
+    const line = sheet && typeof sheet.querySelectorAll === 'function' ? sheet.querySelectorAll('jo-line')[0] : null;
+    if (line) line.focus();
 }
 
 function sync_sidebar_layout() {
-    const sidebar = ui_element('sidebar');
-    const restore_focus = is_wide_layout() && wide_sidebar_collapsed &&
-        sidebar && sidebar.contains(document.activeElement);
-    if (restore_focus) ui_element('drawer-toggle').focus();
+    document.body.classList.toggle('sidebar-pinned', is_wide_layout());
     set_drawer_open(false);
-    document.body.classList.toggle('sidebar-collapsed', wide_sidebar_collapsed);
-    const toggle = ui_element('drawer-toggle');
-    if (toggle) toggle.setAttribute('aria-expanded', String(is_wide_layout() && !wide_sidebar_collapsed));
-    if (sidebar) sidebar.inert = is_wide_layout() ? wide_sidebar_collapsed : !is_drawer_open();
+    const pin = ui_element('pin-sidebar');
+    if (pin) pin.setAttribute('aria-pressed', String(sidebar_pinned));
+}
+
+function handle_sheet_list_keys(event) {
+    const entries = Array.from(ui_element('shortsave-list').querySelectorAll('.shortsave-open'));
+    const index = entries.indexOf(event.target);
+    if (index < 0) return;
+    if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+        event.preventDefault();
+        entries[Math.max(0, Math.min(entries.length - 1, index + (event.key === 'ArrowDown' ? 1 : -1)))].focus();
+    } else if (event.key === 'Enter') {
+        event.preventDefault();
+        open_from_sidebar(event.target.getAttribute('data-id'));
+    }
+}
+
+const HELP_EXAMPLES = ['(18 + 4) * 2 / 4 - 1', '# Shopping\n12\n8', '12\n8\n---\n5', ':foo = 18 + 4\n:foo * 2', "Order '123\n12", '12 / 0'];
+function open_help_dialog(id) {
+    const dialog = ui_element(id);
+    if (!dialog || dialog.open) return;
+    const menu = ui_element('more-actions');
+    const previous = menu && menu.contains(document.activeElement) ? ui_element('more-toggle') : document.activeElement;
+    set_more_open(false);
+    set_drawer_open(false);
+    dialog.addEventListener('close', () => { if (previous && previous.focus) previous.focus(); }, { once: true });
+    dialog.showModal();
+}
+function try_help_example(index) {
+    const dialog = ui_element('quick-help-dialog');
+    dialog.close();
+    import_sheet_text(HELP_EXAMPLES[index]);
+    render_shortsave_list();
+    focus_sheet();
 }
 
 function set_more_open(open, restore_focus = false) {
@@ -1653,17 +1693,16 @@ function init_header_menu() {
     toggle.addEventListener('click', () => set_more_open(menu.hidden, true));
     menu.addEventListener('click', event => {
         const button = event.target.closest('button, a');
-        if (button && button.id !== 'keyboard-shortcuts' && button.id !== 'decimals-toggle') set_more_open(false);
+        if (button && button.id !== 'decimals-toggle') set_more_open(false);
     });
     const decimals = ui_element('decimals-toggle');
     if (decimals) decimals.addEventListener('click', toggle_decimals);
     update_decimals_button();
-    ui_element('add-line').addEventListener('click', () => add_calc_line());
-    const shortcuts = ui_element('keyboard-shortcuts');
-    shortcuts.addEventListener('click', () => {
-        const list = ui_element('shortcut-list');
-        list.hidden = !list.hidden;
-        shortcuts.setAttribute('aria-expanded', String(!list.hidden));
+    ui_element('quick-help').addEventListener('click', () => open_help_dialog('quick-help-dialog'));
+    ui_element('keyboard-shortcuts').addEventListener('click', () => open_help_dialog('shortcuts-dialog'));
+    ui_element('quick-help-dialog').addEventListener('click', event => {
+        const index = event.target.getAttribute('data-example');
+        if (index !== null) try_help_example(Number(index));
     });
     document.addEventListener('click', event => {
         if (!menu.contains(event.target) && !toggle.contains(event.target)) set_more_open(false);
@@ -1671,6 +1710,13 @@ function init_header_menu() {
 }
 
 function handle_header_keys(event) {
+    if (event.isComposing) return;
+    if (event.key === 'F1' || (event.ctrlKey && !event.altKey && !event.metaKey && (event.key === '/' || event.key === '?'))) {
+        event.preventDefault();
+        open_help_dialog(event.key === 'F1' ? 'quick-help-dialog' : 'shortcuts-dialog');
+        return;
+    }
+    if (['quick-help-dialog', 'shortcuts-dialog'].some(id => { const dialog = ui_element(id); return dialog && dialog.open; })) return;
     if (event.key === 'Escape') {
         const menu = ui_element('more-actions');
         const occupied = (menu && !menu.hidden) || is_drawer_open();
@@ -1678,8 +1724,7 @@ function handle_header_keys(event) {
         set_more_open(false, true);
         if (is_drawer_open()) {
             set_drawer_open(false);
-            const toggle = ui_element('drawer-toggle');
-            if (toggle) toggle.focus();
+            focus_sheet();
         }
         return;
     }
@@ -1703,8 +1748,8 @@ function set_drawer_open(open) {
     const was_open = is_drawer_open();
     const had_focus = sidebar.contains(document.activeElement);
     document.body.classList.toggle('drawer-open', drawer);
-    toggle.setAttribute('aria-expanded', String(is_wide_layout() ? !wide_sidebar_collapsed : drawer));
-    sidebar.inert = is_wide_layout() ? wide_sidebar_collapsed : !drawer;
+    toggle.setAttribute('aria-expanded', String(is_wide_layout() || drawer));
+    sidebar.inert = !is_wide_layout() && !drawer;
     // Behind the open drawer the page must not be reachable by keyboard.
     ['content', 'header-actions'].forEach(id => {
         const element = ui_element(id);
@@ -1749,6 +1794,7 @@ function new_sheet_from_header() {
 function init_sidebar() {
     const list = ui_element('shortsave-list');
     if (!list) return;
+    list.addEventListener('keydown', handle_sheet_list_keys);
     list.addEventListener('click', event => {
         const button = event.target.closest('button[data-action]');
         if (!button) return;
@@ -1759,7 +1805,14 @@ function init_sidebar() {
 
     const toggle = ui_element('drawer-toggle');
     if (toggle) toggle.addEventListener('click', toggle_sidebar);
-    try { wide_sidebar_collapsed = window.localStorage.getItem(SIDEBAR_STORAGE_KEY) === 'true'; } catch (error) { /* Optional preference. */ }
+    const pin = ui_element('pin-sidebar');
+    if (pin) pin.addEventListener('click', () => {
+        sidebar_pinned = !sidebar_pinned;
+        try { storage_write('setItem', SIDEBAR_STORAGE_KEY, String(sidebar_pinned)); } catch (error) { /* Optional preference. */ }
+        sync_sidebar_layout();
+        if (!is_wide_layout()) set_drawer_open(true);
+    });
+    try { sidebar_pinned = window.localStorage.getItem(SIDEBAR_STORAGE_KEY) === 'true'; } catch (error) { /* Optional preference. */ }
     sync_sidebar_layout();
     init_header_menu();
     const new_button = ui_element('new-sheet');
@@ -1845,5 +1898,5 @@ if (typeof window !== 'undefined') {
 }
 
 if (typeof module !== 'undefined' && module.exports) {
-    module.exports = { round_for_display, load_decimals, toggle_decimals, DECIMALS_STORAGE_KEY, show_message, init_sidebar, handle_header_keys, toggle_sidebar, sync_sidebar_layout, set_more_open, SIDEBAR_STORAGE_KEY, sheet_export, export_sheet, import_sheet_text, import_sheet_file, init_sheet_files, encode_shared_sheet, decode_shared_sheet, share_sheet, save_shared_sheet, render_shortsave_list, new_sheet, open_shortsave, delete_shortsave, list_shortsaves, sheet_total, ACTIVE_STORAGE_KEY, STORE_STORAGE_KEY, JoLine, JoSheet, classify_line, evaluate_sheet, handle_url_params, reset_sheet, SHEET_STORAGE_KEY, sheet_name, new_sheet_id, load_store, save_store };
+    module.exports = { handle_sheet_list_keys, open_help_dialog, try_help_example, round_for_display, load_decimals, toggle_decimals, DECIMALS_STORAGE_KEY, show_message, init_sidebar, handle_header_keys, toggle_sidebar, sync_sidebar_layout, set_more_open, SIDEBAR_STORAGE_KEY, sheet_export, export_sheet, import_sheet_text, import_sheet_file, init_sheet_files, encode_shared_sheet, decode_shared_sheet, share_sheet, save_shared_sheet, render_shortsave_list, new_sheet, open_shortsave, delete_shortsave, list_shortsaves, sheet_total, ACTIVE_STORAGE_KEY, STORE_STORAGE_KEY, JoLine, JoSheet, classify_line, evaluate_sheet, handle_url_params, reset_sheet, SHEET_STORAGE_KEY, sheet_name, new_sheet_id, load_store, save_store };
 }
