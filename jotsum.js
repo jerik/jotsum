@@ -1542,12 +1542,12 @@ function render_shortsave_list() {
     update_header_sheet_name();
     const list = ui_element('shortsave-list');
     if (!list) return;
-    if (shared_preview) return;
     const entries = list_shortsaves();
     const badge = ui_element('sheet-count');
     if (badge) badge.textContent = String(entries.length);
     const toggle = ui_element('drawer-toggle');
     if (toggle) toggle.setAttribute('aria-label', `Saved sheets (${entries.length})`);
+    if (shared_preview) return;
     // Every keystroke writes the store; only redraw when the list really
     // changed, otherwise a focus move into the list (which blurs and saves
     // the edited line) would remove the button it just focused. The total is
@@ -1638,8 +1638,12 @@ function focus_sheet() {
 }
 
 function sync_sidebar_layout() {
+    const sidebar = ui_element('sidebar');
+    const had_focus = !!(sidebar && sidebar.contains(document.activeElement));
     document.body.classList.toggle('sidebar-pinned', is_wide_layout());
     set_drawer_open(false);
+    // A pinned sidebar that turns into a closed drawer must not keep the focus.
+    if (had_focus && !is_wide_layout() && !is_drawer_open()) focus_sheet();
     const pin = ui_element('pin-sidebar');
     if (pin) pin.setAttribute('aria-pressed', String(sidebar_pinned));
 }
@@ -1661,16 +1665,37 @@ const HELP_EXAMPLES = ['(18 + 4) * 2 / 4 - 1', '# Shopping\n12\n8', '12\n8\n---\
 function open_help_dialog(id) {
     const dialog = ui_element(id);
     if (!dialog || dialog.open) return;
+    // Only one help dialog at a time.
+    ['quick-help-dialog', 'shortcuts-dialog'].forEach(other => {
+        const element = ui_element(other);
+        if (element && element !== dialog && element.open) {
+            element.skip_focus_restore = true;
+            element.close();
+        }
+    });
     const menu = ui_element('more-actions');
-    const previous = menu && menu.contains(document.activeElement) ? ui_element('more-toggle') : document.activeElement;
+    const sidebar = ui_element('sidebar');
+    let previous = document.activeElement;
+    if (menu && menu.contains(previous)) previous = ui_element('more-toggle');
+    // The drawer closes below; its entries cannot take the focus back.
+    else if (sidebar && sidebar.contains(previous) && !is_wide_layout()) previous = null;
+    else if (previous && previous.closest && previous.closest('dialog')) previous = null;
     set_more_open(false);
     set_drawer_open(false);
-    dialog.addEventListener('close', () => { if (previous && previous.focus) previous.focus(); }, { once: true });
+    dialog.skip_focus_restore = false;
+    dialog.addEventListener('close', () => {
+        if (dialog.skip_focus_restore) return;
+        if (previous && previous.isConnected !== false && previous.focus) previous.focus();
+        else focus_sheet();
+    }, { once: true });
     dialog.showModal();
 }
 function try_help_example(index) {
     const dialog = ui_element('quick-help-dialog');
+    // The close event fires later and would move the focus away from the new sheet.
+    dialog.skip_focus_restore = true;
     dialog.close();
+    if (shared_preview) leave_shared_preview();
     import_sheet_text(HELP_EXAMPLES[index]);
     render_shortsave_list();
     focus_sheet();
@@ -1811,6 +1836,8 @@ function init_sidebar() {
         try { storage_write('setItem', SIDEBAR_STORAGE_KEY, String(sidebar_pinned)); } catch (error) { /* Optional preference. */ }
         sync_sidebar_layout();
         if (!is_wide_layout()) set_drawer_open(true);
+        // Keep the focus on the pin button so it can be toggled back.
+        pin.focus();
     });
     try { sidebar_pinned = window.localStorage.getItem(SIDEBAR_STORAGE_KEY) === 'true'; } catch (error) { /* Optional preference. */ }
     sync_sidebar_layout();
