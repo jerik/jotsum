@@ -8,7 +8,7 @@
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2064%2064%22%3E%3Crect%20x%3D%222%22%20y%3D%222%22%20width%3D%2260%22%20height%3D%2260%22%20rx%3D%2213%22%20fill%3D%22%2324743c%22%20stroke%3D%22%2399c5a5%22%20stroke-width%3D%223%22%2F%3E%3Cpath%20d%3D%22M17%2018h30M17%2029h22M17%2040h30M35%2049h12%22%20fill%3D%22none%22%20stroke%3D%22%23ffffff%22%20stroke-width%3D%225%22%20stroke-linecap%3D%22round%22%2F%3E%3C%2Fsvg%3E" />
     <!-- Absolute URL: some web-app installers resolve relative icon URLs against the origin, losing /jotsum/. -->
     <link rel="apple-touch-icon" href="https://jerik.github.io/jotsum/apple-touch-icon.png" />
-    <title>jotsum · B1</title>
+    <title>jotsum · B2</title>
     <style>
       /* Shared page palette; only these blocks define colours. */
       :root {
@@ -492,6 +492,19 @@
         body.sidebar-pinned .total-bar { left: var(--side-w); }
         body.sidebar-pinned .drawer-backdrop { display: none; }
       }
+      /* B2: the total sits in a fixed row right under the header. */
+      .content { padding-bottom: 20px; padding-top: calc(var(--total-h) + 8px); }
+      html {
+        scroll-padding-bottom: 20px;
+        scroll-padding-top: calc(var(--header-h) + var(--total-h) + env(safe-area-inset-top) + 8px);
+      }
+      .total-bar {
+        top: calc(var(--header-h) + env(safe-area-inset-top)); bottom: auto;
+        height: var(--total-h);
+        padding-top: 8px; padding-bottom: 8px;
+        border-top: 0; border-bottom: 1px solid var(--border);
+      }
+      #messages { bottom: calc(16px + env(safe-area-inset-bottom)); }
     </style>
     <script type="text/javascript" src="./jotsum.js" charset="utf-8"></script>
   </head>
@@ -513,7 +526,7 @@
             <li><button type="button" id="keyboard-shortcuts">Keyboard shortcuts <kbd>Ctrl+/</kbd></button></li>
             <li><a href="https://jerik.github.io/jotsum/index.html" download="jotsum.html">Download for offline use</a></li>
             <li><a href="https://github.com/jerik/jotsum" target="_blank" rel="noopener">About / GitHub</a></li>
-            <li class="menu-meta"><span id="version"></span><span>B1 · Summe unten</span></li>
+            <li class="menu-meta"><span id="version"></span><span>B2 · Summe oben</span></li>
           </ul>
           <input type="file" id="import-file" accept=".txt,text/plain" hidden>
         </nav>

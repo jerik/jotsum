@@ -9,7 +9,7 @@ assert.doesNotMatch(visible, /class="brand"|class="action-label"/);
 assert.doesNotMatch(visible, /Add line/);
 for (const entry of ['Import .txt…', 'Export .txt', 'Quick help', 'Keyboard shortcuts', 'About / GitHub']) assert.ok(header.includes(entry));
 assert.doesNotMatch(header, /Add line|id="add-line"/);
-assert.match(html, /<title>jotsum · B1<\/title>/);
+assert.match(html, /<title>jotsum · B2<\/title>/);
 assert.strictEqual([...html.matchAll(/id="total"/g)].length, 1);
 assert.match(html, /class="total-bar"[\s\S]*id="total"/);
 assert.doesNotMatch(header, /Open shared link/);
@@ -192,4 +192,4 @@ assert.strictEqual(nodes['sheet-count'].textContent, String(api.load_store().len
 window.location = new URL('https://example.test/preview/layout-b1/');
 delete require.cache[require.resolve('../../jotsum.js')];
 assert.strictEqual(require('../../jotsum.js').SIDEBAR_STORAGE_KEY, 'jotsum.preview.layout-b1.sidebar-pinned');
-console.log('B1 header, sidebar, help and keyboard checks passed!');
+console.log('B2 header, sidebar, help and keyboard checks passed!');
