@@ -4,14 +4,15 @@ const html = fs.readFileSync(require('path').join(__dirname, '../../jotsum.html'
 const header = html.match(/<header\b[\s\S]*?<\/header>/)[0];
 const visible = header.slice(0, header.indexOf('<ul id="more-actions"'));
 assert.deepStrictEqual([...visible.matchAll(/<button[^>]*id="([^"]+)"/g)].map(m => m[1]),
-    ['drawer-toggle', 'header-total', 'new-sheet', 'share-sheet', 'more-toggle']);
+    ['drawer-toggle', 'new-sheet', 'share-sheet', 'more-toggle']);
 assert.doesNotMatch(visible, /class="brand"|class="action-label"/);
 assert.doesNotMatch(visible, /Add line/);
 for (const entry of ['Import .txt…', 'Export .txt', 'Quick help', 'Keyboard shortcuts', 'About / GitHub']) assert.ok(header.includes(entry));
 assert.doesNotMatch(header, /Add line|id="add-line"/);
 assert.match(html, /<title>jotsum · V4<\/title>/);
 assert.strictEqual([...html.matchAll(/id="total"/g)].length, 1);
-assert.match(html, /<\/jo-sheet>\s*<div class="sheet-total">\s*<span>Total<\/span>\s*<jo-total id="total">/);
+assert.match(html, /<\/jo-sheet>\s*<div id="bottom-total"[^>]*>/);
+assert.match(html, /<button[^>]*id="copy-total"[^>]*><jo-total id="total">/);
 assert.match(header, /<span id="version"><\/span><span>V4 · Seitenspalte<\/span>/);
 const shortcutList = html.match(/<div id="shortcut-list">([\s\S]*?)<\/div>/)[1];
 assert.deepStrictEqual([...shortcutList.matchAll(/<h3>([^<]+)<\/h3>\s*<ul>/g)].map(m => m[1]),
@@ -31,7 +32,7 @@ window.location = new URL('https://example.test/');
 window.history = { replaceState: (_a, _b, url) => { window.location = new URL(url); } };
 const ids = ['sidebar', 'drawer-toggle', 'shortsave-list', 'shortsave-empty', 'sidebar-title', 'new-sheet',
     'content', 'header-actions', 'drawer-backdrop', 'more-actions', 'more-toggle', 'add-line',
-    'quick-help', 'quick-help-dialog', 'shortcuts-dialog', 'pin-sidebar', 'sheet-count', 'keyboard-shortcuts', 'current-sheet-name', 'total', 'header-total', 'header-total-value', 'summary-total', 'summary-total-value',
+    'quick-help', 'quick-help-dialog', 'shortcuts-dialog', 'pin-sidebar', 'sheet-count', 'keyboard-shortcuts', 'current-sheet-name', 'total', 'copy-total', 'total-position', 'total-controls', 'bottom-total', 'top-total', 'summary-total',
     'summary-subtotals', 'summary-subtotal-list', 'summary-variables', 'summary-variable-list', 'sidebar-new-sheet', 'decimals-toggle', 'messages'];
 const nodes = Object.fromEntries(ids.map(id => [id, mockUiElement(id.endsWith('-dialog') ? 'dialog' : 'div')]));
 for (const [id, node] of Object.entries(nodes)) node.id = id;
@@ -63,6 +64,30 @@ window.addEventListener = (type, fn) => (windowListeners[type] ||= []).push(fn);
 window.dispatchEvent = event => (windowListeners[event.type] || []).forEach(fn => fn(event));
 window.localStorage.reset();
 api.new_sheet();
+nodes['bottom-total'].appendChild(nodes['total-controls']);
+nodes['top-total'].hidden = nodes['summary-total'].hidden = true;
+// Simulate the browser moving the controls between their parent slots.
+for (const id of ['bottom-total', 'top-total', 'summary-total']) {
+    const slot = nodes[id];
+    const append = slot.appendChild;
+    slot.appendChild = child => {
+        if (child.parentElement) child.parentElement.removeChild(child);
+        return append(child);
+    };
+}
+api.init_total_position();
+assert.ok(!document.body.classList.contains('total-top'));
+nodes['total-position'].emit('click');
+assert.ok(document.body.classList.contains('total-top'));
+assert.ok(nodes['bottom-total'].hidden);
+assert.strictEqual(nodes['total-controls'].parentElement, nodes['top-total']);
+assert.strictEqual(window.localStorage.getItem(api.TOTAL_POSITION_STORAGE_KEY), 'top');
+assert.strictEqual(nodes['total-position'].getAttribute('aria-label'), 'Move total to bottom');
+nodes['total-position'].emit('click');
+assert.ok(!document.body.classList.contains('total-top'));
+assert.ok(nodes['top-total'].hidden);
+assert.strictEqual(nodes['total-controls'].parentElement, nodes['bottom-total']);
+assert.strictEqual(window.localStorage.getItem(api.TOTAL_POSITION_STORAGE_KEY), 'bottom');
 api.init_sidebar();
 const key = (key, options = {}) => {
     const event = { key, preventDefault() { this.prevented = true; }, ...options };
@@ -273,8 +298,6 @@ assert.strictEqual(previewApi.SIDEBAR_STORAGE_KEY, 'jotsum.preview.layout-b1.sid
 
     api.new_sheet();
     assert.ok(nodes.total.classList.contains('is-placeholder'));
-    assert.strictEqual(nodes['header-total-value'].textContent, '—');
-    assert.strictEqual(nodes['summary-total-value'].textContent, '—');
     assert.ok(nodes['summary-subtotals'].hidden);
     assert.ok(nodes['summary-variables'].hidden);
     assert.ok(key('c', alt).prevented);
@@ -283,14 +306,11 @@ assert.strictEqual(previewApi.SIDEBAR_STORAGE_KEY, 'jotsum.preview.layout-b1.sid
     assert.deepStrictEqual(writes, []);
     key('Escape');
 
-    api.import_sheet_text('12\n8\n--- Food\n:rate = 50\n2 * :rate\n---\n:tax = 3\n:rate = 75');
-    for (const id of ['header-total', 'summary-total']) {
-        assert.ok(!nodes[id].classList.contains('is-placeholder'));
-        assert.strictEqual(String(nodes[id + '-value'].textContent), '120');
-    }
+    api.import_sheet_text('# Ignored label\n12\n8\n--- Food\n# Earlier\n## Einkauf\n:rate = 50\n2 * :rate\n---\n7\n---\n:tax = 3\n:rate = 75');
+    assert.ok(!nodes.total.classList.contains('is-placeholder'));
     const summaryRows = id => nodes[id].children.map(row => row.children.map(cell => String(cell.textContent)));
     assert.ok(!nodes['summary-subtotals'].hidden);
-    assert.deepStrictEqual(summaryRows('summary-subtotal-list'), [['Food', '20'], ['Subtotal 2', '100']]);
+    assert.deepStrictEqual(summaryRows('summary-subtotal-list'), [['Food', '20'], ['Einkauf', '100'], ['Subtotal 3', '7']]);
     assert.ok(!nodes['summary-variables'].hidden);
     assert.deepStrictEqual(summaryRows('summary-variable-list'), [[':rate', '75'], [':tax', '3']]);
 
@@ -315,14 +335,11 @@ assert.strictEqual(previewApi.SIDEBAR_STORAGE_KEY, 'jotsum.preview.layout-b1.sid
     assert.strictEqual(lastMessage().children[1].textContent, 'Total copied: ' + displayed);
     key('Escape');
 
-    for (const id of ['header-total', 'summary-total']) {
-        assert.strictEqual(String(nodes[id + '-value'].textContent), displayed);
-        nodes[id].emit('click');
-        await Promise.resolve();
-        assert.strictEqual(lastMessage().children[1].textContent, 'Total copied: ' + displayed);
-        key('Escape');
-    }
-    assert.deepStrictEqual(writes, [displayed, displayed, displayed]);
+    nodes['copy-total'].emit('click');
+    await Promise.resolve();
+    assert.strictEqual(lastMessage().children[1].textContent, 'Total copied: ' + displayed);
+    key('Escape');
+    assert.deepStrictEqual(writes, [displayed, displayed]);
     assert.ok(nodes['summary-subtotals'].hidden);
     assert.ok(nodes['summary-variables'].hidden);
 

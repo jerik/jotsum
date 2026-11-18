@@ -408,74 +408,128 @@ test('Ctrl+Delete on the only line saves the cleared sheet', async ({ page }) =>
   await expect(page.locator('#total')).toHaveText('0');
 });
 
-test('total aligns with the sheet at every layout width and sidebar position', async ({ page }) => {
+test('total placement and header alignment at every layout width and sidebar position', async ({ page }) => {
   for (const width of [400, 875, 1400, 2560]) {
     await page.setViewportSize({ width, height: 600 });
     for (const pinned of [false, true]) {
       await page.evaluate(pinned => document.body.classList.toggle('sidebar-pinned', pinned), pinned);
-      const edges = await page.evaluate(() => {
-        const rect = selector => document.querySelector(selector).getBoundingClientRect();
-        return {
-          total: rect('#total').right,
-          result: rect('jo-sum').right,
-          sheetWidth: rect('.content').width,
-          sheetLeft: rect('.content').left,
-          layoutRight: rect('.sheet-layout').right,
-          toggle: rect('#drawer-toggle').left,
-          actions: rect('#more-toggle').right
-        };
-      });
-      expect(Math.abs(edges.total - edges.result)).toBeLessThanOrEqual(1);
-      expect(Math.abs(edges.toggle - edges.sheetLeft)).toBeLessThanOrEqual(1);
-      expect(Math.abs(edges.actions - edges.layoutRight)).toBeLessThanOrEqual(1);
-      if (width >= 1400) expect(edges.sheetWidth).toBeLessThanOrEqual(760);
+      const wide = await page.locator('.workspace').evaluate(workspace => workspace.clientWidth >= 1200);
+      for (const top of [false, true]) {
+        const slot = top ? (wide ? '#summary-total' : '#top-total') : '#bottom-total';
+        await expect(page.locator(slot).locator('#total')).toBeVisible();
+        const edges = await page.evaluate(() => {
+          const rect = selector => document.querySelector(selector).getBoundingClientRect();
+          return {
+            total: rect('#total').right,
+            result: rect('jo-sum').right,
+            arrow: rect('#total-position').left,
+            summary: rect('#summary').left,
+            sheetWidth: rect('.content').width,
+            sheetLeft: rect('.content').left,
+            layoutRight: rect('.sheet-layout').right,
+            toggle: rect('#drawer-toggle').left,
+            actions: rect('#more-toggle').right
+          };
+        });
+        expect(Math.abs(edges.total - edges.arrow)).toBeLessThanOrEqual(1);
+        if (top && wide) {
+          expect(edges.total).toBeGreaterThan(edges.summary);
+        } else {
+          expect(Math.abs(edges.total - edges.result)).toBeLessThanOrEqual(1);
+        }
+        expect(Math.abs(edges.toggle - edges.sheetLeft)).toBeLessThanOrEqual(1);
+        expect(Math.abs(edges.actions - edges.layoutRight)).toBeLessThanOrEqual(1);
+        if (width >= 1400) expect(edges.sheetWidth).toBeLessThanOrEqual(760);
+        await page.locator('#total-position').click();
+      }
     }
   }
 });
 
 const summaryExample = '12\n8\n--- Food\n:rate = 50\n2 * :rate';
 
-test('wide sheets show a sticky summary with the total, subtotals and variables', async ({ page, context }) => {
+for (const { width, topSlot } of [{ width: 875, topSlot: '#top-total' }, { width: 1400, topSlot: '#summary-total' }]) {
+  test(`the total switches positions and survives reload at ${width}px`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 600 });
+    await page.goto('/jotsum.html?text=' + encodeURIComponent(summaryExample));
+
+    const total = page.locator('#total');
+    const toggle = page.locator('#total-position');
+    const bottom = page.locator('#bottom-total');
+    const top = page.locator(topSlot);
+    const otherTop = page.locator(topSlot === '#top-total' ? '#summary-total' : '#top-total');
+
+    await expect(bottom.locator('#total')).toHaveText('120');
+    await expect(total).toBeVisible();
+    await expect(bottom).toHaveCSS('position', 'sticky');
+    await expect(top).toBeHidden();
+    await expect(otherTop).toBeHidden();
+    const lastLine = await page.locator('jo-line').last().boundingBox();
+    const bottomRow = await bottom.boundingBox();
+    expect(bottomRow.y).toBeGreaterThanOrEqual(lastLine.y + lastLine.height);
+    await expect(page.locator('.site-header')).not.toContainText('120');
+
+    await expect(toggle).toHaveAccessibleName('Move total to top');
+    await toggle.click();
+    await expect(top.locator('#total')).toHaveText('120');
+    await expect(total).toBeVisible();
+    await expect(total).toHaveCount(1);
+    await expect(bottom).toBeHidden();
+    await expect(otherTop).toBeHidden();
+    await expect(toggle).toHaveAccessibleName('Move total to bottom');
+    await expect(page.locator('.site-header')).not.toContainText('120');
+    if (topSlot === '#top-total') {
+      const header = await page.locator('.site-header').boundingBox();
+      const topRow = await top.boundingBox();
+      expect(Math.abs(topRow.y - header.y - header.height)).toBeLessThanOrEqual(1);
+    }
+
+    await page.reload();
+    await expect(top.locator('#total')).toBeVisible();
+    await expect(bottom).toBeHidden();
+    await toggle.click();
+    await expect(bottom.locator('#total')).toBeVisible();
+    await expect(top).toBeHidden();
+    await page.reload();
+    await expect(bottom.locator('#total')).toBeVisible();
+    await expect(top).toBeHidden();
+  });
+}
+
+test('wide summary keeps its breakdown and offers click-to-copy in top mode', async ({ page, context }) => {
   await page.setViewportSize({ width: 1400, height: 900 });
   await context.grantPermissions(['clipboard-read', 'clipboard-write']);
   await page.goto('/jotsum.html?text=' + encodeURIComponent(summaryExample));
 
-  const summary = page.getByRole('complementary', { name: 'Sheet summary' });
+  const summary = page.locator('#summary');
   await expect(summary).toBeVisible();
   await expect(summary).toHaveCSS('position', 'sticky');
-  await expect(summary.locator('#summary-total-value')).toHaveText('120');
+  await expect(summary.locator('#summary-total')).toBeHidden();
   await expect(summary.locator('#summary-subtotal-list dt')).toHaveText('Food');
   await expect(summary.locator('#summary-subtotal-list dd')).toHaveText('20');
   await expect(summary.locator('#summary-variable-list dt')).toHaveText(':rate');
   await expect(summary.locator('#summary-variable-list dd')).toHaveText('50');
-  await expect(page.locator('#header-total')).toBeHidden();
-  await expect(page.locator('.sheet-total')).toHaveCSS('position', 'static');
-  await expect(page.locator('#total')).toHaveText('120');
 
-  await summary.locator('#summary-total').click();
+  await page.locator('#total-position').click();
+  await summary.locator('#copy-total').click();
   await expect(page.getByText('Total copied: 120', { exact: true })).toBeVisible();
   expect(await page.evaluate(() => navigator.clipboard.readText())).toBe('120');
 
   await page.locator('#drawer-toggle').click();
   await page.locator('#pin-sidebar').click();
   await expect(summary).toBeHidden();
-  await expect(page.locator('#header-total')).toHaveText('Σ 120');
+  await expect(page.locator('#top-total #total')).toHaveText('120');
+  await expect(page.locator('#top-total #total')).toBeVisible();
 });
 
-test('narrow sheets show a sticky inline total and a copyable total in the header', async ({ page, context }) => {
-  await page.setViewportSize({ width: 875, height: 600 });
-  await context.grantPermissions(['clipboard-read', 'clipboard-write']);
-  await page.goto('/jotsum.html?text=' + encodeURIComponent(summaryExample));
+test('wide summary is hidden in bottom mode when there is no breakdown', async ({ page }) => {
+  await page.setViewportSize({ width: 1400, height: 600 });
+  await page.goto('/jotsum.html?text=42');
 
-  await expect(page.locator('.summary')).toBeHidden();
-  const headerTotal = page.locator('#header-total');
-  await expect(headerTotal).toBeVisible();
-  await expect(headerTotal).toHaveText('Σ 120');
-  await expect(page.locator('.sheet-total')).toHaveCSS('position', 'sticky');
-  await expect(page.locator('#total')).toHaveText('120');
-  await expect(page.locator('#total')).toBeInViewport({ ratio: 1 });
-
-  await headerTotal.click();
-  await expect(page.getByText('Total copied: 120', { exact: true })).toBeVisible();
-  expect(await page.evaluate(() => navigator.clipboard.readText())).toBe('120');
+  const summary = page.locator('#summary');
+  await expect(summary).toBeHidden();
+  await page.locator('#total-position').click();
+  await expect(summary.locator('#total')).toBeVisible();
+  await page.locator('#total-position').click();
+  await expect(summary).toBeHidden();
 });

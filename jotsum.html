@@ -76,6 +76,10 @@
         scroll-padding-bottom: calc(var(--total-h) + env(safe-area-inset-bottom) + 8px);
       }
 
+      html:has(.top-total:not([hidden])) {
+        scroll-padding-top: calc(var(--header-h) + 1px + var(--total-h) + env(safe-area-inset-top) + 8px);
+      }
+
       a { color: var(--accent); }
       button, input { color: var(--text); }
       input { background: var(--surface); border-color: var(--border); }
@@ -479,22 +483,36 @@
       .sidebar-heading { height: var(--total-h); box-sizing: border-box; }
       .sidebar-heading .sidebar-title { padding: 0 0 0 16px; margin-right: auto; }
       .sidebar-heading .icon-btn { width: 36px; height: 36px; }
-      /* Keep the total readable if a message overlaps its natural position. */
       .sheet-total {
-        position: sticky; bottom: env(safe-area-inset-bottom); z-index: 41;
+        position: sticky; z-index: 41;
         box-sizing: border-box; height: var(--total-h); align-items: center;
-        background: var(--surface); border-top: 3px double var(--border);
+        background: var(--surface);
+      }
+      .sheet-total[hidden] { display: none; }
+      .bottom-total { bottom: env(safe-area-inset-bottom); border-top: 3px double var(--border); }
+      .top-total {
+        top: calc(var(--header-h) + 1px + env(safe-area-inset-top));
+        border-bottom: 1px solid var(--border);
       }
       body.drawer-open .sheet-total { z-index: 10; }
-      .sheet-total > span { padding-inline: 7px; }
-      #header-total {
-        flex: 0 1 auto; min-width: 0; display: block;
-        overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+      .sheet-total .total-controls { display: contents; }
+      .sheet-total .total-label { padding-inline: 7px; }
+      #copy-total {
+        grid-column: 2; min-width: 0; padding: 0; border: 0;
+        background: transparent; color: inherit; cursor: pointer;
       }
-      #header-total, .summary-value, .summary dd { font-variant-numeric: tabular-nums; }
-      .is-placeholder > .total-value { color: var(--muted); }
+      #total-position { color: var(--muted); }
+      .sheet-total #total-position {
+        position: absolute; top: 50%; left: 100%; transform: translateY(-50%);
+        width: 16px; min-width: 16px;
+        padding: 0; background: var(--surface);
+      }
+      #total-position svg { width: 14px; height: 14px; transition: transform .2s ease; }
+      body.total-top #total-position svg { transform: rotate(180deg); }
       #messages { z-index: 40; bottom: calc(var(--total-h) + env(safe-area-inset-bottom) + 16px); }
+      body.total-top #messages { bottom: calc(env(safe-area-inset-bottom) + 16px); }
       .summary {
+        --summary-wide: 0;
         display: none;
         position: sticky; top: calc(var(--header-h) + env(safe-area-inset-top) + 20px);
         max-height: calc(100dvh - var(--header-h) - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 40px);
@@ -502,11 +520,12 @@
         box-sizing: border-box; overflow: auto;
         background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
       }
-      #summary-total {
-        width: 100%; height: auto; min-height: 36px; padding: 6px;
-        justify-content: space-between; text-align: right; overflow-wrap: anywhere;
+      .summary .total-controls {
+        display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center;
+        padding-left: 6px;
       }
-      .summary-value { font-size: 24px; font-weight: bold; min-width: 0; }
+      .summary jo-total { font-size: 24px; }
+      .summary dd { font-variant-numeric: tabular-nums; }
       .summary section { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border); }
       .summary h2 { margin: 0 0 8px; font-size: 14px; }
       .summary dl { margin: 0; }
@@ -517,10 +536,8 @@
       @container workspace (min-width: 1200px) {
         .wrap, .sheet-layout { width: calc(var(--sheet-w) + var(--summary-gap) + var(--summary-w)); }
         .sheet-layout { grid-template-columns: var(--sheet-w) var(--summary-w); gap: var(--summary-gap); }
-        .summary { display: block; }
-        #header-total { display: none; }
-        .sheet-total { position: static; }
-        #messages { bottom: calc(env(safe-area-inset-bottom) + 16px); }
+        .summary { --summary-wide: 1; }
+        .summary:has(> :not([hidden])) { display: block; }
       }
     </style>
     <script type="text/javascript" src="./jotsum.js" charset="utf-8"></script>
@@ -532,7 +549,6 @@
       <div class="wrap">
         <button type="button" id="drawer-toggle" class="header-button" aria-label="Saved sheets (0)" title="Saved sheets (Alt+B / Ctrl+B)" aria-expanded="false" aria-controls="sidebar"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16M5 8h2M5 12h2"/></svg><span id="sheet-count" class="sheet-count" aria-hidden="true">0</span></button>
         <span class="breadcrumb"><span class="breadcrumb-brand">jotsum / </span><span id="current-sheet-name" class="current-sheet-name"></span></span>
-        <button type="button" id="header-total" class="header-button is-placeholder" title="Copy total (Alt+C)">Σ <span id="header-total-value" class="total-value">—</span></button>
         <nav id="header-actions" class="actions" aria-label="Sheet actions">
           <button type="button" id="new-sheet" class="header-button" aria-label="New sheet" title="New sheet (Alt+N)"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg></button>
           <button type="button" id="share-sheet" class="header-button" aria-label="Share" title="Share"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="m8.6 10.5 6.8-4M8.6 13.5l6.8 4"/></svg></button>
@@ -565,16 +581,18 @@
       <div id="messages" aria-live="polite" aria-relevant="additions text"></div>
       <main class="sheet-layout">
         <div id="content" class="content">
+          <div id="top-total" class="sheet-total top-total" hidden></div>
           <jo-sheet id="sheet"></jo-sheet>
-          <div class="sheet-total">
-            <span>Total</span>
-            <jo-total id="total"></jo-total>
+          <div id="bottom-total" class="sheet-total bottom-total">
+            <div id="total-controls" class="total-controls">
+              <span class="total-label">Total</span>
+              <button type="button" id="copy-total" title="Copy total (Alt+C)"><jo-total id="total"></jo-total></button>
+              <button type="button" id="total-position" class="header-button" aria-label="Move total to top" title="Move total to top"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M6 11l6-6 6 6"/></svg></button>
+            </div>
           </div>
         </div>
         <aside id="summary" class="summary" aria-label="Sheet summary">
-          <button type="button" id="summary-total" class="header-button is-placeholder" title="Copy total (Alt+C)">
-            <span>Total</span><span id="summary-total-value" class="summary-value total-value">—</span>
-          </button>
+          <div id="summary-total" hidden></div>
           <section id="summary-subtotals" hidden>
             <h2>Subtotals</h2>
             <dl id="summary-subtotal-list"></dl>
