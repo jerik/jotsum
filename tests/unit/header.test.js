@@ -4,14 +4,17 @@ const html = fs.readFileSync(require('path').join(__dirname, '../../jotsum.html'
 const header = html.match(/<header\b[\s\S]*?<\/header>/)[0];
 const visible = header.slice(0, header.indexOf('<ul id="more-actions"'));
 assert.deepStrictEqual([...visible.matchAll(/<button[^>]*id="([^"]+)"/g)].map(m => m[1]),
-    ['drawer-toggle', 'new-sheet', 'share-sheet', 'more-toggle']);
+    ['drawer-toggle', 'header-total', 'new-sheet', 'share-sheet', 'more-toggle']);
 assert.doesNotMatch(visible, /class="brand"|class="action-label"/);
 assert.doesNotMatch(visible, /Add line/);
 for (const entry of ['Import .txt…', 'Export .txt', 'Quick help', 'Keyboard shortcuts', 'About / GitHub']) assert.ok(header.includes(entry));
 assert.doesNotMatch(header, /Add line|id="add-line"/);
-assert.match(html, /<title>jotsum<\/title>/);
+assert.match(html, /<title>jotsum · V1<\/title>/);
 assert.strictEqual([...html.matchAll(/id="total"/g)].length, 1);
-assert.match(html, /class="total-bar"[\s\S]*id="total"/);
+assert.match(html, /<\/jo-sheet>\s*<div class="total-row"[^>]*>\s*<span>Total<\/span>\s*<jo-total id="total"><\/jo-total>/);
+assert.match(html, /\.total-row\s*\{[^}]*position: sticky; bottom: 0;[^}]*grid-template-columns: subgrid;[^}]*border-top: 3px double var\(--border\)/);
+assert.match(html, /--sheet-w: 760px;/);
+assert.match(header, /<span id="version"><\/span><span>V1 · Kassenbon<\/span>/);
 const shortcutList = html.match(/<div id="shortcut-list">([\s\S]*?)<\/div>/)[1];
 assert.deepStrictEqual([...shortcutList.matchAll(/<h3>([^<]+)<\/h3>\s*<ul>/g)].map(m => m[1]),
     ['Help', 'Saved sheets', 'Sheet']);
@@ -30,7 +33,7 @@ window.location = new URL('https://example.test/');
 window.history = { replaceState: (_a, _b, url) => { window.location = new URL(url); } };
 const ids = ['sidebar', 'drawer-toggle', 'shortsave-list', 'shortsave-empty', 'sidebar-title', 'new-sheet',
     'content', 'header-actions', 'drawer-backdrop', 'more-actions', 'more-toggle', 'add-line',
-    'quick-help', 'quick-help-dialog', 'shortcuts-dialog', 'pin-sidebar', 'sheet-count', 'keyboard-shortcuts', 'current-sheet-name', 'total', 'total-position', 'sidebar-new-sheet', 'decimals-toggle', 'messages'];
+    'quick-help', 'quick-help-dialog', 'shortcuts-dialog', 'pin-sidebar', 'sheet-count', 'keyboard-shortcuts', 'current-sheet-name', 'total', 'header-total', 'header-total-value', 'sidebar-new-sheet', 'decimals-toggle', 'messages'];
 const nodes = Object.fromEntries(ids.map(id => [id, mockUiElement(id.endsWith('-dialog') ? 'dialog' : 'div')]));
 for (const [id, node] of Object.entries(nodes)) node.id = id;
 nodes['more-actions'].hidden = true;
@@ -254,16 +257,6 @@ assert.strictEqual(String(heading.nextElementSibling.textContent), '0');
 assert.deepStrictEqual(api.evaluate_sheet(['# Heading 100', '5', '---']).sums, [0, 5, 5]);
 assert.strictEqual(api.evaluate_sheet(['# Heading 100', '5', '---']).total, 5);
 assert.strictEqual(api.evaluate_sheet(['# Heading 100']).counted[0], false);
-api.load_total_position();
-assert.ok(!document.body.classList.contains('total-top'));
-nodes['total-position'].emit('click');
-assert.strictEqual(window.localStorage.getItem(api.TOTAL_POSITION_STORAGE_KEY), 'top');
-assert.strictEqual(nodes['total-position'].getAttribute('aria-label'), 'Move total to bottom');
-document.body.classList.remove('total-top');
-api.load_total_position();
-assert.ok(document.body.classList.contains('total-top'));
-nodes['total-position'].emit('click');
-assert.strictEqual(window.localStorage.getItem(api.TOTAL_POSITION_STORAGE_KEY), 'bottom');
 api.save_store(Array.from({ length: 100 }, (_, i) => ({ id: 'badge-' + i, lines: ['1'] })));
 api.render_shortsave_list();
 assert.strictEqual(nodes['sheet-count'].textContent, '99+');
@@ -272,10 +265,6 @@ window.location = new URL('https://example.test/preview/layout-b1/');
 delete require.cache[require.resolve('../../jotsum.js')];
 const previewApi = require('../../jotsum.js');
 assert.strictEqual(previewApi.SIDEBAR_STORAGE_KEY, 'jotsum.preview.layout-b1.sidebar-pinned');
-assert.strictEqual(previewApi.TOTAL_POSITION_STORAGE_KEY, 'jotsum.preview.layout-b1.total-position');
-previewApi.toggle_total_position();
-assert.strictEqual(window.localStorage.getItem(previewApi.TOTAL_POSITION_STORAGE_KEY), 'top');
-assert.strictEqual(window.localStorage.getItem(api.TOTAL_POSITION_STORAGE_KEY), 'bottom');
 (async () => {
     const writes = [];
     window.navigator.clipboard.writeText = async value => { writes.push(value); };
@@ -285,6 +274,8 @@ assert.strictEqual(window.localStorage.getItem(api.TOTAL_POSITION_STORAGE_KEY), 
 
     api.new_sheet();
     assert.ok(nodes.total.classList.contains('is-placeholder'));
+    assert.strictEqual(nodes['header-total-value'].textContent, '—');
+    assert.ok(nodes['header-total-value'].classList.contains('is-placeholder'));
     assert.ok(key('c', alt).prevented);
     assert.strictEqual(lastMessage().className, 'message message-info');
     assert.strictEqual(lastMessage().children[1].textContent, 'No total to copy.');
@@ -294,6 +285,8 @@ assert.strictEqual(window.localStorage.getItem(api.TOTAL_POSITION_STORAGE_KEY), 
     api.import_sheet_text('12.125\n8');
     // The browser exposes the rendered total as a string.
     const displayed = String(nodes.total.textContent);
+    assert.strictEqual(String(nodes['header-total-value'].textContent), displayed);
+    assert.ok(!nodes['header-total-value'].classList.contains('is-placeholder'));
     nodes.total.textContent = displayed;
     for (const modifier of ['ctrlKey', 'metaKey', 'shiftKey']) {
         assert.ok(!key('c', { ...alt, [modifier]: true }).prevented);
@@ -310,6 +303,11 @@ assert.strictEqual(window.localStorage.getItem(api.TOTAL_POSITION_STORAGE_KEY), 
     assert.deepStrictEqual(writes, [displayed]);
     assert.strictEqual(lastMessage().className, 'message message-success');
     assert.strictEqual(lastMessage().children[1].textContent, 'Total copied: ' + displayed);
+    key('Escape');
+
+    nodes['header-total'].emit('click');
+    await Promise.resolve();
+    assert.deepStrictEqual(writes, [displayed, displayed]);
     key('Escape');
 
     window.navigator.clipboard.writeText = async () => { throw new Error('Clipboard unavailable'); };

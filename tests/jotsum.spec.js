@@ -40,8 +40,7 @@ test('Alt+C reports that an empty sheet has no total to copy', async ({ page }) 
 });
 
 test('initial start of page with line and sum', async ({ page }) => {
-  // Expect a title "to contain" a substring.
-  await expect(page).toHaveTitle(/jotsum/);
+  await expect(page).toHaveTitle("jotsum · V1");
 
   const jol = await page.locator('//jo-line').count(); 
   const jos = await page.locator('//jo-sum').count(); 
@@ -409,32 +408,77 @@ test('Ctrl+Delete on the only line saves the cleared sheet', async ({ page }) =>
   await expect(page.locator('#total')).toHaveText('0');
 });
 
-test('total aligns with the sheet at every layout width and position', async ({ page }) => {
-  for (const width of [400, 700, 1024, 1440, 1920]) {
-    await page.setViewportSize({ width, height: 900 });
+test('total aligns with the sheet at every layout width and sidebar position', async ({ page }) => {
+  for (const width of [400, 875, 1400, 2560]) {
+    await page.setViewportSize({ width, height: 600 });
     for (const pinned of [false, true]) {
-      for (const top of [false, true]) {
-        await page.evaluate(({ pinned, top }) => {
-          document.body.classList.toggle('sidebar-pinned', pinned);
-          document.body.classList.toggle('total-top', top);
-        }, { pinned, top });
-        const edges = await page.evaluate(() => {
-          const rect = selector => document.querySelector(selector).getBoundingClientRect();
-          return {
-            label: rect('.total-inner > span').left,
-            sheet: rect('jo-line').left,
-            total: rect('#total').right,
-            result: rect('jo-sum').right,
-            toggle: rect('#drawer-toggle svg').left,
-            actions: rect('#header-actions').right,
-            width: document.documentElement.clientWidth
-          };
-        });
-        expect(Math.abs(edges.label - edges.sheet)).toBeLessThan(1);
-        expect(Math.abs(edges.total - edges.result)).toBeLessThan(1);
-        expect(Math.abs(edges.toggle - 16)).toBeLessThan(1);
-        expect(edges.width - edges.actions).toBe(16);
+      // Pinning only affects the layout at widths that support a pinned sidebar.
+      await page.evaluate(pinned => {
+        document.body.classList.toggle('sidebar-pinned', pinned && matchMedia('(min-width: 700px)').matches);
+      }, pinned);
+      const edges = await page.evaluate(() => {
+        const rect = selector => document.querySelector(selector).getBoundingClientRect();
+        return {
+          label: rect('.total-row > span').left,
+          sheetLeft: rect('.content').left,
+          sheetRight: rect('.content').right,
+          sheetWidth: rect('.content').width,
+          total: rect('#total').right,
+          result: rect('jo-sum').right,
+          toggle: rect('#drawer-toggle').left,
+          actions: rect('#more-toggle').right
+        };
+      });
+      expect(Math.abs(edges.label - edges.sheetLeft)).toBeLessThanOrEqual(1);
+      expect(Math.abs(edges.total - edges.result)).toBeLessThanOrEqual(1);
+      if (width >= 1400) {
+        expect(edges.sheetWidth).toBeLessThanOrEqual(760);
+        expect(Math.abs(edges.toggle - edges.sheetLeft)).toBeLessThanOrEqual(1);
+        expect(Math.abs(edges.actions - edges.sheetRight)).toBeLessThanOrEqual(1);
       }
     }
   }
+});
+
+test('the receipt total follows the last line on a short sheet', async ({ page }) => {
+  await page.setViewportSize({ width: 1400, height: 900 });
+  await page.goto('/jotsum.html?text=' + encodeURIComponent('12\n8'));
+  await expect(page.locator('#total')).toHaveText('20');
+  const gap = await page.locator('.total-row').evaluate(row =>
+    row.getBoundingClientRect().top - document.querySelector('jo-line:last-of-type').getBoundingClientRect().bottom
+  );
+  expect(gap).toBeGreaterThanOrEqual(0);
+  expect(gap).toBeLessThanOrEqual(60);
+});
+
+test('the receipt total stays in view on a long sheet', async ({ page }) => {
+  await page.setViewportSize({ width: 875, height: 600 });
+  await page.goto('/jotsum.html?text=' + encodeURIComponent(Array(60).fill('1').join('\n')));
+  const lines = page.locator('jo-line');
+  const row = page.locator('.total-row');
+  await expect(lines).toHaveCount(60);
+  await lines.first().focus();
+  await expect(lines.first()).toBeFocused();
+  await expect(row).toBeInViewport({ ratio: 1 });
+  expect(await row.evaluate(element => element.getBoundingClientRect().bottom)).toBeCloseTo(600, 0);
+
+  await lines.last().focus();
+  await expect(lines.last()).toBeFocused();
+  const gap = await row.evaluate(element =>
+    element.getBoundingClientRect().top - document.querySelector('jo-line:last-of-type').getBoundingClientRect().bottom
+  );
+  expect(gap).toBeGreaterThanOrEqual(0);
+  expect(gap).toBeLessThanOrEqual(1);
+});
+
+test('the header total stays visible on a phone and copies the displayed value', async ({ page, context }) => {
+  await page.setViewportSize({ width: 400, height: 600 });
+  await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+  await page.goto('/jotsum.html?text=' + encodeURIComponent('# A long sheet name for a narrow window\n12\n8'));
+  const headerTotal = page.getByRole('button', { name: 'Copy total' });
+  await expect(headerTotal).toHaveText('Σ 20');
+  await expect(headerTotal).toBeInViewport({ ratio: 1 });
+  await headerTotal.click();
+  await expect(page.getByText('Total copied: 20', { exact: true })).toBeVisible();
+  expect(await page.evaluate(() => navigator.clipboard.readText())).toBe('20');
 });
