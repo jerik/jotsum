@@ -859,18 +859,18 @@ class JoSheet extends HTMLElement {
         const hint_only = lines.length === 1 && lines[0].classList.contains('is-placeholder');
         const total_element = document.getElementById('total');
         if (hint_only) {
-            total_element.textContent = lines[0].getAttribute('data-placeholder-sum');
+            const hint = lines[0].getAttribute('data-placeholder-sum');
+            total_element.setAttribute('data-placeholder-sum', hint);
+            total_element.textContent = total_element.parentElement?.id === 'top-total-copy' ? '—' : hint;
             total_element.classList.add('is-placeholder');
         } else {
             total_element.textContent = this.round(total);
             total_element.classList.remove('is-placeholder');
         }
-        for (const id of ['top-total-value', 'total-pill-value']) {
-            const mirror = ui_element(id);
-            if (mirror) {
-                mirror.textContent = hint_only ? '—' : total_element.textContent;
-                mirror.classList.toggle('is-placeholder', hint_only);
-            }
+        const pill_value = ui_element('total-pill-value');
+        if (pill_value) {
+            pill_value.textContent = hint_only ? '—' : total_element.textContent;
+            pill_value.classList.toggle('is-placeholder', hint_only);
         }
         update_header_sheet_name();
         if (display_only === true || shared_preview) return;
@@ -1547,12 +1547,20 @@ const SIDEBAR_STORAGE_KEY = storage_namespace + 'sidebar-pinned';
 let sidebar_pinned = false;
 const TOTAL_POSITION_STORAGE_KEY = storage_namespace + 'total-position';
 function set_total_position(top) {
-    document.body.classList.toggle('total-top', top);
     const button = ui_element('total-position');
+    const had_focus = document.activeElement === button;
+    document.body.classList.toggle('total-top', top);
+    const total = ui_element('total');
+    const total_container = ui_element(top ? 'top-total-copy' : 'total-row');
+    if (total && total_container) {
+        if (total.parentElement !== total_container) total_container.appendChild(total);
+        if (total.classList.contains('is-placeholder')) {
+            total.textContent = top ? '—' : total.getAttribute('data-placeholder-sum');
+        }
+    }
     if (button) {
         const container = ui_element(top ? 'top-total-inner' : 'total-row');
         if (container && button.parentElement !== container) {
-            const had_focus = document.activeElement === button;
             container.appendChild(button);
             if (had_focus) button.focus();
         }
@@ -1858,7 +1866,7 @@ function init_total_display() {
         const total = row.getBoundingClientRect();
         const bottom = stack.bottom + lift;
         const top = stack.top + lift;
-        const overlaps = stack.height && top < total.bottom + 8 && bottom > total.top - 8;
+        const overlaps = total.height && stack.height && top < total.bottom + 8 && bottom > total.top - 8;
         const next_lift = overlaps ? bottom - total.top + 8 : 0;
         if (lift !== next_lift) {
             lift = next_lift;

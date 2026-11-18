@@ -12,7 +12,9 @@ assert.doesNotMatch(header, /Add line|id="add-line"/);
 assert.match(html, /<title>jotsum · V3<\/title>/);
 assert.match(header, /id="version"><\/span><span>V3 · Zeile \+ Schwebefeld<\/span>/);
 assert.strictEqual([...html.matchAll(/id="total"/g)].length, 1);
+assert.doesNotMatch(header, /id="total"|Σ/);
 assert.match(html, /<\/jo-sheet>\s*<div id="total-row"[^>]*>\s*<span[^>]*>Total<\/span>\s*<jo-total id="total">/);
+assert.match(html, /body\.total-top \.total-row, body\.total-top \.pill-position \{ display: none; \}/);
 const shortcutList = html.match(/<div id="shortcut-list">([\s\S]*?)<\/div>/)[1];
 assert.deepStrictEqual([...shortcutList.matchAll(/<h3>([^<]+)<\/h3>\s*<ul>/g)].map(m => m[1]),
     ['Help', 'Saved sheets', 'Sheet']);
@@ -32,7 +34,7 @@ window.history = { replaceState: (_a, _b, url) => { window.location = new URL(ur
 const ids = ['sidebar', 'drawer-toggle', 'shortsave-list', 'shortsave-empty', 'sidebar-title', 'new-sheet',
     'content', 'header-actions', 'drawer-backdrop', 'more-actions', 'more-toggle', 'add-line',
     'quick-help', 'quick-help-dialog', 'shortcuts-dialog', 'pin-sidebar', 'sheet-count', 'keyboard-shortcuts', 'current-sheet-name', 'total', 'total-position', 'total-row', 'top-total-inner',
-    'top-total-copy', 'top-total-value', 'total-pill', 'total-pill-value', 'sidebar-new-sheet', 'decimals-toggle', 'messages'];
+    'top-total-copy', 'total-pill', 'total-pill-value', 'sidebar-new-sheet', 'decimals-toggle', 'messages'];
 let on_total_intersection;
 window.IntersectionObserver = class {
     constructor(callback) { on_total_intersection = callback; }
@@ -42,7 +44,9 @@ window.ResizeObserver = class { observe() {} };
 const nodes = Object.fromEntries(ids.map(id => [id, mockUiElement(id.endsWith('-dialog') ? 'dialog' : 'div')]));
 for (const [id, node] of Object.entries(nodes)) node.id = id;
 nodes['more-actions'].hidden = true;
+nodes['total-row'].appendChild(nodes.total);
 nodes['total-row'].appendChild(nodes['total-position']);
+nodes['top-total-inner'].appendChild(nodes['top-total-copy']);
 nodes.sidebar.appendChild(nodes['sidebar-title']);
 nodes['add-line'].tagName = 'BUTTON';
 nodes['more-actions'].appendChild(nodes['add-line']);
@@ -266,24 +270,32 @@ assert.strictEqual(api.evaluate_sheet(['# Heading 100']).counted[0], false);
 api.load_total_position();
 assert.ok(!document.body.classList.contains('total-top'));
 assert.strictEqual(nodes['total-position'].parentElement, nodes['total-row']);
-for (const id of ['top-total-value', 'total-pill-value']) {
-    assert.strictEqual(nodes[id].textContent, nodes.total.textContent);
-    assert.ok(!nodes[id].classList.contains('is-placeholder'));
-}
+assert.strictEqual(nodes.total.parentElement, nodes['total-row']);
+assert.strictEqual(nodes['total-pill-value'].textContent, nodes.total.textContent);
+assert.ok(!nodes['total-pill-value'].classList.contains('is-placeholder'));
 on_total_intersection([{ isIntersecting: false }]);
 assert.ok(nodes['total-pill'].classList.contains('is-visible'));
 on_total_intersection([{ isIntersecting: true }]);
 assert.ok(!nodes['total-pill'].classList.contains('is-visible'));
 nodes['total-position'].emit('click');
+assert.ok(document.body.classList.contains('total-top'));
 assert.strictEqual(nodes['total-position'].parentElement, nodes['top-total-inner']);
+assert.strictEqual(nodes.total.parentElement, nodes['top-total-copy']);
+assert.strictEqual(String(nodes.total.textContent), '5');
 assert.strictEqual(window.localStorage.getItem(api.TOTAL_POSITION_STORAGE_KEY), 'top');
 assert.strictEqual(nodes['total-position'].getAttribute('aria-label'), 'Move total to bottom');
 document.body.classList.remove('total-top');
+nodes['total-row'].appendChild(nodes.total);
+nodes['total-row'].appendChild(nodes['total-position']);
 api.load_total_position();
 assert.ok(document.body.classList.contains('total-top'));
+assert.strictEqual(nodes.total.parentElement, nodes['top-total-copy']);
+assert.strictEqual(nodes['total-position'].parentElement, nodes['top-total-inner']);
 nodes['total-position'].emit('click');
+assert.ok(!document.body.classList.contains('total-top'));
 assert.strictEqual(window.localStorage.getItem(api.TOTAL_POSITION_STORAGE_KEY), 'bottom');
 assert.strictEqual(nodes['total-position'].parentElement, nodes['total-row']);
+assert.strictEqual(nodes.total.parentElement, nodes['total-row']);
 api.save_store(Array.from({ length: 100 }, (_, i) => ({ id: 'badge-' + i, lines: ['1'] })));
 api.render_shortsave_list();
 assert.strictEqual(nodes['sheet-count'].textContent, '99+');
@@ -305,15 +317,18 @@ assert.strictEqual(window.localStorage.getItem(api.TOTAL_POSITION_STORAGE_KEY), 
 
     api.new_sheet();
     assert.ok(nodes.total.classList.contains('is-placeholder'));
-    for (const id of ['top-total-value', 'total-pill-value']) {
-        assert.strictEqual(nodes[id].textContent, '—');
-        assert.ok(nodes[id].classList.contains('is-placeholder'));
-    }
+    assert.strictEqual(nodes.total.textContent, '—');
+    assert.strictEqual(nodes['total-pill-value'].textContent, '—');
+    assert.ok(nodes['total-pill-value'].classList.contains('is-placeholder'));
     assert.ok(key('c', alt).prevented);
     assert.strictEqual(lastMessage().className, 'message message-info');
     assert.strictEqual(lastMessage().children[1].textContent, 'No total to copy.');
     assert.deepStrictEqual(writes, []);
     key('Escape');
+    previewApi.toggle_total_position();
+    assert.strictEqual(nodes.total.textContent, sheet.querySelectorAll()[0].getAttribute('data-placeholder-sum'));
+    previewApi.toggle_total_position();
+    assert.strictEqual(nodes.total.textContent, '—');
 
     api.import_sheet_text('12.125\n8');
     // The browser exposes the rendered total as a string.
