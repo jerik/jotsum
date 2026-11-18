@@ -40,8 +40,7 @@ test('Alt+C reports that an empty sheet has no total to copy', async ({ page }) 
 });
 
 test('initial start of page with line and sum', async ({ page }) => {
-  // Expect a title "to contain" a substring.
-  await expect(page).toHaveTitle(/jotsum/);
+  await expect(page).toHaveTitle('jotsum · V4');
 
   const jol = await page.locator('//jo-line').count(); 
   const jos = await page.locator('//jo-sum').count(); 
@@ -73,7 +72,7 @@ test('Enter on the last line creates a new empty input field', async ({ page }) 
 });
 
 test('add a new calculation', async ({page}) => {
-  await expect(page).toHaveTitle(/jotsum/);
+  await expect(page).toHaveTitle('jotsum · V4');
   await page.locator('jo-line').last().press('End');
   await page.locator('jo-line').last().press('Enter');
 
@@ -409,32 +408,74 @@ test('Ctrl+Delete on the only line saves the cleared sheet', async ({ page }) =>
   await expect(page.locator('#total')).toHaveText('0');
 });
 
-test('total aligns with the sheet at every layout width and position', async ({ page }) => {
-  for (const width of [400, 700, 1024, 1440, 1920]) {
-    await page.setViewportSize({ width, height: 900 });
+test('total aligns with the sheet at every layout width and sidebar position', async ({ page }) => {
+  for (const width of [400, 875, 1400, 2560]) {
+    await page.setViewportSize({ width, height: 600 });
     for (const pinned of [false, true]) {
-      for (const top of [false, true]) {
-        await page.evaluate(({ pinned, top }) => {
-          document.body.classList.toggle('sidebar-pinned', pinned);
-          document.body.classList.toggle('total-top', top);
-        }, { pinned, top });
-        const edges = await page.evaluate(() => {
-          const rect = selector => document.querySelector(selector).getBoundingClientRect();
-          return {
-            label: rect('.total-inner > span').left,
-            sheet: rect('jo-line').left,
-            total: rect('#total').right,
-            result: rect('jo-sum').right,
-            toggle: rect('#drawer-toggle svg').left,
-            actions: rect('#header-actions').right,
-            width: document.documentElement.clientWidth
-          };
-        });
-        expect(Math.abs(edges.label - edges.sheet)).toBeLessThan(1);
-        expect(Math.abs(edges.total - edges.result)).toBeLessThan(1);
-        expect(Math.abs(edges.toggle - 16)).toBeLessThan(1);
-        expect(edges.width - edges.actions).toBe(16);
-      }
+      await page.evaluate(pinned => document.body.classList.toggle('sidebar-pinned', pinned), pinned);
+      const edges = await page.evaluate(() => {
+        const rect = selector => document.querySelector(selector).getBoundingClientRect();
+        return {
+          total: rect('#total').right,
+          result: rect('jo-sum').right,
+          sheetWidth: rect('.content').width,
+          sheetLeft: rect('.content').left,
+          layoutRight: rect('.sheet-layout').right,
+          toggle: rect('#drawer-toggle').left,
+          actions: rect('#more-toggle').right
+        };
+      });
+      expect(Math.abs(edges.total - edges.result)).toBeLessThanOrEqual(1);
+      expect(Math.abs(edges.toggle - edges.sheetLeft)).toBeLessThanOrEqual(1);
+      expect(Math.abs(edges.actions - edges.layoutRight)).toBeLessThanOrEqual(1);
+      if (width >= 1400) expect(edges.sheetWidth).toBeLessThanOrEqual(760);
     }
   }
+});
+
+const summaryExample = '12\n8\n--- Food\n:rate = 50\n2 * :rate';
+
+test('wide sheets show a sticky summary with the total, subtotals and variables', async ({ page, context }) => {
+  await page.setViewportSize({ width: 1400, height: 900 });
+  await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+  await page.goto('/jotsum.html?text=' + encodeURIComponent(summaryExample));
+
+  const summary = page.getByRole('complementary', { name: 'Sheet summary' });
+  await expect(summary).toBeVisible();
+  await expect(summary).toHaveCSS('position', 'sticky');
+  await expect(summary.locator('#summary-total-value')).toHaveText('120');
+  await expect(summary.locator('#summary-subtotal-list dt')).toHaveText('Food');
+  await expect(summary.locator('#summary-subtotal-list dd')).toHaveText('20');
+  await expect(summary.locator('#summary-variable-list dt')).toHaveText(':rate');
+  await expect(summary.locator('#summary-variable-list dd')).toHaveText('50');
+  await expect(page.locator('#header-total')).toBeHidden();
+  await expect(page.locator('.sheet-total')).toHaveCSS('position', 'static');
+  await expect(page.locator('#total')).toHaveText('120');
+
+  await summary.locator('#summary-total').click();
+  await expect(page.getByText('Total copied: 120', { exact: true })).toBeVisible();
+  expect(await page.evaluate(() => navigator.clipboard.readText())).toBe('120');
+
+  await page.locator('#drawer-toggle').click();
+  await page.locator('#pin-sidebar').click();
+  await expect(summary).toBeHidden();
+  await expect(page.locator('#header-total')).toHaveText('Σ 120');
+});
+
+test('narrow sheets show a sticky inline total and a copyable total in the header', async ({ page, context }) => {
+  await page.setViewportSize({ width: 875, height: 600 });
+  await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+  await page.goto('/jotsum.html?text=' + encodeURIComponent(summaryExample));
+
+  await expect(page.locator('.summary')).toBeHidden();
+  const headerTotal = page.locator('#header-total');
+  await expect(headerTotal).toBeVisible();
+  await expect(headerTotal).toHaveText('Σ 120');
+  await expect(page.locator('.sheet-total')).toHaveCSS('position', 'sticky');
+  await expect(page.locator('#total')).toHaveText('120');
+  await expect(page.locator('#total')).toBeInViewport({ ratio: 1 });
+
+  await headerTotal.click();
+  await expect(page.getByText('Total copied: 120', { exact: true })).toBeVisible();
+  expect(await page.evaluate(() => navigator.clipboard.readText())).toBe('120');
 });

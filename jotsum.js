@@ -785,7 +785,7 @@ class JoSheet extends HTMLElement {
         }
         const lines = Array.from(this.querySelectorAll('jo-line'));
         const texts = lines.map(line => line.textContent.trim());
-        const { sums, types, total, errors } = evaluate_sheet(texts);
+        const { sums, types, total, errors, vars } = evaluate_sheet(texts);
 
         lines.forEach((line, i) => {
             const type = types[i];
@@ -865,6 +865,24 @@ class JoSheet extends HTMLElement {
             total_element.textContent = this.round(total);
             total_element.classList.remove('is-placeholder');
         }
+        for (const id of ['header-total', 'summary-total']) {
+            const button = ui_element(id);
+            const value = ui_element(id + '-value');
+            if (!button || !value) continue;
+            button.classList.toggle('is-placeholder', hint_only);
+            value.textContent = hint_only ? '—' : total_element.textContent;
+        }
+
+        const subtotals = [];
+        texts.forEach((text, i) => {
+            if (types[i] !== 'separator') return;
+            const label = text.replace(/^-{3,}/, '').trim() || `Subtotal ${subtotals.length + 1}`;
+            subtotals.push([label, this.round(sums[i])]);
+        });
+        render_summary_rows('subtotals', 'subtotal', subtotals);
+        render_summary_rows('variables', 'variable',
+            Array.from(vars, ([name, value]) => [':' + name, this.round(value)]));
+
         update_header_sheet_name();
         if (display_only === true || shared_preview) return;
         persist_shortsave(lines.map(line => line.textContent));
@@ -1538,25 +1556,6 @@ function reset_sheet() {
 // markup the sheet keeps working and nothing is drawn.
 const SIDEBAR_STORAGE_KEY = storage_namespace + 'sidebar-pinned';
 let sidebar_pinned = false;
-const TOTAL_POSITION_STORAGE_KEY = storage_namespace + 'total-position';
-function set_total_position(top) {
-    document.body.classList.toggle('total-top', top);
-    const button = ui_element('total-position');
-    if (button) {
-        button.setAttribute('aria-label', top ? 'Move total to bottom' : 'Move total to top');
-        button.title = button.getAttribute('aria-label');
-    }
-}
-function toggle_total_position() {
-    const top = !document.body.classList.contains('total-top');
-    set_total_position(top);
-    try { storage_write('setItem', TOTAL_POSITION_STORAGE_KEY, top ? 'top' : 'bottom'); } catch (error) { /* Optional preference. */ }
-}
-function load_total_position() {
-    let top = false;
-    try { top = window.localStorage.getItem(TOTAL_POSITION_STORAGE_KEY) === 'top'; } catch (error) { /* Optional preference. */ }
-    set_total_position(top);
-}
 let roving_sheet_id = null;
 function set_roving_entry(target) {
     if (!target) return;
@@ -1591,6 +1590,24 @@ function ui_element(id) {
     if (typeof document === 'undefined' || typeof document.getElementById !== 'function') return null;
     const element = document.getElementById(id);
     return element && typeof element.appendChild === 'function' && typeof element.contains === 'function' ? element : null;
+}
+
+function render_summary_rows(section_id, list_id, rows) {
+    const section = ui_element('summary-' + section_id);
+    const list = ui_element('summary-' + list_id + '-list');
+    if (!section || !list) return;
+    section.hidden = rows.length === 0;
+    while (list.firstChild) list.removeChild(list.firstChild);
+    for (const [label, value] of rows) {
+        const row = document.createElement('div');
+        const term = document.createElement('dt');
+        const description = document.createElement('dd');
+        term.textContent = label;
+        description.textContent = value;
+        row.appendChild(term);
+        row.appendChild(description);
+        list.appendChild(row);
+    }
 }
 
 function is_wide_layout() {
@@ -1872,7 +1889,7 @@ function set_drawer_open(open) {
     toggle.setAttribute('aria-expanded', String(is_wide_layout() || drawer));
     sidebar.inert = !is_wide_layout() && !drawer;
     // Behind the open drawer the page must not be reachable by keyboard.
-    ['content', 'header-actions'].forEach(id => {
+    ['content', 'summary', 'header-total', 'header-actions'].forEach(id => {
         const element = ui_element(id);
         if (element) element.inert = drawer;
     });
@@ -1937,9 +1954,10 @@ function init_sidebar() {
     });
     try { sidebar_pinned = window.localStorage.getItem(SIDEBAR_STORAGE_KEY) === 'true'; } catch (error) { /* Optional preference. */ }
     sync_sidebar_layout();
-    load_total_position();
-    const total_position = ui_element('total-position');
-    if (total_position) total_position.addEventListener('click', toggle_total_position);
+    for (const id of ['header-total', 'summary-total']) {
+        const button = ui_element(id);
+        if (button) button.addEventListener('click', copy_total);
+    }
     const sidebar_new = ui_element('sidebar-new-sheet');
     if (sidebar_new) sidebar_new.addEventListener('click', new_sheet_from_header);
     init_header_menu();
@@ -2026,5 +2044,5 @@ if (typeof window !== 'undefined') {
 }
 
 if (typeof module !== 'undefined' && module.exports) {
-    module.exports = { TOTAL_POSITION_STORAGE_KEY, toggle_total_position, load_total_position, HELP_EXAMPLES, handle_sheet_list_keys, open_help_dialog, try_help_example, round_for_display, load_decimals, toggle_decimals, DECIMALS_STORAGE_KEY, show_message, init_sidebar, handle_header_keys, toggle_sidebar, sync_sidebar_layout, set_more_open, SIDEBAR_STORAGE_KEY, sheet_export, export_sheet, import_sheet_text, import_sheet_file, init_sheet_files, encode_shared_sheet, decode_shared_sheet, share_sheet, save_shared_sheet, render_shortsave_list, new_sheet, open_shortsave, delete_shortsave, list_shortsaves, sheet_total, ACTIVE_STORAGE_KEY, STORE_STORAGE_KEY, JoLine, JoSheet, classify_line, evaluate_sheet, handle_url_params, reset_sheet, SHEET_STORAGE_KEY, sheet_name, new_sheet_id, load_store, save_store };
+    module.exports = { HELP_EXAMPLES, handle_sheet_list_keys, open_help_dialog, try_help_example, round_for_display, load_decimals, toggle_decimals, DECIMALS_STORAGE_KEY, show_message, init_sidebar, handle_header_keys, toggle_sidebar, sync_sidebar_layout, set_more_open, SIDEBAR_STORAGE_KEY, sheet_export, export_sheet, import_sheet_text, import_sheet_file, init_sheet_files, encode_shared_sheet, decode_shared_sheet, share_sheet, save_shared_sheet, render_shortsave_list, new_sheet, open_shortsave, delete_shortsave, list_shortsaves, sheet_total, ACTIVE_STORAGE_KEY, STORE_STORAGE_KEY, JoLine, JoSheet, classify_line, evaluate_sheet, handle_url_params, reset_sheet, SHEET_STORAGE_KEY, sheet_name, new_sheet_id, load_store, save_store };
 }
