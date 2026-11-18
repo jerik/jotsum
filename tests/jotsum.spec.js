@@ -141,18 +141,18 @@ test('a separator line shows a subtotal that is not double counted', async ({ pa
   await expect(page.locator('#total')).toHaveText('350'); // not 650
 });
 
-test('the SUBTOTAL variable references the preceding subtotal block', async ({ page }) => {
-  const text = 'A 100\n---\nVAT :SUBTOTAL_1 * 0.19';
+test(':PREV references the preceding subtotal block', async ({ page }) => {
+  const text = '12\n8\n---\nVAT :PREV * 0.19';
   await page.goto('/jotsum.html?text=' + encodeURIComponent(text));
 
   const lines = page.locator('jo-line');
-  await expect(lines).toHaveCount(3);
+  await expect(lines).toHaveCount(4);
 
-  const lastLine = lines.nth(2);
+  const lastLine = lines.nth(3);
   const lastSum = lastLine.locator('xpath=following-sibling::jo-sum[1]');
-  await expect(lastSum).toHaveText('19');
+  await expect(lastSum).toHaveText('3.80');
 
-  await expect(page.locator('#total')).toHaveText('119');
+  await expect(page.locator('#total')).toHaveText('23.80');
 });
 
 test('editing an earlier line live-recalculates a later line through a variable', async ({ page }) => {

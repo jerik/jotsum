@@ -71,13 +71,14 @@ for (const mode of ['2', '6']) {
         ];
         for (const [value, display] of cases) assert.strictEqual(String(api.round_for_display(value)), display);
     }
-    const result = api.evaluate_sheet([':x = 1/3', ':x * 3', '---', ':SUBTOTAL_1 * 3']);
-    const fractional_subtotal = api.evaluate_sheet(['1/3', '---', ':SUBTOTAL_1 * 3']);
-    assert.strictEqual(fractional_subtotal.vars.get('SUBTOTAL_1'), 1/3);
+    const result = api.evaluate_sheet([':x = 1/3', ':x * 3', '---', ':PREV * 3']);
+    const fractional_subtotal = api.evaluate_sheet(['1/3', '---', ':PREV * 3']);
+    assert.strictEqual(fractional_subtotal.sums[1], 1/3);
     assert.strictEqual(fractional_subtotal.sums[2], 1);
     assert.strictEqual(result.vars.get('x'), 1/3);
     assert.strictEqual(result.sums[1], 1);
-    assert.strictEqual(result.vars.get('SUBTOTAL_1'), 1);
+    assert.strictEqual(result.sums[2], 1);
+    assert.strictEqual(result.sums[3], 3);
     assert.strictEqual(String(api.round_for_display(result.sums[1])), '1');
     console.log(mode + ': ' + values.map(value => String(api.round_for_display(value))).join(' | '));
 }

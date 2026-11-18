@@ -30,7 +30,8 @@ The page follows your system’s light/dark setting. It includes an app icon for
 | Escaping | `'2024` keeps a number out of the calculation |
 | Headings | `# Rechnung 2024` labels a section without counting its numbers |
 | Variables | `:rate = 85`, used later as `12 * :rate` |
-| Subtotals | A `---` line sums the block above it and stores it as `:SUBTOTAL_n` |
+| Subtotals | A `---` line shows the sum of the block above it |
+| Previous result | `:PREV` references the nearest result above |
 | Error hints | Structurally broken lines show `?` and stay out of the total |
 | Input | Type, paste multiple lines at once, or pass text in the URL |
 
@@ -81,7 +82,7 @@ Workshop 4 * :rate       340
                         1360
 ```
 
-Variables are resolved in document order, so a definition has to come before its use. A name starts with a letter or `_` and continues with letters, digits and `_`; it never contains a `-`. So `:1Test = 5` is not a definition. Names are case-sensitive: `:Auto = 5` does not define `:auto`, which produces "Unknown variable :auto" when used. A dash is always the operator, so in `:SUBTOTAL_1-50` the `-` is a subtraction.
+Variables are resolved in document order, so a definition has to come before its use. A name starts with a letter or `_` and continues with letters, digits and `_`; it never contains a `-`. So `:1Test = 5` is not a definition. Names are case-sensitive: `:Auto = 5` does not define `:auto`, which produces "Unknown variable :auto" when used. A dash is always the operator, so in `:total-50` the `-` is a subtraction.
 
 A `:` in front of a digit never starts a variable. With a digit directly before and directly after it, the `:` is part of a time, and a time is text:
 
@@ -95,17 +96,25 @@ Time 10:30                 0
 
 ---
 
+## Previous result
+
+`:PREV` uses the nearest line above with a result, including zero, a variable definition, or a subtotal. It skips blank lines, headings, and text with no unescaped numbers or resolved variables. If the nearest relevant line has an error, it reports “The line above has an error”. If there is no such line, it reports “No line above with a result”.
+
+The name `:PREV` is case-insensitive and reserved. Defining it in any spelling reports “:PREV is reserved”.
+
 ## Subtotals
 
-A separator line sums the line results since the previous separator, shows that subtotal, and stores it as `:SUBTOTAL_1`, `:SUBTOTAL_2`, and so on. A line is a separator when it starts with three or more `-` followed by a space or the end of the line.
+A separator line sums the line results since the previous separator and shows that subtotal. A line is a separator when it starts with three or more `-` followed by a space or the end of the line.
 
 ```
 Design 12 * 85           1020
 Development 30 * 85      2550
 ---                      3570
-VAT :SUBTOTAL_1 * 0.19  678.30
+VAT :PREV * 0.19        678.30
                        4248.30
 ```
+
+Use `:name = :PREV` directly below a separator to save its subtotal under a stable name.
 
 A subtotal only reads lines that are already part of the total, so it is not added a second time.
 

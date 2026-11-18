@@ -35,12 +35,12 @@ function testColon() {
 }
 
 function testNameRule() {
-    // No dash in a name: ":SUBTOTAL_1-50" stays a subtraction.
-    check_line(':SUBTOTAL_1-50', 250, { vars: new Map([['SUBTOTAL_1', 300]]) });
+    // No dash in a name: ":total-50" stays a subtraction.
+    check_line(':total-50', 250, { vars: new Map([['total', 300]]) });
     {
-        const result = evaluate_sheet(['A 300', '---', ':SUBTOTAL_1-50']);
-        assert.strictEqual(result.errors[2], null);
-        assert.strictEqual(result.sums[2], 250);
+        const result = evaluate_sheet([':total = 300', ':total-50']);
+        assert.strictEqual(result.errors[1], null);
+        assert.strictEqual(result.sums[1], 250);
     }
     assert.deepStrictEqual(classify_line(':a-b = 5'), { type: 'value' });
 
@@ -205,7 +205,6 @@ function testSeparators() {
         assert.deepStrictEqual(result.errors, [null, null, null, null]);
         assert.deepStrictEqual(result.sums, [100, 100, 20, 20], 'a separator shows the subtotal, not its label');
         assert.strictEqual(result.total, 120, 'the 5 in "--- 5" counts nowhere');
-        assert.strictEqual(result.vars.get('SUBTOTAL_2'), 20);
         assert.strictEqual(sheet_total(lines), '120');
     }
     {

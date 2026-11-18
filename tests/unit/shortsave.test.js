@@ -187,7 +187,7 @@ test('list totals match the total under each sheet', () => {
         ['Rent 1200', 'Food 300', 'Bus 45'],
         ['Coffee 3.5', 'Cake 2.25', '1/3'],
         [':rate = 2.5', 'Hours 4 * :rate', 'Extra :rate'],
-        ['A 10', 'B 20', '---', 'C 5', '---', 'Both :SUBTOTAL_1 + :SUBTOTAL_2'],
+        ['A 10', 'B 20', '---', ':first = :PREV', 'C 5', '---', 'Both :first + :PREV'],
         ['Valid 7', 'Broken 5 +', 'Unknown :nope', 'Glued 10 20', 'Valid 1.5'],
         ['# Budget', 'Notes without numbers', 'Item 40']
     ];
