@@ -865,6 +865,13 @@ class JoSheet extends HTMLElement {
             total_element.textContent = this.round(total);
             total_element.classList.remove('is-placeholder');
         }
+        for (const id of ['top-total-value', 'total-pill-value']) {
+            const mirror = ui_element(id);
+            if (mirror) {
+                mirror.textContent = hint_only ? '—' : total_element.textContent;
+                mirror.classList.toggle('is-placeholder', hint_only);
+            }
+        }
         update_header_sheet_name();
         if (display_only === true || shared_preview) return;
         persist_shortsave(lines.map(line => line.textContent));
@@ -1543,6 +1550,12 @@ function set_total_position(top) {
     document.body.classList.toggle('total-top', top);
     const button = ui_element('total-position');
     if (button) {
+        const container = ui_element(top ? 'top-total-inner' : 'total-row');
+        if (container && button.parentElement !== container) {
+            const had_focus = document.activeElement === button;
+            container.appendChild(button);
+            if (had_focus) button.focus();
+        }
         button.setAttribute('aria-label', top ? 'Move total to bottom' : 'Move total to top');
         button.title = button.getAttribute('aria-label');
     }
@@ -1824,6 +1837,41 @@ async function copy_total() {
     show_message({ tone: 'success', text: `Total copied: ${value}` });
 }
 
+function init_total_display() {
+    const row = ui_element('total-row');
+    const pill = ui_element('total-pill');
+    const top_copy = ui_element('top-total-copy');
+    const messages = ui_element('messages');
+    if (!row || !pill || !top_copy || !messages) return;
+
+    pill.addEventListener('click', copy_total);
+    top_copy.addEventListener('click', copy_total);
+    new window.IntersectionObserver(([entry]) => {
+        pill.classList.toggle('is-visible', !entry.isIntersecting);
+    }).observe(row);
+
+    // Measure the message stack at its usual offset before deciding if it
+    // needs to sit above the inline total at the current scroll position.
+    let lift = 0;
+    const position_messages = () => {
+        const stack = messages.getBoundingClientRect();
+        const total = row.getBoundingClientRect();
+        const bottom = stack.bottom + lift;
+        const top = stack.top + lift;
+        const overlaps = stack.height && top < total.bottom + 8 && bottom > total.top - 8;
+        const next_lift = overlaps ? bottom - total.top + 8 : 0;
+        if (lift !== next_lift) {
+            lift = next_lift;
+            messages.style.setProperty('--message-lift', `${lift}px`);
+        }
+    };
+    const resize = new window.ResizeObserver(position_messages);
+    resize.observe(messages);
+    resize.observe(ui_element('content'));
+    window.addEventListener('resize', position_messages);
+    window.addEventListener('scroll', position_messages, { passive: true });
+}
+
 function handle_header_keys(event) {
     if (event.isComposing) return;
     if (event.key === 'F1' || event.key === 'F2' || (event.ctrlKey && !event.altKey && !event.metaKey && (event.key === '/' || event.key === '?'))) {
@@ -1940,6 +1988,7 @@ function init_sidebar() {
     load_total_position();
     const total_position = ui_element('total-position');
     if (total_position) total_position.addEventListener('click', toggle_total_position);
+    init_total_display();
     const sidebar_new = ui_element('sidebar-new-sheet');
     if (sidebar_new) sidebar_new.addEventListener('click', new_sheet_from_header);
     init_header_menu();

@@ -9,9 +9,10 @@ assert.doesNotMatch(visible, /class="brand"|class="action-label"/);
 assert.doesNotMatch(visible, /Add line/);
 for (const entry of ['Import .txt…', 'Export .txt', 'Quick help', 'Keyboard shortcuts', 'About / GitHub']) assert.ok(header.includes(entry));
 assert.doesNotMatch(header, /Add line|id="add-line"/);
-assert.match(html, /<title>jotsum<\/title>/);
+assert.match(html, /<title>jotsum · V3<\/title>/);
+assert.match(header, /id="version"><\/span><span>V3 · Zeile \+ Schwebefeld<\/span>/);
 assert.strictEqual([...html.matchAll(/id="total"/g)].length, 1);
-assert.match(html, /class="total-bar"[\s\S]*id="total"/);
+assert.match(html, /<\/jo-sheet>\s*<div id="total-row"[^>]*>\s*<span[^>]*>Total<\/span>\s*<jo-total id="total">/);
 const shortcutList = html.match(/<div id="shortcut-list">([\s\S]*?)<\/div>/)[1];
 assert.deepStrictEqual([...shortcutList.matchAll(/<h3>([^<]+)<\/h3>\s*<ul>/g)].map(m => m[1]),
     ['Help', 'Saved sheets', 'Sheet']);
@@ -30,10 +31,18 @@ window.location = new URL('https://example.test/');
 window.history = { replaceState: (_a, _b, url) => { window.location = new URL(url); } };
 const ids = ['sidebar', 'drawer-toggle', 'shortsave-list', 'shortsave-empty', 'sidebar-title', 'new-sheet',
     'content', 'header-actions', 'drawer-backdrop', 'more-actions', 'more-toggle', 'add-line',
-    'quick-help', 'quick-help-dialog', 'shortcuts-dialog', 'pin-sidebar', 'sheet-count', 'keyboard-shortcuts', 'current-sheet-name', 'total', 'total-position', 'sidebar-new-sheet', 'decimals-toggle', 'messages'];
+    'quick-help', 'quick-help-dialog', 'shortcuts-dialog', 'pin-sidebar', 'sheet-count', 'keyboard-shortcuts', 'current-sheet-name', 'total', 'total-position', 'total-row', 'top-total-inner',
+    'top-total-copy', 'top-total-value', 'total-pill', 'total-pill-value', 'sidebar-new-sheet', 'decimals-toggle', 'messages'];
+let on_total_intersection;
+window.IntersectionObserver = class {
+    constructor(callback) { on_total_intersection = callback; }
+    observe(target) { assert.strictEqual(target, nodes['total-row']); }
+};
+window.ResizeObserver = class { observe() {} };
 const nodes = Object.fromEntries(ids.map(id => [id, mockUiElement(id.endsWith('-dialog') ? 'dialog' : 'div')]));
 for (const [id, node] of Object.entries(nodes)) node.id = id;
 nodes['more-actions'].hidden = true;
+nodes['total-row'].appendChild(nodes['total-position']);
 nodes.sidebar.appendChild(nodes['sidebar-title']);
 nodes['add-line'].tagName = 'BUTTON';
 nodes['more-actions'].appendChild(nodes['add-line']);
@@ -256,7 +265,17 @@ assert.strictEqual(api.evaluate_sheet(['# Heading 100', '5', '---']).total, 5);
 assert.strictEqual(api.evaluate_sheet(['# Heading 100']).counted[0], false);
 api.load_total_position();
 assert.ok(!document.body.classList.contains('total-top'));
+assert.strictEqual(nodes['total-position'].parentElement, nodes['total-row']);
+for (const id of ['top-total-value', 'total-pill-value']) {
+    assert.strictEqual(nodes[id].textContent, nodes.total.textContent);
+    assert.ok(!nodes[id].classList.contains('is-placeholder'));
+}
+on_total_intersection([{ isIntersecting: false }]);
+assert.ok(nodes['total-pill'].classList.contains('is-visible'));
+on_total_intersection([{ isIntersecting: true }]);
+assert.ok(!nodes['total-pill'].classList.contains('is-visible'));
 nodes['total-position'].emit('click');
+assert.strictEqual(nodes['total-position'].parentElement, nodes['top-total-inner']);
 assert.strictEqual(window.localStorage.getItem(api.TOTAL_POSITION_STORAGE_KEY), 'top');
 assert.strictEqual(nodes['total-position'].getAttribute('aria-label'), 'Move total to bottom');
 document.body.classList.remove('total-top');
@@ -264,6 +283,7 @@ api.load_total_position();
 assert.ok(document.body.classList.contains('total-top'));
 nodes['total-position'].emit('click');
 assert.strictEqual(window.localStorage.getItem(api.TOTAL_POSITION_STORAGE_KEY), 'bottom');
+assert.strictEqual(nodes['total-position'].parentElement, nodes['total-row']);
 api.save_store(Array.from({ length: 100 }, (_, i) => ({ id: 'badge-' + i, lines: ['1'] })));
 api.render_shortsave_list();
 assert.strictEqual(nodes['sheet-count'].textContent, '99+');
@@ -285,6 +305,10 @@ assert.strictEqual(window.localStorage.getItem(api.TOTAL_POSITION_STORAGE_KEY), 
 
     api.new_sheet();
     assert.ok(nodes.total.classList.contains('is-placeholder'));
+    for (const id of ['top-total-value', 'total-pill-value']) {
+        assert.strictEqual(nodes[id].textContent, '—');
+        assert.ok(nodes[id].classList.contains('is-placeholder'));
+    }
     assert.ok(key('c', alt).prevented);
     assert.strictEqual(lastMessage().className, 'message message-info');
     assert.strictEqual(lastMessage().children[1].textContent, 'No total to copy.');
@@ -311,6 +335,14 @@ assert.strictEqual(window.localStorage.getItem(api.TOTAL_POSITION_STORAGE_KEY), 
     assert.strictEqual(lastMessage().className, 'message message-success');
     assert.strictEqual(lastMessage().children[1].textContent, 'Total copied: ' + displayed);
     key('Escape');
+
+    for (const id of ['top-total-copy', 'total-pill']) {
+        nodes[id].emit('click');
+        await Promise.resolve();
+        assert.strictEqual(lastMessage().children[1].textContent, 'Total copied: ' + displayed);
+        key('Escape');
+    }
+    assert.deepStrictEqual(writes, [displayed, displayed, displayed]);
 
     window.navigator.clipboard.writeText = async () => { throw new Error('Clipboard unavailable'); };
     assert.ok(key('c', alt).prevented);

@@ -40,8 +40,7 @@ test('Alt+C reports that an empty sheet has no total to copy', async ({ page }) 
 });
 
 test('initial start of page with line and sum', async ({ page }) => {
-  // Expect a title "to contain" a substring.
-  await expect(page).toHaveTitle(/jotsum/);
+  await expect(page).toHaveTitle('jotsum · V3');
 
   const jol = await page.locator('//jo-line').count(); 
   const jos = await page.locator('//jo-sum').count(); 
@@ -410,31 +409,104 @@ test('Ctrl+Delete on the only line saves the cleared sheet', async ({ page }) =>
 });
 
 test('total aligns with the sheet at every layout width and position', async ({ page }) => {
-  for (const width of [400, 700, 1024, 1440, 1920]) {
-    await page.setViewportSize({ width, height: 900 });
+  await page.goto('/jotsum.html?text=' + encodeURIComponent('12\n8'));
+  for (const width of [400, 875, 1400, 2560]) {
+    await page.setViewportSize({ width, height: width === 875 ? 600 : 900 });
     for (const pinned of [false, true]) {
+      await page.evaluate(pinned => document.body.classList.toggle('sidebar-pinned', pinned), pinned);
       for (const top of [false, true]) {
-        await page.evaluate(({ pinned, top }) => {
-          document.body.classList.toggle('sidebar-pinned', pinned);
-          document.body.classList.toggle('total-top', top);
-        }, { pinned, top });
+        if (top) await page.locator('#total-row #total-position').click();
         const edges = await page.evaluate(() => {
           const rect = selector => document.querySelector(selector).getBoundingClientRect();
           return {
-            label: rect('.total-inner > span').left,
-            sheet: rect('jo-line').left,
+            sheet: rect('.content').toJSON(),
+            label: rect('.total-label').left,
+            line: rect('jo-line').left,
             total: rect('#total').right,
-            result: rect('jo-sum').right,
-            toggle: rect('#drawer-toggle svg').left,
-            actions: rect('#header-actions').right,
+            results: Array.from(document.querySelectorAll('jo-sum'), sum => sum.getBoundingClientRect().right),
+            header: rect('.wrap').toJSON(),
+            drawer: rect('#drawer-toggle').left,
+            more: rect('#more-toggle').right,
+            topTotal: rect('#top-total-inner').toJSON(),
             width: document.documentElement.clientWidth
           };
         });
-        expect(Math.abs(edges.label - edges.sheet)).toBeLessThan(1);
-        expect(Math.abs(edges.total - edges.result)).toBeLessThan(1);
-        expect(Math.abs(edges.toggle - 16)).toBeLessThan(1);
-        expect(edges.width - edges.actions).toBe(16);
+        expect(Math.abs(edges.label - edges.line)).toBeLessThanOrEqual(1);
+        for (const result of edges.results) expect(Math.abs(edges.total - result)).toBeLessThanOrEqual(1);
+        if (width >= 1400) expect(edges.sheet.width).toBeLessThanOrEqual(760);
+        expect(Math.abs(edges.header.left - edges.sheet.left)).toBeLessThanOrEqual(1);
+        expect(Math.abs(edges.header.right - edges.sheet.right)).toBeLessThanOrEqual(1);
+        expect(Math.abs(edges.drawer - edges.sheet.left)).toBeLessThanOrEqual(1);
+        expect(Math.abs(edges.more - edges.sheet.right)).toBeLessThanOrEqual(1);
+        if (top) {
+          expect(Math.abs(edges.topTotal.left - edges.sheet.left)).toBeLessThanOrEqual(1);
+          expect(Math.abs(edges.topTotal.right - edges.sheet.right)).toBeLessThanOrEqual(1);
+          await page.locator('#top-total-inner #total-position').click();
+        }
+        const sidebarWidth = pinned && width >= 700 ? 260 : 0;
+        expect(Math.abs(edges.sheet.left - sidebarWidth - (edges.width - edges.sheet.right))).toBeLessThanOrEqual(1);
       }
     }
   }
+});
+
+test('a short sheet shows its total directly below the last line', async ({ page }) => {
+  await page.setViewportSize({ width: 1400, height: 900 });
+  await page.goto('/jotsum.html?text=' + encodeURIComponent('12\n8'));
+  await expect(page.locator('#total-row')).toBeInViewport();
+  await expect(page.locator('#total')).toHaveText('20');
+  const gap = await page.locator('#total-row').evaluate(row =>
+    row.getBoundingClientRect().top - document.querySelector('jo-line:last-of-type').getBoundingClientRect().bottom);
+  expect(gap).toBeGreaterThanOrEqual(0);
+  expect(gap).toBeLessThanOrEqual(60);
+  await expect(page.locator('#total-pill')).toBeHidden();
+});
+
+test('the floating pill mirrors and copies an offscreen total until the row scrolls into view', async ({ page, context }) => {
+  await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+  await page.setViewportSize({ width: 875, height: 600 });
+  await page.goto('/jotsum.html?text=' + encodeURIComponent(Array(60).fill('2').join('\n')));
+  await page.locator('jo-line').first().focus();
+  const pill = page.locator('#total-pill');
+  await expect(pill).toBeVisible();
+  await expect(pill).toHaveText('Σ 120');
+  const position = await pill.evaluate(element => ({
+    right: document.querySelector('.content').getBoundingClientRect().right - element.getBoundingClientRect().right,
+    bottom: window.innerHeight - element.getBoundingClientRect().bottom
+  }));
+  expect(Math.abs(position.right)).toBeLessThanOrEqual(1);
+  expect(position.bottom).toBe(16);
+  await pill.click();
+  await expect(page.getByText('Total copied: 120', { exact: true })).toBeVisible();
+  expect(await page.evaluate(() => navigator.clipboard.readText())).toBe('120');
+  const messageBottom = await page.locator('#messages').evaluate(element => element.getBoundingClientRect().bottom);
+  const pillTop = await pill.evaluate(element => element.getBoundingClientRect().top);
+  expect(messageBottom).toBeLessThanOrEqual(pillTop);
+
+  await page.locator('#total-row').scrollIntoViewIfNeeded();
+  await expect(page.locator('#total-row')).toBeInViewport();
+  await expect(pill).toBeHidden();
+});
+
+test('top mode keeps the inline row and suppresses the pill when the row is offscreen', async ({ page, context }) => {
+  await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+  await page.setViewportSize({ width: 875, height: 600 });
+  await page.goto('/jotsum.html?text=' + encodeURIComponent(Array(60).fill('2').join('\n')));
+  await page.locator('#total-row #total-position').click();
+  await page.reload();
+  await page.locator('jo-line').first().focus();
+  const top = page.locator('.top-total');
+  await expect(top).toBeInViewport();
+  await expect(top.locator('#total-position')).toHaveAccessibleName('Move total to bottom');
+  await expect(top.locator('#top-total-value')).toHaveText('120');
+  await expect(page.locator('#total-row')).not.toBeInViewport();
+  await expect(page.locator('#total-row #total')).toHaveText('120');
+  await expect(page.locator('#total-pill')).toBeHidden();
+
+  await top.locator('#top-total-copy').click();
+  await expect(page.getByText('Total copied: 120', { exact: true })).toBeVisible();
+  expect(await page.evaluate(() => navigator.clipboard.readText())).toBe('120');
+  await top.locator('#total-position').click();
+  await expect(top).toBeHidden();
+  await expect(page.locator('#total-row #total-position')).toHaveAccessibleName('Move total to top');
 });

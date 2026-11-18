@@ -8,7 +8,7 @@
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2064%2064%22%3E%3Crect%20x%3D%222%22%20y%3D%222%22%20width%3D%2260%22%20height%3D%2260%22%20rx%3D%2213%22%20fill%3D%22%2324743c%22%20stroke%3D%22%2399c5a5%22%20stroke-width%3D%223%22%2F%3E%3Cpath%20d%3D%22M17%2018h30M17%2029h22M17%2040h30M35%2049h12%22%20fill%3D%22none%22%20stroke%3D%22%23ffffff%22%20stroke-width%3D%225%22%20stroke-linecap%3D%22round%22%2F%3E%3C%2Fsvg%3E" />
     <!-- Absolute URL: some web-app installers resolve relative icon URLs against the origin, losing /jotsum/. -->
     <link rel="apple-touch-icon" href="https://jerik.github.io/jotsum/apple-touch-icon.png" />
-    <title>jotsum</title>
+    <title>jotsum · V3</title>
     <style>
       /* Shared page palette; only these blocks define colours. */
       :root {
@@ -16,6 +16,11 @@
         --header-h: 40px;
         --total-h: 44px;
         --side-w: 260px;
+        --sheet-w: 760px;
+        --sheet-left-gutter: max(16px, env(safe-area-inset-left));
+        --sheet-right-gutter: max(16px, env(safe-area-inset-right));
+        --pill-bottom: max(16px, env(safe-area-inset-bottom));
+        --pill-h: 34px;
         --background: #f5f6f7;
         --surface: #ffffff;
         --line: #eff1f3;
@@ -63,6 +68,7 @@
         }
       }
       body {
+        --sheet-offset: 0px;
         margin: 0;
         background: var(--background); color: var(--text);
         font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
@@ -70,6 +76,7 @@
       html {
         /* Fokussierte Zeilen nicht unter den Sticky-Header scrollen */
         scroll-padding-top: calc(var(--header-h) + env(safe-area-inset-top) + 8px);
+        scroll-padding-bottom: calc(var(--pill-bottom) + var(--pill-h) + 8px);
       }
 
       a { color: var(--accent); }
@@ -85,8 +92,6 @@
         padding-top: env(safe-area-inset-top);
       }
       .wrap {
-        max-width: 1040px; margin: 0 auto;
-        padding: 8px max(16px, env(safe-area-inset-right)) 8px max(16px, env(safe-area-inset-left));
         min-height: 44px;
         display: flex; align-items: center; gap: 12px;
       }
@@ -144,7 +149,6 @@
 	  
 	  /* Mobile: Summe etwas schmaler, damit’s immer passt */
 	  @media (max-width: 600px) {
-	    .wrap { padding: 8px max(12px, env(safe-area-inset-right)) 8px max(12px, env(safe-area-inset-left)); }
 	    jo-sheet, jo-lastline {
 	  	column-gap: 8px;
 	    }
@@ -265,7 +269,6 @@
 
       /* Mobile */
       @media (max-width: 600px) {
-		.wrap { padding: 8px max(12px, env(safe-area-inset-right)) 8px max(12px, env(safe-area-inset-left)); gap: 8px; }
 		.brand { font-size: 16px; }            /* vorher 18px */
 		.btn { padding: 5px 8px; font-size: 13px; }
 
@@ -273,17 +276,17 @@
 
       /* Layout: Seitenleiste + Blatt */
       .layout { display: block; }
+      .wrap, .content, .top-total-inner, .pill-dock {
+        width: min(var(--sheet-w), calc(100% - var(--sheet-left-gutter) - var(--sheet-right-gutter)));
+        margin-inline: auto;
+      }
       .content {
         display: grid;
         /* Intrinsic results, capped at 45%; both child grids use these tracks. */
         grid-template-columns: minmax(0, 1fr) fit-content(45%);
         column-gap: 12px;
         min-width: 0;
-        width: 100%;
-        max-width: 1072px;
-        box-sizing: border-box;
-        margin: 0 auto;
-        padding: 0 max(16px, env(safe-area-inset-right)) 0 max(16px, env(safe-area-inset-left));
+        padding-bottom: calc(var(--pill-bottom) + var(--pill-h) + 8px);
       }
       .content > footer { grid-column: 1 / -1; }
       @media (max-width: 600px) {
@@ -354,7 +357,6 @@
       .drawer-backdrop { display: none; }
 
       /* Saved sheets are a drawer at every window width. */
-      .content { padding-left: max(16px, env(safe-area-inset-left)); }
       .sidebar {
         position: fixed; z-index: 20; left: 0;
         top: calc(var(--header-h) + env(safe-area-inset-top));
@@ -387,7 +389,7 @@
 
       #messages {
         position: fixed; z-index: 10; left: 50%; transform: translateX(-50%);
-        bottom: max(16px, env(safe-area-inset-bottom));
+        bottom: calc(var(--pill-bottom) + var(--pill-h) + 8px + var(--message-lift, 0px));
         width: min(36rem, calc(100vw - 32px - env(safe-area-inset-left) - env(safe-area-inset-right)));
         max-width: 36rem; display: flex; flex-direction: column; gap: 8px;
         pointer-events: none;
@@ -450,17 +452,7 @@
       .wrap { min-height: 40px; height: 40px; box-sizing: border-box; padding-top: 0; padding-bottom: 0; gap: 8px; }
       .header-button { height: 36px; min-width: 36px; padding: 0 6px; }
       .current-sheet-name { flex: 1; }
-      .content { padding-bottom: calc(var(--total-h) + env(safe-area-inset-bottom) + 20px); }
-      html { scroll-padding-bottom: calc(var(--total-h) + env(safe-area-inset-bottom) + 20px); }
-      .total-bar {
-        position: fixed; bottom: 0; left: 0; right: 0; z-index: 10;
-        display: flex; align-items: center; gap: 16px;
-        box-sizing: border-box; height: calc(var(--total-h) + env(safe-area-inset-bottom));
-        padding: 8px max(16px, env(safe-area-inset-right)) calc(8px + env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
-        background: var(--surface); border-top: 1px solid var(--border);
-      }
-      .total-bar jo-total { flex: 1; border: 0; font-size: 18px; }
-      #messages { z-index: 40; bottom: calc(var(--total-h) + env(safe-area-inset-bottom) + 16px); }
+      #messages { z-index: 40; }
       .sidebar footer { margin: 16px auto; }
       jo-sum { min-width: 10ch; }
       .breadcrumb { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -484,38 +476,94 @@
       #shortcut-list ul { margin: 4px 0 0; padding-inline-start: 20px; font-size: 13px; line-height: 1.8; }
       #shortcut-list kbd { color: var(--muted); white-space: nowrap; }
       .help-note { font-size: 12px; color: var(--muted); }
-      .total-bar { padding-left: max(16px, calc((100% - 1040px) / 2)); padding-right: max(16px, calc((100% - 1040px) / 2)); }
       @media (min-width: 700px) {
-        body.sidebar-pinned { overflow: auto; }
+        body.sidebar-pinned { --sheet-offset: var(--side-w); overflow: auto; }
         body.sidebar-pinned .sidebar { width: var(--side-w); transform: none; visibility: visible; box-shadow: none; }
-        body.sidebar-pinned .layout { margin-left: var(--side-w); }
-        body.sidebar-pinned .total-bar { left: var(--side-w); }
         body.sidebar-pinned .drawer-backdrop { display: none; }
       }
-      /* Header and total use the same gutters as the sheet. */
-      .wrap { max-width: none; padding-left: 16px; padding-right: 16px; }
-      .total-bar { display: block; padding: 0 0 env(safe-area-inset-bottom); }
-      .total-inner {
-        position: relative; display: flex; align-items: center; height: var(--total-h);
-        box-sizing: border-box; width: 100%; max-width: 1072px; margin: 0 auto;
-        padding: 0 max(16px, env(safe-area-inset-right)) 0 max(16px, env(safe-area-inset-left));
+      .site-header { padding-left: var(--sheet-offset); }
+      .layout { margin-left: var(--sheet-offset); }
+
+      .total-row {
+        position: relative;
+        grid-column: 1 / -1;
+        display: grid;
+        grid-template-columns: subgrid;
+        align-items: stretch;
+        border-top: 1px solid var(--border);
+        min-height: 36px;
       }
-      .total-inner jo-total { margin-left: auto; padding: 7px; }
-      #total-position { position: absolute; right: 0; width: 16px; min-width: 16px; padding: 0; color: var(--muted); }
+      .total-label { align-self: center; }
+      .total-row jo-total {
+        align-items: center;
+        background: transparent;
+        border: 0;
+      }
+      /* Reserve space for the arrow while keeping all displayed values aligned. */
+      jo-sum, .total-row jo-total { padding-right: 26px; }
+      #total-position { position: absolute; right: 0; top: 50%; transform: translateY(-50%); width: 24px; min-width: 24px; padding: 0; color: var(--muted); }
       #total-position svg { width: 14px; height: 14px; transition: transform .2s ease; }
       body.total-top #total-position svg { transform: rotate(180deg); }
-      /* The toggle's icon, not its button, lines up with the sidebar title. */
-      #drawer-toggle { margin-left: -8px; }
+      .top-total, .pill-position {
+        position: fixed;
+        left: var(--sheet-offset); right: 0;
+        z-index: 10;
+      }
+      .top-total {
+        display: none;
+        top: calc(var(--header-h) + env(safe-area-inset-top));
+        background: var(--surface);
+        border-bottom: 1px solid var(--border);
+      }
+      .top-total-inner {
+        position: relative;
+        display: flex; align-items: center; justify-content: space-between;
+        height: var(--total-h);
+      }
+      .total-copy {
+        color: var(--text);
+        font: inherit;
+        font-weight: bold;
+        font-variant-numeric: tabular-nums;
+        cursor: pointer;
+      }
+      .total-copy .is-placeholder { color: var(--muted); }
+      #top-total-copy {
+        border: 0; background: transparent;
+        margin-left: auto; padding: 7px 26px 7px 7px;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+        font-size: 18px;
+      }
+      .pill-position { bottom: var(--pill-bottom); pointer-events: none; }
+      .pill-dock { display: flex; justify-content: flex-end; }
+      #total-pill {
+        height: var(--pill-h);
+        padding: 0 12px;
+        border: 1px solid var(--border);
+        border-radius: 999px;
+        background: var(--surface);
+        box-shadow: 0 2px 8px var(--shadow);
+        opacity: 0;
+        visibility: hidden;
+        transition: opacity .2s ease, visibility 0s linear .2s;
+      }
+      #total-pill.is-visible {
+        opacity: 1;
+        visibility: visible;
+        pointer-events: auto;
+        transition-delay: 0s;
+      }
+      @media (prefers-reduced-motion: reduce) {
+        #total-pill { transition: none; }
+      }
       .sidebar-heading { height: var(--total-h); box-sizing: border-box; }
       .sidebar-heading .sidebar-title { padding: 0 0 0 16px; margin-right: auto; }
       .sidebar-heading .icon-btn { width: 36px; height: 36px; }
       body.total-top .content { padding-top: calc(var(--total-h) + 8px); padding-bottom: 20px; }
       html:has(body.total-top) { scroll-padding-bottom: 20px; scroll-padding-top: calc(var(--header-h) + var(--total-h) + env(safe-area-inset-top) + 8px); }
-      body.total-top .total-bar {
-        top: calc(var(--header-h) + env(safe-area-inset-top)); bottom: auto;
-        height: var(--total-h); padding: 0; border-top: 0; border-bottom: 1px solid var(--border);
-      }
-      body.total-top #messages { bottom: calc(16px + env(safe-area-inset-bottom)); }
+      body.total-top .top-total { display: block; }
+      body.total-top .pill-position { display: none; }
+      body.total-top #messages { bottom: calc(var(--pill-bottom) + var(--message-lift, 0px)); }
     </style>
     <script type="text/javascript" src="./jotsum.js" charset="utf-8"></script>
   </head>
@@ -537,7 +585,7 @@
             <li><button type="button" id="keyboard-shortcuts">Keyboard shortcuts <kbd>F2 / Ctrl+/</kbd></button></li>
             <li><a href="https://jerik.github.io/jotsum/index.html" download="jotsum.html">Download for offline use</a></li>
             <li><a href="https://github.com/jerik/jotsum" target="_blank" rel="noopener">About / GitHub</a></li>
-            <li class="menu-meta"><span id="version"></span></li>
+            <li class="menu-meta"><span id="version"></span><span>V3 · Zeile + Schwebefeld</span></li>
           </ul>
           <input type="file" id="import-file" accept=".txt,text/plain" hidden>
         </nav>
@@ -559,11 +607,23 @@
         <!-- Sheet -->
         <jo-sheet id="sheet">
         </jo-sheet>
+        <div id="total-row" class="total-row">
+          <span class="total-label">Total</span>
+          <jo-total id="total"></jo-total>
+          <button type="button" id="total-position" class="header-button" aria-label="Move total to top" title="Move total to top"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M6 11l6-6 6 6"/></svg></button>
+        </div>
+        <div class="top-total">
+          <div id="top-total-inner" class="top-total-inner">
+            <span>Total</span>
+            <button type="button" id="top-total-copy" class="total-copy" aria-label="Copy total" title="Copy total (Alt+C)"><span id="top-total-value"></span></button>
+          </div>
+        </div>
+        <div class="pill-position">
+          <div class="pill-dock">
+            <button type="button" id="total-pill" class="total-copy" aria-label="Copy total" title="Copy total (Alt+C)">Σ <span id="total-pill-value"></span></button>
+          </div>
+        </div>
       </main>
-    </div>
-    <div class="total-bar" aria-label="Sheet total">
-      <div class="total-inner"><span>Total</span>
-      <jo-total id="total"></jo-total><button type="button" id="total-position" class="header-button" aria-label="Move total to top" title="Move total to top"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M6 11l6-6 6 6"/></svg></button></div>
     </div>
     <dialog id="quick-help-dialog" aria-labelledby="help-title"><h2 id="help-title">Quick help</h2><section class="help-topic"><div><h3>Operators</h3><p>+ - * / and parentheses.</p><pre># quickhelp operators
 (18 + 4) * 2 / 4 - 1</pre></div><button type="button" class="btn" data-example="0">Try it</button></section><section class="help-topic"><div><h3>Headings</h3><p>A line starting with # is a heading and does not count.</p><pre># quickhelp headings
