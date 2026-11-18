@@ -12,6 +12,33 @@ test.beforeEach(async ({ page }) => {
   await page.goto('/jotsum.html');
 });
 
+test('F2 shows keyboard shortcuts in three sections', async ({ page }) => {
+  await page.keyboard.press('F2');
+
+  const dialog = page.getByRole('dialog', { name: 'Keyboard shortcuts' });
+  await expect(dialog).toBeVisible();
+  await expect(dialog.getByRole('heading', { level: 3 })).toHaveText(['Help', 'Saved sheets', 'Sheet']);
+});
+
+test('Alt+C copies the displayed total', async ({ page, context }) => {
+  await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+  await page.goto('/jotsum.html?text=' + encodeURIComponent('12\n8'));
+  await expect(page.locator('#total')).toHaveText('20');
+
+  await page.keyboard.press('Alt+c');
+
+  await expect(page.getByText('Total copied: 20', { exact: true })).toBeVisible();
+  expect(await page.evaluate(() => navigator.clipboard.readText())).toBe('20');
+});
+
+test('Alt+C reports that an empty sheet has no total to copy', async ({ page }) => {
+  await expect(page.locator('#total')).toHaveClass(/is-placeholder/);
+
+  await page.keyboard.press('Alt+c');
+
+  await expect(page.getByText('No total to copy.', { exact: true })).toBeVisible();
+});
+
 test('initial start of page with line and sum', async ({ page }) => {
   // Expect a title "to contain" a substring.
   await expect(page).toHaveTitle(/jotsum/);

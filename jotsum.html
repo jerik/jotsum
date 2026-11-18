@@ -433,7 +433,6 @@
       }
       .more-actions button:hover, .more-actions a:hover { background: var(--hover); }
       .more-actions kbd { margin-left: 24px; color: var(--muted); }
-      #shortcut-list { padding: 8px 12px 8px 28px; font-size: 13px; line-height: 1.8; }
       .touch-action { display: none; }
       @media (pointer: coarse) { .touch-action { display: list-item; } }
 
@@ -481,6 +480,9 @@
       .help-topic { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; padding: 10px 0; border-top: 1px solid var(--border); }
       .help-topic pre { margin: 4px 0 0; font-size: 13px; color: var(--muted); white-space: pre-wrap; }
       .help-topic .btn { flex: none; }
+      #shortcut-list .help-topic { display: block; }
+      #shortcut-list ul { margin: 4px 0 0; padding-inline-start: 20px; font-size: 13px; line-height: 1.8; }
+      #shortcut-list kbd { color: var(--muted); white-space: nowrap; }
       .help-note { font-size: 12px; color: var(--muted); }
       .total-bar { padding-left: max(16px, calc((100% - 1040px) / 2)); padding-right: max(16px, calc((100% - 1040px) / 2)); }
       @media (min-width: 700px) {
@@ -576,12 +578,43 @@
 :foo * 2</pre></div><button type="button" class="btn" data-example="3">Try it</button></section><section class="help-topic"><div><h3>Escaping</h3><p>An apostrophe keeps a number out of the sum.</p><pre># quickhelp escaping
 Order &#x27;123
 12</pre></div><button type="button" class="btn" data-example="4">Try it</button></section><section class="help-topic"><div><h3>Errors</h3><p>? marks a line that cannot be calculated; it does not count.</p><pre># quickhelp errors
-12 / 0</pre></div><button type="button" class="btn" data-example="5">Try it</button></section><p class="help-note">Try it opens the example as a new sheet.</p><form method="dialog"><button class="btn">Close</button></form></dialog><dialog id="shortcuts-dialog" aria-labelledby="shortcuts-title"><h2 id="shortcuts-title">Keyboard shortcuts</h2><ul id="shortcut-list">
-                <li>F1 — Toggle quick help</li><li>F2 / Ctrl+/ — Toggle keyboard shortcuts</li><li>Alt+B / Ctrl+B — Saved sheets</li><li>Alt+↑ / Alt+↓ — Previous / next sheet</li><li>Delete — Delete focused saved sheet</li><li>Alt+N — New sheet</li>
-                <li>Enter — Next / new line</li><li>Ctrl+Enter — Insert below</li>
-                <li>Ctrl+Shift+Enter — Insert above</li><li>Ctrl+Delete — Remove line</li>
-                <li>↑ / ↓ — Move between lines</li><li>Escape — Close menu / drawer / newest message</li>
-              </ul><form method="dialog"><button class="btn">Close</button></form></dialog>
+12 / 0</pre></div><button type="button" class="btn" data-example="5">Try it</button></section><p class="help-note">Try it opens the example as a new sheet.</p><form method="dialog"><button class="btn">Close</button></form></dialog>
+    <dialog id="shortcuts-dialog" aria-labelledby="shortcuts-title">
+      <h2 id="shortcuts-title">Keyboard shortcuts</h2>
+      <div id="shortcut-list">
+        <section class="help-topic">
+          <h3>Help</h3>
+          <ul>
+            <li><kbd>F1</kbd> — Toggle quick help</li>
+            <li><kbd>F2</kbd> / <kbd>Ctrl+/</kbd> — Toggle keyboard shortcuts</li>
+            <li><kbd>Escape</kbd> — Close menu / drawer / newest message</li>
+          </ul>
+        </section>
+        <section class="help-topic">
+          <h3>Saved sheets</h3>
+          <ul>
+            <li><kbd>Alt+B</kbd> / <kbd>Ctrl+B</kbd> — Toggle saved sheets</li>
+            <li><kbd>Alt+↑</kbd> / <kbd>Alt+↓</kbd> — Open previous / next sheet</li>
+            <li><kbd>Alt+N</kbd> — New sheet</li>
+            <li><kbd>↑</kbd> / <kbd>↓</kbd> — Move focus in the list without wrapping</li>
+            <li><kbd>Enter</kbd> — Open the focused saved sheet</li>
+            <li><kbd>Delete</kbd> — Delete the focused saved sheet after confirmation</li>
+          </ul>
+        </section>
+        <section class="help-topic">
+          <h3>Sheet</h3>
+          <ul>
+            <li><kbd>Enter</kbd> — Move to the next line or add a new one at the end</li>
+            <li><kbd>Ctrl+Enter</kbd> — Insert below</li>
+            <li><kbd>Ctrl+Shift+Enter</kbd> — Insert above</li>
+            <li><kbd>Ctrl+Delete</kbd> — Remove line</li>
+            <li><kbd>↑</kbd> / <kbd>↓</kbd> — Move between lines</li>
+            <li><kbd>Alt+C</kbd> — Copy the total</li>
+          </ul>
+        </section>
+      </div>
+      <form method="dialog"><button class="btn">Close</button></form>
+    </dialog>
   </body>
 </html>
 

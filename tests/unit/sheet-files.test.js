@@ -57,8 +57,11 @@ function test(name, run) {
 test('export preserves sheet text and derives safe display filenames', () => {
     const lines = ['# Urlaub ä', '', ' Food 30 ', ''];
     assert.deepStrictEqual(sheet_export(lines), {
-        text: '# Urlaub ä\n\n Food 30 \n', filename: 'Urlaub ä.txt'
+        text: '# Urlaub ä\n\n Food 30 \n', filename: 'Urlaub_ä.txt'
     });
+    assert.strictEqual(sheet_export([':foo = 20']).filename, '_foo_=_20.txt');
+    assert.strictEqual(sheet_export(['# Trip\t\tBudget']).filename, 'Trip_Budget.txt');
+    assert.strictEqual(sheet_export(['# A  \u00a0 B. ']).filename, 'A_B.txt');
     assert.strictEqual(sheet_export(['## A/B\\C:D*E?F"G<H>I|J']).filename, 'A_B_C_D_E_F_G_H_I_J.txt');
     assert.strictEqual(sheet_export([]).filename, 'Untitled.txt');
     assert.strictEqual(sheet_export(['', '  ']).filename, 'Untitled.txt');
