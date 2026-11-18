@@ -1,5 +1,5 @@
 const assert = require('assert');
-const { JoLine } = require('../../jotsum.js');
+const { JoLine, evaluate_sheet } = require('../../jotsum.js');
 
 
 
@@ -118,15 +118,15 @@ function testCalculateWithContext() {
     joLine.calculate('5 :unknown 3', { vars: new Map([['auto', 120]]) }, unknown_report);
     assert.strictEqual(unknown_report.error && unknown_report.error.code, 'unknown-variable', `Expected unknown-variable, but got ${JSON.stringify(unknown_report.error)}`);
 
-    // Underscores are part of a name, which is what :SUBTOTAL_1 relies on.
-    const underscore_name = joLine.calculate(':SUBTOTAL_1 + 1', { vars: new Map([['SUBTOTAL_1', 300]]) });
+    // Underscores and digits are valid in a variable name.
+    const underscore_name = joLine.calculate(':total_1 + 1', { vars: new Map([['total_1', 300]]) });
     assert.strictEqual(underscore_name, 301, `Expected 301, but got ${underscore_name}`);
 
     // A dash is never part of a name - it is always the operator, with nothing
     // left to guess about.
     const dash_cases = [
-        { expression: ':SUBTOTAL_1-50', vars: [['SUBTOTAL_1', 300]], expected: 250 },
-        { expression: ':SUBTOTAL_1-50 + 5', vars: [['SUBTOTAL_1', 300]], expected: 255 },
+        { expression: ':total-50', vars: [['total', 300]], expected: 250 },
+        { expression: ':total-50 + 5', vars: [['total', 300]], expected: 255 },
         { expression: ':a- 5', vars: [['a', 7]], expected: 2 },
         { expression: ':a -5', vars: [['a', 7]], expected: 2 },
         { expression: ':a-:b', vars: [['a', 7], ['b', 5]], expected: 2 },
@@ -256,6 +256,44 @@ function testErrorReports() {
     console.log('All error report tests passed!');
 }
 
+function testPreviousResult() {
+    function check(lines, sums, total) {
+        const result = evaluate_sheet(lines);
+        assert.deepStrictEqual(result.errors, Array(lines.length).fill(null));
+        assert.deepStrictEqual(result.sums, sums);
+        assert.strictEqual(result.total, total);
+    }
+
+    assert.strictEqual(evaluate_sheet([':PREV']).errors[0].message, 'No line above with a result');
+    check(['12', '', '# Heading 50', 'Notes', "Order '123", ':PREV'], [12, 0, 0, 0, 0, 12], 24);
+    check(['12', '8', '---', 'VAT :PREV * 0.19'], [12, 8, 20, 3.8], 23.8);
+    check([':foo = 5', ':PREV'], [5, 5], 5);
+    check(['12', '5 - 5', ':PREV'], [12, 0, 0], 12);
+    check(['12', ':PREV * 2', ':PREV + 1'], [12, 24, 25], 61);
+    check(['60', ':prev-50', '(:Prev) + :pReV'], [60, 10, 20], 90);
+    check(['12', '8', '---', ':sub = :PREV', '5', ':sub'], [12, 8, 20, 20, 5, 20], 45);
+    const big = '1' + '0'.repeat(308);
+    assert.strictEqual(evaluate_sheet([big, big, '---', ':PREV']).errors[3].message, 'The line above has an error');
+
+    const broken = evaluate_sheet(['12', '5 / 0', 'Notes', ':PREV', ':PREV']);
+    assert.deepStrictEqual(broken.errors.slice(3).map(error => error.message), [
+        'The line above has an error', 'The line above has an error',
+    ]);
+    assert.strictEqual(broken.total, 12);
+
+    for (const spelling of ['PREV', 'prev']) {
+        const result = evaluate_sheet([`:${spelling} = 5`, ':PREV']);
+        assert.deepStrictEqual(result.errors.map(error => error.message), [
+            ':PREV is reserved', 'The line above has an error',
+        ]);
+        assert.strictEqual(result.vars.size, 0);
+    }
+
+    const legacy = evaluate_sheet(['12', '---', ':SUBTOTAL_1']);
+    assert.strictEqual(legacy.errors[2].message, 'Unknown variable :SUBTOTAL_1');
+}
+
 testCalculate();
 testCalculateWithContext();
 testErrorReports();
+testPreviousResult();

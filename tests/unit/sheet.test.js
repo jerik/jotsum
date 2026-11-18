@@ -51,14 +51,11 @@ function testEvaluateSheet() {
         const result = evaluate_sheet(['A 100', 'B 200', '---', 'C 50', '---']);
         assert.deepStrictEqual(result.sums, [100, 200, 300, 50, 50]);
         assert.strictEqual(result.total, 350);
-        assert.strictEqual(result.vars.get('SUBTOTAL_1'), 300);
-        assert.strictEqual(result.vars.get('SUBTOTAL_2'), 50);
     }
 
-    // 4) :SUBTOTAL_1 kann wie jede andere Variable in einer spaeteren Zeile
-    // benutzt werden.
+    // 4) :PREV references the subtotal immediately above it.
     {
-        const result = evaluate_sheet(['A 100', '---', 'VAT :SUBTOTAL_1 * 0.19']);
+        const result = evaluate_sheet(['A 100', '---', 'VAT :PREV * 0.19']);
         assert.strictEqual(result.sums[2], 19);
         assert.strictEqual(result.total, 119);
     }
@@ -76,10 +73,10 @@ function testEvaluateSheet() {
             '---',
         ]);
         assert.strictEqual(result.total, 170);
+        assert.strictEqual(result.sums[2], 100);
+        assert.strictEqual(result.sums[6], 70);
         assert.strictEqual(result.vars.get('fee'), 5);
         assert.strictEqual(result.vars.get('note'), 999);
-        assert.strictEqual(result.vars.get('SUBTOTAL_1'), 100);
-        assert.strictEqual(result.vars.get('SUBTOTAL_2'), 70);
     }
 
     // 6) Eine Variable kann in der Definition einer anderen Variable benutzt
@@ -105,7 +102,7 @@ function testEvaluateSheet() {
 
         const result = evaluate_sheet([
             'A 100', '  # Rechnung 2024  ', '## (2+3) (4+5) :unknown', 'B 50', '---',
-            'VAT :SUBTOTAL_1 * 0.2', '###### Year 2025', '---',
+            'VAT :PREV * 0.2', '###### Year 2025', '---',
         ]);
         assert.deepStrictEqual(result.types, [
             'value', 'heading', 'heading', 'value', 'separator', 'value', 'heading', 'separator',
@@ -113,8 +110,6 @@ function testEvaluateSheet() {
         assert.deepStrictEqual(result.sums, [100, 0, 0, 50, 150, 30, 0, 30]);
         assert.deepStrictEqual(result.errors, Array(8).fill(null));
         assert.strictEqual(result.total, 180);
-        assert.strictEqual(result.vars.get('SUBTOTAL_1'), 150);
-        assert.strictEqual(result.vars.get('SUBTOTAL_2'), 30);
     }
 
     console.log('All evaluate_sheet tests passed!');

@@ -53,7 +53,7 @@ function fixture(search = '') {
     assert.ok((await encode_shared_sheet(['x'])).startsWith('1u.'));
     assert.ok((await encode_shared_sheet(['abc'.repeat(1024)])).startsWith('1d.'));
 
-    const lines = ['Rent 1200', '', 'Food 300', '<img src=x onerror=alert()>'];
+    const lines = ['Rent 1200', '', 'Food 300', '---', 'VAT :PREV * 0.19', '<img src=x onerror=alert()>'];
     const encoded = await encode_shared_sheet(lines);
     window.localStorage.reset();
     window.sessionStorage.reset();
@@ -63,7 +63,8 @@ function fixture(search = '') {
     const page = fixture('#s=' + encoded);
     await window.onload();
     assert.deepStrictEqual(page.texts(), lines);
-    assert.strictEqual(page.total.textContent, 1500);
+    assert.strictEqual(page.total.textContent, 1785);
+    assert.strictEqual(page.sheet.querySelectorAll()[4].nextElementSibling.textContent, 285);
     assert.strictEqual(JSON.stringify(window.localStorage.data), before);
     assert.strictEqual(JSON.stringify(window.sessionStorage.data), sessionBefore);
     assert.strictEqual(page.notices.messages.children.some(n => n.children[1].textContent === 'Shared sheet · not saved here'), true);

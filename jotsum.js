@@ -1000,7 +1000,7 @@ class JoLine extends HTMLElement {
     // A dash is part of a word (e-mail, make-love-not-war) when a letter sits
     // next to it. Exception: directly after a variable reference the letter on
     // the left belongs to the variable name, so only the right side counts -
-    // that keeps ":SUBTOTAL_1-50" and ":a- 5" working as subtractions.
+    // that keeps ":total-50" and ":a- 5" working as subtractions.
     is_dash_in_word(expression, i, variable_end) {
         const next_is_letter = expression[i+1] && expression[i+1].match(/[a-zA-Z]/);
         if (i === variable_end) {
@@ -1082,7 +1082,7 @@ class JoLine extends HTMLElement {
                 } else if (char === ':' && !/[0-9]/.test(expression[i+1] || '')) {
                     // Variable reference. Names are letters, digits and
                     // underscores - deliberately no dash, because a dash is an
-                    // operator and ":SUBTOTAL_1-50" has to be a subtraction
+                    // operator and ":total-50" has to be a subtraction
                     // with nothing left to guess. A name never starts with a
                     // digit, so in "Price:100" the ':' is just punctuation.
                     let j = i + 1;
@@ -1095,7 +1095,17 @@ class JoLine extends HTMLElement {
                     const vars = context && context.vars;
                     const taken = name.length;
 
-                    if (vars && vars.has(name)) {
+                    if (name.toUpperCase() === 'PREV') {
+                        const previous = context && context.previous;
+                        if (!previous) {
+                            this._set_error(report, 'no-previous-result', 'No line above with a result');
+                        } else if (previous.error) {
+                            this._set_error(report, 'previous-line-error', 'The line above has an error');
+                        } else {
+                            tokens.push(previous.value);
+                            has_operand = true;
+                        }
+                    } else if (vars && vars.has(name)) {
                         tokens.push(vars.get(name));
                         has_operand = true;
                     } else {
@@ -1377,7 +1387,7 @@ function classify_line(text) {
 }
 
 function evaluate_sheet(lines) {
-    const context = { vars: new Map(), block_sum: 0, subtotal_index: 0 };
+    const context = { vars: new Map(), block_sum: 0, previous: null };
     const sums = new Array(lines.length);
     const types = new Array(lines.length);
     const errors = new Array(lines.length);
@@ -1399,10 +1409,11 @@ function evaluate_sheet(lines) {
         } else if (classified.type === 'separator') {
             // Nothing gets parsed for a separator, so it can never be errorous.
             errors[i] = null;
-            context.subtotal_index++;
-            context.vars.set('SUBTOTAL_' + context.subtotal_index, context.block_sum);
             sums[i] = context.block_sum;
             context.block_sum = 0;
+        } else if (classified.type === 'definition' && classified.name.toUpperCase() === 'PREV') {
+            sums[i] = 0;
+            errors[i] = { code: 'reserved-variable', message: ':PREV is reserved' };
         } else if (classified.type === 'definition') {
             const report = {};
             const wert = JoLine.prototype.calculate.call(JoLine.prototype, classified.expr, context, report);
@@ -1433,6 +1444,11 @@ function evaluate_sheet(lines) {
                 counted[i] = JoLine.prototype.tokenize.call(JoLine.prototype, text, context)
                     .some(token => typeof token === 'number');
             }
+        }
+
+        if (errors[i] || counted[i] || classified.type === 'definition' || classified.type === 'separator') {
+            // An overflowing subtotal (Infinity) must not pass on as a silent 0.
+            context.previous = { value: sums[i], error: errors[i] || !isFinite(sums[i]) };
         }
     }
 
@@ -1718,7 +1734,7 @@ function handle_sheet_list_keys(event) {
     }
 }
 
-const HELP_EXAMPLES = ['(18 + 4) * 2 / 4 - 1', '# Shopping\n12\n8', '12\n8\n---\n5', ':foo = 18 + 4\n:foo * 2', "Order '123\n12", '12 / 0'].map((text, index) => '# quickhelp ' + ['operators', 'headings', 'subtotals', 'variables', 'escaping', 'errors'][index] + '\n' + text);
+const HELP_EXAMPLES = ['(18 + 4) * 2 / 4 - 1', '# Shopping\n12\n8', '12\n8\n---\nVAT :PREV * 0.19', ':foo = 18 + 4\n:foo * 2', "Order '123\n12", '12 / 0'].map((text, index) => '# quickhelp ' + ['operators', 'headings', 'subtotals', 'variables', 'escaping', 'errors'][index] + '\n' + text);
 function open_help_dialog(id) {
     const dialog = ui_element(id);
     if (!dialog) return;
