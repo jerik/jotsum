@@ -664,11 +664,12 @@ const MAX_IMPORT_BYTES = 256 * 1024;
 const MAX_IMPORT_LINES = 2000;
 
 function sheet_export(lines) {
-    const name = sheet_name(lines).replace(/[<>:"/\\|?*\x00-\x1f\x7f]/g, '_')
+    // Collapse whitespace first so a tab run becomes one '_' like a space run.
+    const name = sheet_name(lines).replace(/\s+/g, ' ').replace(/[<>:"/\\|?*\x00-\x1f\x7f]/g, '_')
         .replace(/[. ]+$/, '') || 'Untitled';
     // Windows device names are reserved even with a .txt extension.
     const safe_name = /^(con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\.|$)/i.test(name) ? '_' + name : name;
-    return { text: lines.join('\n'), filename: safe_name + '.txt' };
+    return { text: lines.join('\n'), filename: safe_name.replace(/\s+/g, '_') + '.txt' };
 }
 
 function export_sheet() {
@@ -1791,6 +1792,22 @@ function init_header_menu() {
     });
 }
 
+async function copy_total() {
+    const total = ui_element('total');
+    if (total.classList.contains('is-placeholder')) {
+        show_message({ text: 'No total to copy.' });
+        return;
+    }
+    const value = total.textContent;
+    try {
+        await window.navigator.clipboard.writeText(value);
+    } catch (error) {
+        show_message({ tone: 'error', text: 'Could not copy the total.' });
+        return;
+    }
+    show_message({ tone: 'success', text: `Total copied: ${value}` });
+}
+
 function handle_header_keys(event) {
     if (event.isComposing) return;
     if (event.key === 'F1' || event.key === 'F2' || (event.ctrlKey && !event.altKey && !event.metaKey && (event.key === '/' || event.key === '?'))) {
@@ -1821,6 +1838,9 @@ function handle_header_keys(event) {
     } else if (event.altKey && !event.ctrlKey && key === 'n') {
         event.preventDefault();
         new_sheet_from_header();
+    } else if (event.altKey && !event.ctrlKey && (key === 'c' || event.code === 'KeyC')) {
+        event.preventDefault();
+        copy_total();
     }
 }
 

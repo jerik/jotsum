@@ -165,7 +165,7 @@ URL input preserves blank lines (including an empty `?text=`) and is decoded onc
 
 **Shared fragment.** `#s=1d.<base64url>` contains UTF-8 text compressed with deflate-raw; `#s=1u.<base64url>` contains uncompressed UTF-8 when that is shorter. Base64url has no padding. Lines are joined with `\n`. Opening a fragment previews and calculates the sheet without saving; **Save to my sheets** (or editing) creates a new shortsave. Invalid links, encoded parts over 64 KB, decoded text over 256 KB, and more than 2000 lines are rejected.
 
-**Text files.** Use **Export .txt** in the header’s **⋯** menu to download the open sheet as UTF-8 `.txt`, named after its display name with unsafe filename characters replaced. Use **Import .txt…** in that menu to choose a `.txt` file, or drop one onto the sheet. Each import opens a new shortsave and leaves existing sheets unchanged. Windows line endings are normalized; blank lines are preserved. Files larger than 256 KiB (262,144 bytes) or 2000 lines are rejected with a notice.
+**Text files.** Use **Export .txt** in the header’s **⋯** menu to download the open sheet as UTF-8 `.txt`, named after its display name with unsafe filename characters replaced by underscores and each remaining run of whitespace replaced by a single underscore. Use **Import .txt…** in that menu to choose a `.txt` file, or drop one onto the sheet. Each import opens a new shortsave and leaves existing sheets unchanged. Windows line endings are normalized; blank lines are preserved. Files larger than 256 KiB (262,144 bytes) or 2000 lines are rejected with a notice.
 
 **Offline.** Saving the page stores one self-contained HTML file, including the script, so it runs without a connection.
 
@@ -256,6 +256,7 @@ continued typing dismisses the notice; a failed save leaves it visible.
 | `Ctrl + Shift + Enter` | Insert a new line above the current one |
 | `Ctrl + Delete` | Remove the current line |
 | `↑` / `↓` | Move between lines |
+| `Alt + C` | Copy the displayed total |
 
 ---
 

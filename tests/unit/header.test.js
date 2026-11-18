@@ -12,6 +12,9 @@ assert.doesNotMatch(header, /Add line|id="add-line"/);
 assert.match(html, /<title>jotsum<\/title>/);
 assert.strictEqual([...html.matchAll(/id="total"/g)].length, 1);
 assert.match(html, /class="total-bar"[\s\S]*id="total"/);
+const shortcutList = html.match(/<div id="shortcut-list">([\s\S]*?)<\/div>/)[1];
+assert.deepStrictEqual([...shortcutList.matchAll(/<h3>([^<]+)<\/h3>\s*<ul>/g)].map(m => m[1]),
+    ['Help', 'Saved sheets', 'Sheet']);
 assert.doesNotMatch(header, /Open shared link/);
 assert.match(header, /href="https:\/\/github.com\/jerik\/jotsum"/);
 for (const button of visible.matchAll(/<button[^>]*>/g)) {
@@ -27,11 +30,10 @@ window.location = new URL('https://example.test/');
 window.history = { replaceState: (_a, _b, url) => { window.location = new URL(url); } };
 const ids = ['sidebar', 'drawer-toggle', 'shortsave-list', 'shortsave-empty', 'sidebar-title', 'new-sheet',
     'content', 'header-actions', 'drawer-backdrop', 'more-actions', 'more-toggle', 'add-line',
-    'quick-help', 'quick-help-dialog', 'shortcuts-dialog', 'pin-sidebar', 'sheet-count', 'keyboard-shortcuts', 'shortcut-list', 'current-sheet-name', 'total', 'total-position', 'sidebar-new-sheet', 'decimals-toggle', 'messages'];
+    'quick-help', 'quick-help-dialog', 'shortcuts-dialog', 'pin-sidebar', 'sheet-count', 'keyboard-shortcuts', 'current-sheet-name', 'total', 'total-position', 'sidebar-new-sheet', 'decimals-toggle', 'messages'];
 const nodes = Object.fromEntries(ids.map(id => [id, mockUiElement(id.endsWith('-dialog') ? 'dialog' : 'div')]));
 for (const [id, node] of Object.entries(nodes)) node.id = id;
 nodes['more-actions'].hidden = true;
-nodes['shortcut-list'].hidden = true;
 nodes.sidebar.appendChild(nodes['sidebar-title']);
 nodes['add-line'].tagName = 'BUTTON';
 nodes['more-actions'].appendChild(nodes['add-line']);
@@ -274,4 +276,46 @@ assert.strictEqual(previewApi.TOTAL_POSITION_STORAGE_KEY, 'jotsum.preview.layout
 previewApi.toggle_total_position();
 assert.strictEqual(window.localStorage.getItem(previewApi.TOTAL_POSITION_STORAGE_KEY), 'top');
 assert.strictEqual(window.localStorage.getItem(api.TOTAL_POSITION_STORAGE_KEY), 'bottom');
-console.log('App header, sidebar, help and keyboard checks passed!');
+(async () => {
+    const writes = [];
+    window.navigator.clipboard.writeText = async value => { writes.push(value); };
+    const messages = nodes.messages;
+    const lastMessage = () => messages.children[messages.children.length - 1];
+    const alt = { altKey: true };
+
+    api.new_sheet();
+    assert.ok(nodes.total.classList.contains('is-placeholder'));
+    assert.ok(key('c', alt).prevented);
+    assert.strictEqual(lastMessage().className, 'message message-info');
+    assert.strictEqual(lastMessage().children[1].textContent, 'No total to copy.');
+    assert.deepStrictEqual(writes, []);
+    key('Escape');
+
+    api.import_sheet_text('12.125\n8');
+    // The browser exposes the rendered total as a string.
+    const displayed = String(nodes.total.textContent);
+    nodes.total.textContent = displayed;
+    for (const modifier of ['ctrlKey', 'metaKey', 'shiftKey']) {
+        assert.ok(!key('c', { ...alt, [modifier]: true }).prevented);
+    }
+    for (const dialogKey of ['F1', 'F2']) {
+        key(dialogKey);
+        assert.ok(!key('c', alt).prevented);
+        key(dialogKey);
+    }
+    assert.deepStrictEqual(writes, []);
+
+    assert.ok(key('ç', { ...alt, code: 'KeyC' }).prevented);
+    await Promise.resolve();
+    assert.deepStrictEqual(writes, [displayed]);
+    assert.strictEqual(lastMessage().className, 'message message-success');
+    assert.strictEqual(lastMessage().children[1].textContent, 'Total copied: ' + displayed);
+    key('Escape');
+
+    window.navigator.clipboard.writeText = async () => { throw new Error('Clipboard unavailable'); };
+    assert.ok(key('c', alt).prevented);
+    await Promise.resolve();
+    assert.strictEqual(lastMessage().className, 'message message-error');
+    assert.strictEqual(lastMessage().children[1].textContent, 'Could not copy the total.');
+    console.log('App header, sidebar, help and keyboard checks passed!');
+})().catch(error => { console.error(error); process.exitCode = 1; });
