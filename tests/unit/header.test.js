@@ -4,7 +4,7 @@ const html = fs.readFileSync(require('path').join(__dirname, '../../jotsum.html'
 const header = html.match(/<header\b[\s\S]*?<\/header>/)[0];
 const visible = header.slice(0, header.indexOf('<ul id="more-actions"'));
 assert.deepStrictEqual([...visible.matchAll(/<button[^>]*id="([^"]+)"/g)].map(m => m[1]),
-    ['drawer-toggle', 'header-total', 'new-sheet', 'share-sheet', 'more-toggle']);
+    ['drawer-toggle', 'new-sheet', 'share-sheet', 'more-toggle']);
 assert.doesNotMatch(visible, /class="brand"|class="action-label"/);
 assert.doesNotMatch(visible, /Add line/);
 for (const entry of ['Import .txt…', 'Export .txt', 'Quick help', 'Keyboard shortcuts', 'About / GitHub']) assert.ok(header.includes(entry));
@@ -33,9 +33,21 @@ window.location = new URL('https://example.test/');
 window.history = { replaceState: (_a, _b, url) => { window.location = new URL(url); } };
 const ids = ['sidebar', 'drawer-toggle', 'shortsave-list', 'shortsave-empty', 'sidebar-title', 'new-sheet',
     'content', 'header-actions', 'drawer-backdrop', 'more-actions', 'more-toggle', 'add-line',
-    'quick-help', 'quick-help-dialog', 'shortcuts-dialog', 'pin-sidebar', 'sheet-count', 'keyboard-shortcuts', 'current-sheet-name', 'total', 'header-total', 'header-total-value', 'sidebar-new-sheet', 'decimals-toggle', 'messages'];
+    'quick-help', 'quick-help-dialog', 'shortcuts-dialog', 'pin-sidebar', 'sheet-count', 'keyboard-shortcuts', 'current-sheet-name', 'total', 'top-total-row', 'receipt-total-row', 'total-position', 'sidebar-new-sheet', 'decimals-toggle', 'messages'];
 const nodes = Object.fromEntries(ids.map(id => [id, mockUiElement(id.endsWith('-dialog') ? 'dialog' : 'div')]));
 for (const [id, node] of Object.entries(nodes)) node.id = id;
+const topRow = nodes['top-total-row'];
+const receiptRow = nodes['receipt-total-row'];
+const totalPosition = nodes['total-position'];
+for (const row of [topRow, receiptRow]) {
+    const append = row.appendChild;
+    row.appendChild = child => {
+        if (child.parentElement) child.parentElement.removeChild(child);
+        return append(child);
+    };
+}
+receiptRow.appendChild(nodes.total);
+receiptRow.appendChild(totalPosition);
 nodes['more-actions'].hidden = true;
 nodes.sidebar.appendChild(nodes['sidebar-title']);
 nodes['add-line'].tagName = 'BUTTON';
@@ -257,6 +269,23 @@ assert.strictEqual(String(heading.nextElementSibling.textContent), '0');
 assert.deepStrictEqual(api.evaluate_sheet(['# Heading 100', '5', '---']).sums, [0, 5, 5]);
 assert.strictEqual(api.evaluate_sheet(['# Heading 100', '5', '---']).total, 5);
 assert.strictEqual(api.evaluate_sheet(['# Heading 100']).counted[0], false);
+assert.strictEqual(nodes.total.parentElement, receiptRow);
+assert.ok(topRow.hidden);
+assert.strictEqual(totalPosition.getAttribute('aria-label'), 'Move total to top');
+totalPosition.emit('click');
+assert.deepStrictEqual(topRow.children, [nodes.total, totalPosition]);
+assert.ok(receiptRow.hidden);
+assert.ok(document.body.classList.contains('total-top'));
+assert.strictEqual(totalPosition.getAttribute('aria-label'), 'Move total to bottom');
+assert.strictEqual(window.localStorage.getItem(api.TOTAL_POSITION_STORAGE_KEY), 'top');
+document.body.classList.remove('total-top');
+api.load_total_position();
+assert.ok(document.body.classList.contains('total-top'));
+totalPosition.emit('click');
+assert.deepStrictEqual(receiptRow.children, [nodes.total, totalPosition]);
+assert.ok(topRow.hidden);
+assert.ok(!document.body.classList.contains('total-top'));
+assert.strictEqual(window.localStorage.getItem(api.TOTAL_POSITION_STORAGE_KEY), 'bottom');
 api.save_store(Array.from({ length: 100 }, (_, i) => ({ id: 'badge-' + i, lines: ['1'] })));
 api.render_shortsave_list();
 assert.strictEqual(nodes['sheet-count'].textContent, '99+');
@@ -265,6 +294,7 @@ window.location = new URL('https://example.test/preview/layout-b1/');
 delete require.cache[require.resolve('../../jotsum.js')];
 const previewApi = require('../../jotsum.js');
 assert.strictEqual(previewApi.SIDEBAR_STORAGE_KEY, 'jotsum.preview.layout-b1.sidebar-pinned');
+assert.strictEqual(previewApi.TOTAL_POSITION_STORAGE_KEY, 'jotsum.preview.layout-b1.total-position');
 (async () => {
     const writes = [];
     window.navigator.clipboard.writeText = async value => { writes.push(value); };
@@ -274,8 +304,6 @@ assert.strictEqual(previewApi.SIDEBAR_STORAGE_KEY, 'jotsum.preview.layout-b1.sid
 
     api.new_sheet();
     assert.ok(nodes.total.classList.contains('is-placeholder'));
-    assert.strictEqual(nodes['header-total-value'].textContent, '—');
-    assert.ok(nodes['header-total-value'].classList.contains('is-placeholder'));
     assert.ok(key('c', alt).prevented);
     assert.strictEqual(lastMessage().className, 'message message-info');
     assert.strictEqual(lastMessage().children[1].textContent, 'No total to copy.');
@@ -285,8 +313,6 @@ assert.strictEqual(previewApi.SIDEBAR_STORAGE_KEY, 'jotsum.preview.layout-b1.sid
     api.import_sheet_text('12.125\n8');
     // The browser exposes the rendered total as a string.
     const displayed = String(nodes.total.textContent);
-    assert.strictEqual(String(nodes['header-total-value'].textContent), displayed);
-    assert.ok(!nodes['header-total-value'].classList.contains('is-placeholder'));
     nodes.total.textContent = displayed;
     for (const modifier of ['ctrlKey', 'metaKey', 'shiftKey']) {
         assert.ok(!key('c', { ...alt, [modifier]: true }).prevented);
@@ -305,7 +331,8 @@ assert.strictEqual(previewApi.SIDEBAR_STORAGE_KEY, 'jotsum.preview.layout-b1.sid
     assert.strictEqual(lastMessage().children[1].textContent, 'Total copied: ' + displayed);
     key('Escape');
 
-    nodes['header-total'].emit('click');
+    totalPosition.emit('click');
+    assert.ok(key('c', alt).prevented);
     await Promise.resolve();
     assert.deepStrictEqual(writes, [displayed, displayed]);
     key('Escape');

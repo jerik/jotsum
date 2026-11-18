@@ -416,25 +416,29 @@ test('total aligns with the sheet at every layout width and sidebar position', a
       await page.evaluate(pinned => {
         document.body.classList.toggle('sidebar-pinned', pinned && matchMedia('(min-width: 700px)').matches);
       }, pinned);
-      const edges = await page.evaluate(() => {
-        const rect = selector => document.querySelector(selector).getBoundingClientRect();
-        return {
-          label: rect('.total-row > span').left,
-          sheetLeft: rect('.content').left,
-          sheetRight: rect('.content').right,
-          sheetWidth: rect('.content').width,
-          total: rect('#total').right,
-          result: rect('jo-sum').right,
-          toggle: rect('#drawer-toggle').left,
-          actions: rect('#more-toggle').right
-        };
-      });
-      expect(Math.abs(edges.label - edges.sheetLeft)).toBeLessThanOrEqual(1);
-      expect(Math.abs(edges.total - edges.result)).toBeLessThanOrEqual(1);
-      if (width >= 1400) {
-        expect(edges.sheetWidth).toBeLessThanOrEqual(760);
-        expect(Math.abs(edges.toggle - edges.sheetLeft)).toBeLessThanOrEqual(1);
-        expect(Math.abs(edges.actions - edges.sheetRight)).toBeLessThanOrEqual(1);
+      for (const row of ['#receipt-total-row', '#top-total-row']) {
+        await expect(page.locator(row).locator('#total')).toBeVisible();
+        const edges = await page.evaluate(() => {
+          const rect = selector => document.querySelector(selector).getBoundingClientRect();
+          return {
+            label: rect('.total-row:not([hidden]) > span').left,
+            sheetLeft: rect('.content').left,
+            sheetRight: rect('.content').right,
+            sheetWidth: rect('.content').width,
+            total: rect('#total').right,
+            result: rect('jo-sum').right,
+            toggle: rect('#drawer-toggle').left,
+            actions: rect('#more-toggle').right
+          };
+        });
+        expect(Math.abs(edges.label - edges.sheetLeft)).toBeLessThanOrEqual(1);
+        expect(Math.abs(edges.total - edges.result)).toBeLessThanOrEqual(1);
+        if (width >= 1400) {
+          expect(edges.sheetWidth).toBeLessThanOrEqual(760);
+          expect(Math.abs(edges.toggle - edges.sheetLeft)).toBeLessThanOrEqual(1);
+          expect(Math.abs(edges.actions - edges.sheetRight)).toBeLessThanOrEqual(1);
+        }
+        await page.locator('#total-position').click();
       }
     }
   }
@@ -444,7 +448,7 @@ test('the receipt total follows the last line on a short sheet', async ({ page }
   await page.setViewportSize({ width: 1400, height: 900 });
   await page.goto('/jotsum.html?text=' + encodeURIComponent('12\n8'));
   await expect(page.locator('#total')).toHaveText('20');
-  const gap = await page.locator('.total-row').evaluate(row =>
+  const gap = await page.locator('#receipt-total-row').evaluate(row =>
     row.getBoundingClientRect().top - document.querySelector('jo-line:last-of-type').getBoundingClientRect().bottom
   );
   expect(gap).toBeGreaterThanOrEqual(0);
@@ -455,7 +459,7 @@ test('the receipt total stays in view on a long sheet', async ({ page }) => {
   await page.setViewportSize({ width: 875, height: 600 });
   await page.goto('/jotsum.html?text=' + encodeURIComponent(Array(60).fill('1').join('\n')));
   const lines = page.locator('jo-line');
-  const row = page.locator('.total-row');
+  const row = page.locator('#receipt-total-row');
   await expect(lines).toHaveCount(60);
   await lines.first().focus();
   await expect(lines.first()).toBeFocused();
@@ -471,14 +475,42 @@ test('the receipt total stays in view on a long sheet', async ({ page }) => {
   expect(gap).toBeLessThanOrEqual(1);
 });
 
-test('the header total stays visible on a phone and copies the displayed value', async ({ page, context }) => {
+test('the total switches rows and remembers its position on reload', async ({ page }) => {
   await page.setViewportSize({ width: 400, height: 600 });
-  await context.grantPermissions(['clipboard-read', 'clipboard-write']);
-  await page.goto('/jotsum.html?text=' + encodeURIComponent('# A long sheet name for a narrow window\n12\n8'));
-  const headerTotal = page.getByRole('button', { name: 'Copy total' });
-  await expect(headerTotal).toHaveText('Σ 20');
-  await expect(headerTotal).toBeInViewport({ ratio: 1 });
-  await headerTotal.click();
-  await expect(page.getByText('Total copied: 20', { exact: true })).toBeVisible();
-  expect(await page.evaluate(() => navigator.clipboard.readText())).toBe('20');
+  await page.goto('/jotsum.html?text=' + encodeURIComponent('1234\n8'));
+  const header = page.locator('.site-header');
+  const receipt = page.locator('#receipt-total-row');
+  const top = page.locator('#top-total-row');
+  const total = page.locator('#total');
+  const arrow = page.locator('#total-position');
+
+  await expect(receipt.locator('#total')).toBeVisible();
+  await expect(total).toHaveText('1242');
+  await expect(top).toBeHidden();
+  await expect(header).not.toContainText('1242');
+  await expect(arrow).toHaveAccessibleName('Move total to top');
+
+  await arrow.click();
+  await expect(receipt).toBeHidden();
+  await expect(top.locator('#total')).toBeVisible();
+  await expect(total).toHaveText('1242');
+  await expect(header).not.toContainText('1242');
+  await expect(arrow).toHaveAccessibleName('Move total to bottom');
+  const gap = await top.evaluate(row =>
+    row.getBoundingClientRect().top - document.querySelector('.site-header').getBoundingClientRect().bottom
+  );
+  expect(Math.abs(gap)).toBeLessThanOrEqual(1);
+
+  await page.reload();
+  await expect(top.locator('#total')).toBeVisible();
+  await expect(receipt).toBeHidden();
+
+  await arrow.click();
+  await expect(receipt.locator('#total')).toBeVisible();
+  await expect(top).toBeHidden();
+  await expect(arrow).toHaveAccessibleName('Move total to top');
+
+  await page.reload();
+  await expect(receipt.locator('#total')).toBeVisible();
+  await expect(top).toBeHidden();
 });
